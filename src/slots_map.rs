@@ -1,4 +1,4 @@
-use std::{sync::{Arc, Mutex, MutexGuard}, thread};
+use std::{array, sync::{Arc, RwLock}, thread};
 
 use chrono::Timelike;
 use rand::seq::IndexedRandom;
@@ -7,7 +7,7 @@ use crate::{common::{types::*, constants::*, utils::*}, slot::Slot};
 
 
 pub struct SlotsMap {
-    slots: Arc<Vec<Mutex<Slot>>>,
+    pub slots: Arc<RwLock<[Slot; 2*SLOTS_PER_MINUTE as usize]>>,
     mmsi: u32
 }
 
@@ -15,16 +15,11 @@ pub struct SlotsMap {
 impl SlotsMap {
     pub fn init(mmsi: u32) -> Self {
         let slots_map: Self = Self {
-            slots: Arc::new(
-            (0..2*SLOTS_PER_MINUTE)
-                .map(|i| {
-                    Mutex::new(Slot::init(i))
-                }).collect::<Vec<Mutex<Slot>>>()
-            ),
+            slots: Arc::new(RwLock::new(array::from_fn(|i: usize| Slot::init(i as u16)))),
             mmsi: mmsi
         };
 
-        let slots_cleanup_clone: Arc<Vec<Mutex<Slot>>> = Arc::clone(&slots_map.slots);
+        let slots_cleanup_clone: Arc<RwLock<[Slot; 4500]>> = Arc::clone(&slots_map.slots);
 
         thread::spawn(move || {
             let mut last_update_minute: u32 = get_current_datetime().minute();
@@ -33,8 +28,7 @@ impl SlotsMap {
                 if get_current_datetime().minute() != last_update_minute {
                     last_update_minute = get_current_datetime().minute();
 
-                    for slot_mutex in slots_cleanup_clone.iter() {
-                        let mut slot: MutexGuard<'_, Slot> = slot_mutex.lock().unwrap();
+                    for slot in slots_cleanup_clone.write().unwrap().iter_mut() {
                         match slot.frames_since_last_use {
                             -2 => {
                                 if !slot.is_free() {
@@ -53,42 +47,37 @@ impl SlotsMap {
     }
 
 
-    pub fn slot_mutex(&self, si: u16) -> &Mutex<Slot> {
-        &self.slots[si as usize]
-    }
-
-
     pub fn use_slot(&self, si: u16) -> () {
-        self.slot_mutex(si).lock().unwrap().tick();
+        self.slots.write().unwrap()[si as usize].tick();
     }
 
 
     pub fn mark_slot_as_used(&self, si: u16) -> () {
-        self.slot_mutex(si).lock().unwrap().mark_as_used();
+        self.slots.write().unwrap()[si as usize].mark_as_used();
     }
 
 
     pub fn slot_owner(&self, si: u16) -> u32 {
-        self.slot_mutex(si).lock().unwrap().owner
+        self.slots.read().unwrap()[si as usize].owner
     }
 
     pub fn slot_timeout(&self, si: u16) -> i16 {
-        self.slot_mutex(si).lock().unwrap().timeout
+        self.slots.read().unwrap()[si as usize].timeout
     }
 
 
     pub fn slot_channel(&self, si: u16) -> Channel {
-        self.slot_mutex(si).lock().unwrap().channel
+        self.slots.read().unwrap()[si as usize].channel
     }
 
 
     pub fn is_slot_free(&self, si: u16) -> bool {
-        self.slot_mutex(si).lock().unwrap().is_free()
+        self.slots.read().unwrap()[si as usize].is_free()
     }
 
 
     pub fn is_slot_expired(&self, si: u16) -> bool {
-        self.slot_mutex(si).lock().unwrap().frames_since_last_use > 2
+        self.slots.read().unwrap()[si as usize].frames_since_last_use > 2
     }
 
 
@@ -98,12 +87,12 @@ impl SlotsMap {
 
 
     pub fn book_slot(&self, si: u16, mmsi: u32, timeout: Option<i16>, assigned: Option<bool>) -> () {
-        self.slot_mutex(si).lock().unwrap().book(mmsi, timeout.unwrap_or(-1), assigned.unwrap_or(false));
+        self.slots.write().unwrap()[si as usize].book(mmsi, timeout.unwrap_or(-1), assigned.unwrap_or(false));
     }
 
 
     pub fn release_slot(&self, si: u16) -> () {
-        self.slot_mutex(si).lock().unwrap().release();
+        self.slots.write().unwrap()[si as usize].release();
     }
 
 
@@ -165,9 +154,9 @@ impl SlotsMap {
         let channel: Channel = channel.unwrap_or(Channel::Any);
 
         match channel {
-            Channel::Any => (0..self.slots.len() as u16).filter(|si: &u16| self.is_slot_free(*si)).collect(),
-            Channel::C87B => (0..self.slots.len() as u16).filter(|si: &u16| self.is_slot_free(*si) && matches!(self.slot_channel(*si), Channel::C87B)).collect(),
-            Channel::C88B => (0..self.slots.len() as u16).filter(|si: &u16| self.is_slot_free(*si) && matches!(self.slot_channel(*si), Channel::C88B)).collect(),
+            Channel::Any => (0..2*SLOTS_PER_MINUTE).filter(|si: &u16| self.is_slot_free(*si)).collect(),
+            Channel::C87B => (0..2*SLOTS_PER_MINUTE).filter(|si: &u16| self.is_slot_free(*si) && matches!(self.slot_channel(*si), Channel::C87B)).collect(),
+            Channel::C88B => (0..2*SLOTS_PER_MINUTE).filter(|si: &u16| self.is_slot_free(*si) && matches!(self.slot_channel(*si), Channel::C88B)).collect(),
             _ => {Box::new([])}
         }
     }
@@ -198,8 +187,8 @@ impl SlotsMap {
                 }
             },
             Channel::Any => {
-                let c_87_b_slots_range = self.slots_idx_range(ref_si, end_si, Channel::C87B);
-                let c_88_b_slots_range = self.slots_idx_range(ref_si, end_si, Channel::C88B);
+                let c_87_b_slots_range: Box<[u16]> = self.slots_idx_range(ref_si, end_si, Channel::C87B);
+                let c_88_b_slots_range: Box<[u16]> = self.slots_idx_range(ref_si, end_si, Channel::C88B);
                 let available_87_b_slots: Box<[u16]> = self.extract_available_slots_idx(c_87_b_slots_range);
                 let available_88_b_slots: Box<[u16]> = self.extract_available_slots_idx(c_88_b_slots_range);
                 let is_87_b_selection_feasible: bool = available_87_b_slots.len() >= 4.max(slots_count as usize);

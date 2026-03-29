@@ -156,7 +156,7 @@ impl AisRunner {
                     if t_s_owner == 0 && cs_timeout > 0 {
                         slots_map.book_slot(t_s, self_mmsi, Some(cs_timeout as i16), None);
                     } else if t_s_timeout == -1 || cs_timeout > 0 {
-                        slots_map.slot_mutex(t_s).lock().unwrap().timeout = cs_timeout as i16;
+                        slots_map.slots.write().unwrap()[t_s as usize].timeout = cs_timeout as i16;
                     } else if t_s_timeout == -1 || cs_timeout == 0 {
                         slots_map.release_slot(t_s);
                     }
@@ -455,7 +455,7 @@ impl AisRunner {
                 log("Lancement de la phase continue SOTDMA.".yellow());
 
                 loop {
-                    let last_msg5_timestamp = self.state.last_msg5_timestamp();
+                    let last_msg5_timestamp: i64 = self.state.last_msg5_timestamp();
                     if last_msg5_timestamp == -1 || get_timestamp(None) - last_msg5_timestamp >= 356 {
                         self.state.set_last_msg5_timestamp(get_timestamp(None));
                         self.sotdma_continuous(5);

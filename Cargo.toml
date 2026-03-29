@@ -1,0 +1,15 @@
+[package]
+name = "ProjetBateauRust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.43"
+colored = "3.1.1"
+crc = "3.4.0"
+dashmap = "6.1.0"
+local-ip-address = "0.6.10"
+rand = "0.9.2"
+
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"

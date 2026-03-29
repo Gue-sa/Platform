@@ -1,0 +1,12 @@
+* Refactor ce qui a été marqué
+* Implémenter des Result partout où on peut
+* Vérifier que les Result gèrent bien les erreurs
+* Remplacer les .unwrap() et !panic()
+* Gestion des erreurs
+* Remplacer les threads par du tokio
+* faire de la mutabilité intérieure
+* mpsc avec les antennes
+* condvar + clock thread
+* refactor le systeme de messages qui est DEGUEULASSE
+* changement de rr
+* mettre les fields en privé

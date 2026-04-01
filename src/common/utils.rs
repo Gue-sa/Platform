@@ -26,7 +26,7 @@ pub fn pad_left(bits: &str, target_size: usize) -> String {
 }
 
 
-pub fn uint_to_bits<T: Binary>(nbr: T, bits_size: Option<usize>) -> String {
+pub fn uint_to_bits<T: Binary>(nbr: &T, bits_size: Option<usize>) -> String {
     let bits_size: usize = bits_size.unwrap_or(0);
 
     if bits_size == 0 {
@@ -116,5 +116,5 @@ pub fn datetime_to_slots_idx(datetime: Option<DateTime<Local>>) -> [u16; 2] {
 
 pub fn log(msg: ColoredString) -> () {
     let slots: [u16; 2] = datetime_to_slots_idx(None);
-    println!("[{}, {}] : {}\n", slots[0], slots[1], msg);
+    println!("[{}, {}] : {}", slots[0], slots[1], msg);
 }

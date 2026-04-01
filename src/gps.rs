@@ -6,10 +6,10 @@ use crate::{boat_info::BoatInfo, common::{constants::BOAT_IP, utils::log}};
 
 
 pub struct Gps {
-    pub boat_info: Arc<BoatInfo>,
+    boat_info: Arc<BoatInfo>,
     rx: Mutex<Receiver<String>>,
-    pub tx: Sender<String>,
-    pub antenna_tx: Sender<String>
+    tx: Sender<String>,
+    antenna_tx: Sender<String>
 }
 
 
@@ -33,8 +33,7 @@ impl Gps {
                         let latitude: u32 = parts.next().unwrap().parse().unwrap();
                         let longitude: u32 = parts.next().unwrap().parse().unwrap();
                         
-                        self.boat_info.set_latitude(Some(latitude));
-                        self.boat_info.set_longitude(Some(longitude));
+                        self.boat_info.update_positon(Some(latitude), Some(longitude));
 
                         log(format!("Position mise à jour depuis le GPS : {}", msg).white().italic());
                     }  

@@ -1,7 +1,7 @@
 use crate::common::utils::*;
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Channel {
     C87B,
     C88B,

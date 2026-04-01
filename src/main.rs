@@ -15,8 +15,8 @@ mod display;
 
 fn main() {
     let boat: Boat = Boat::init();
+    
     boat.start();
-    loop {
-        
-    }
+
+    loop{}
 }

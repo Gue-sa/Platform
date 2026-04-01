@@ -30,16 +30,16 @@ pub struct AisState {
 
 pub struct AisRunner {
     state: AisState,
-    pub ais_tx: Sender<Packet>,
+    ais_tx: Sender<Packet>,
     ais_rx: Mutex<Receiver<Packet>>,
-    pub c_87_b_tx: Sender<String>,
-    pub c_88_b_tx: Sender<String>
+    c_87_b_tx: Sender<String>,
+    c_88_b_tx: Sender<String>
 }
 
 
 impl AisState {
     pub fn init(boat_info: Arc<BoatInfo>, boats_registry: Arc<RwLock<BoatsInfoRegistry>>) -> Self {
-        let mmsi: u32 = boat_info.mmsi();
+        let mmsi: u32 = boat_info.get_static_data().mmsi;
 
         Self {
             boat_info: boat_info,
@@ -129,8 +129,8 @@ impl AisRunner {
     pub fn handle_transmission(&self, msg: &str, channel: Channel) -> () {
         let t_s: u16 = SlotsMap::current_slot_number(channel);
         let (msg_type, _, communication_state, _, boat_info) = Message::parse(msg).unwrap();
-        let boat_mmsi: u32 = boat_info.mmsi();
-        let self_mmsi: u32 = self.state.boat_info().mmsi();
+        let boat_mmsi: u32 = boat_info.get_static_data().mmsi;
+        let self_mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
         
         if boat_mmsi != self_mmsi && IMPLEMENTED_MSGS.binary_search(&msg_type).is_ok() {
             if self.state.boats_registry().is_registered(&boat_mmsi) {
@@ -140,11 +140,11 @@ impl AisRunner {
             }
 
             let slots_map: &SlotsMap = self.state.slots_map();
-            let t_s_owner: u32 = slots_map.slot_owner(t_s);
-            let t_s_timeout: i16 = slots_map.slot_timeout(t_s);
+            let t_s_owner: Option<u32> = slots_map.slot_owner(t_s);
+            let t_s_timeout: Option<u8> = slots_map.slot_timeout(t_s);
 
-            if t_s_owner == 0 || t_s_owner == self_mmsi {
-                if t_s_timeout != -1 {
+            if t_s_owner.is_none() || t_s_owner == Some(self_mmsi) {
+                if t_s_timeout.is_some() {
                     slots_map.use_slot(t_s);
                 } else {
                     slots_map.mark_slot_as_used(t_s);
@@ -153,11 +153,11 @@ impl AisRunner {
                 if [1, 2].binary_search(&msg_type).is_ok() {
                     let cs_timeout: u8 = communication_state.clone().unwrap().slot_timeout().unwrap();
                     
-                    if t_s_owner == 0 && cs_timeout > 0 {
-                        slots_map.book_slot(t_s, self_mmsi, Some(cs_timeout as i16), None);
-                    } else if t_s_timeout == -1 || cs_timeout > 0 {
-                        slots_map.slots.write().unwrap()[t_s as usize].timeout = cs_timeout as i16;
-                    } else if t_s_timeout == -1 || cs_timeout == 0 {
+                    if t_s_owner.is_none() && cs_timeout > 0 {
+                        slots_map.book_slot(t_s, self_mmsi, Some(cs_timeout), None);
+                    } else if t_s_timeout.is_none() || cs_timeout > 0 {
+                        slots_map.slots.write().unwrap()[t_s as usize].timeout = Some(cs_timeout);
+                    } else if t_s_timeout == Some(0) || cs_timeout == 0 {
                         slots_map.release_slot(t_s);
                     }
 
@@ -165,7 +165,7 @@ impl AisRunner {
                         let cs_offset: u16 = communication_state.clone().unwrap().slot_offset().unwrap();
                         let rsv_s: u16 = SlotsMap::offseted_slot(t_s, cs_offset);
 
-                        slots_map.book_slot(rsv_s, boat_mmsi, Some(cs_timeout as i16), None);
+                        slots_map.book_slot(rsv_s, boat_mmsi, Some(cs_timeout), None);
                         slots_map.release_slot(t_s);
                     }
                 } else if msg_type == 3 {
@@ -174,7 +174,7 @@ impl AisRunner {
 
                     if cs_keep_flag == false {
                         slots_map.release_slot(t_s);
-                    } else if slots_map.slot_owner(t_s) == 0 && cs_keep_flag {
+                    } else if slots_map.slot_owner(t_s).is_none() && cs_keep_flag {
                         slots_map.book_slot(t_s, boat_mmsi, None, None);
                     }
 
@@ -240,8 +240,8 @@ impl AisRunner {
         let tmo_max: u8 = self.state.tmo_max();
 
         let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max) as u8;
-        let mmsi: u32 = self.state.boat_info().mmsi();
-        self.state.slots_map().book_slot(next_nts, mmsi, Some(timeout as i16), Some(false));
+        let mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
+        self.state.slots_map().book_slot(next_nts, mmsi, Some(timeout), Some(false));
         
         next_nts
     }
@@ -269,10 +269,11 @@ impl AisRunner {
 
         let sync_state: u8 = self.state.sync_state();
         let nts: u16 = self.state.nts().unwrap();
-        let timeout: i16 = self.state.slots_map().slot_timeout(nts);
+
+        let timeout: Option<u8> = self.state.slots_map().slot_timeout(nts);
         let recv_stations: u8 = self.state.recv_stations();
 
-        let com_state: Option<CommunicationState> = if NO_CS_MSGS.binary_search(&msg_type).is_err() {Some(CommunicationState::init(msg_type, Some(sync_state), Some(timeout as u8), offset, Some(nts), Some(recv_stations), offset, slots_nbr, keep_flag))} else {None};
+        let com_state: Option<CommunicationState> = if NO_CS_MSGS.binary_search(&msg_type).is_err() {Some(CommunicationState::init(msg_type, Some(sync_state), timeout, offset, Some(nts), Some(recv_stations), offset, slots_nbr, keep_flag))} else {None};
 
         let msg: Message = Message::init(None, Some(self.state.boat_info().as_ref().clone()), Some(msg_type), com_state).unwrap();
         
@@ -373,32 +374,35 @@ impl AisRunner {
     }
 
 
-    pub fn sotdma_continuous(&self, msg_type: u8) -> () {
-        if self.get_next_nts().is_err() {
-            self.state.increase_t_counter();
-            self.set_next_ns();
-            let next_nts: u16 = self.set_next_nts();
-            let nts: u16 = self.state.nts().unwrap();
-            let offset: u16 = SlotsMap::slot_offset(Some(next_nts), nts);
-
-            log(format!("NTS manquant détecté. Réservation du NTS {} pour le remplacer.", next_nts).yellow());
-
-            self.wait_for_nts();
-            self.itdma(nts, 3, offset, 1, true);
-            self.state.set_nts(Some(next_nts));
-        } else if NO_CS_MSGS.binary_search(&msg_type).is_ok() {
+    pub fn sotdma_continuous(&self, msg_type: u8) -> () { // A refactor !
+        if NO_CS_MSGS.binary_search(&msg_type).is_ok() {
             self.wait_for_nts();
             self.send(msg_type, None, None, None);
             let nts: u16 = self.state.nts().unwrap();
             self.state.slots_map().use_slot(nts);
             self.state.increase_t_counter();
             self.set_next_ns();
-            let next_nts: u16 = self.get_next_nts().unwrap();
-            self.state.set_nts(Some(next_nts));
+            
+            match self.get_next_nts() {
+                Ok(next_nts) => self.state.set_nts(Some(next_nts)),
+                Err(e) => {
+                    self.state.increase_t_counter();
+                    self.set_next_ns();
+                    let next_nts: u16 = self.set_next_nts();
+                    let nts: u16 = self.state.nts().unwrap();
+                    let offset: u16 = SlotsMap::slot_offset(Some(next_nts), nts);
+
+                    log(format!("NTS manquant détecté. Réservation du NTS {} pour le remplacer.", next_nts).yellow());
+
+                    self.wait_for_nts();
+                    self.itdma(nts, 3, offset, 1, true);
+                    self.state.set_nts(Some(next_nts));
+                }
+            }
         } else if SOTDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
             self.wait_for_nts();
             let nts: u16 = self.state.nts().unwrap();
-            if self.state.slots_map().slot_timeout(nts) == 0 {
+            if self.state.slots_map().slot_timeout(nts) == Some(0) {
                 let nts_channel: Channel = if nts < SLOTS_PER_MINUTE {Channel::C87B} else {Channel::C88B};
                 let ns: u16 = self.state.ns().unwrap();
                 let si: u16 = self.state.si();
@@ -419,16 +423,31 @@ impl AisRunner {
                 let tmo_min: u8 = self.state.tmo_min();
                 let tmo_max: u8 = self.state.tmo_max();
                 let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max);
-                let mmsi: u32 = self.state.boat_info().mmsi();
-                self.state.slots_map().book_slot(new_nts, mmsi, Some(timeout as i16), None);
+                let mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
+                self.state.slots_map().book_slot(new_nts, mmsi, Some(timeout), None);
             } else {
                 self.send(msg_type, None, None, None);
                 let nts: u16 = self.state.nts().unwrap();
                 self.state.slots_map().use_slot(nts);
                 self.state.increase_t_counter();
                 self.set_next_ns();
-                let next_nts: u16 = self.get_next_nts().unwrap();
-                self.state.set_nts(Some(next_nts));
+
+                match self.get_next_nts() {
+                    Ok(next_nts) => self.state.set_nts(Some(next_nts)),
+                    Err(e) => {
+                        self.state.increase_t_counter();
+                        self.set_next_ns();
+                        let next_nts: u16 = self.set_next_nts();
+                        let nts: u16 = self.state.nts().unwrap();
+                        let offset: u16 = SlotsMap::slot_offset(Some(next_nts), nts);
+
+                        log(format!("NTS manquant détecté. Réservation du NTS {} pour le remplacer.", next_nts).yellow());
+
+                        self.wait_for_nts();
+                        self.itdma(nts, 3, offset, 1, true);
+                        self.state.set_nts(Some(next_nts));
+                    }
+                }
             }
         }
     }

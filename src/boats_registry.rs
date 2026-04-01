@@ -1,5 +1,3 @@
-use std::{collections::HashMap, sync::{Mutex, MutexGuard}};
-
 use dashmap::{DashMap, mapref::one::Ref};
 
 use crate::boat_info::BoatInfo;
@@ -19,7 +17,7 @@ impl BoatsInfoRegistry {
 
 
     pub fn register(&mut self, info: BoatInfo) -> () {
-        self.registry.insert(info.mmsi(), info);
+        self.registry.insert(info.get_static_data().mmsi, info);
     }
 
 
@@ -34,7 +32,7 @@ impl BoatsInfoRegistry {
 
 
     pub fn update(&mut self, new_boat_info: BoatInfo) -> () {
-        let mmsi: u32 = new_boat_info.mmsi();
+        let mmsi: u32 = new_boat_info.get_static_data().mmsi;
         if self.is_registered(&mmsi) {
             self.registry.insert(mmsi, new_boat_info);
         }

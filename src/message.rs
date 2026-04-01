@@ -3,7 +3,7 @@ use std::sync::{RwLock, atomic::AtomicU32};
 use chrono::Timelike;
 use crc::{CRC_16_IBM_SDLC, Crc};
 
-use crate::{boat_info::BoatInfo, common::{types::*, utils::*}, impl_option_access};
+use crate::{boat_info::{BoatInfo, NavigationData, StaticData, VoyageData}, common::{types::*, utils::*}, impl_option_access};
 
 
 #[derive(Clone, Debug)]
@@ -247,13 +247,13 @@ impl CommunicationState {
 
     pub fn build_sub_message(&self) -> Result<String, &'static str> {
         if (self.slot_timeout.unwrap() == 3 || self.slot_timeout.unwrap() == 5 || self.slot_timeout.unwrap() == 7) && self.received_stations.is_some() {
-            Ok(uint_to_bits(self.received_stations.unwrap(), Some(14)))
+            Ok(uint_to_bits(&self.received_stations.unwrap(), Some(14)))
         } else if (self.slot_timeout.unwrap() == 2 || self.slot_timeout.unwrap() == 4 || self.slot_timeout.unwrap() == 6) && self.slot_number.is_some() {
-            Ok(uint_to_bits(self.slot_number.unwrap(), Some(14)))
+            Ok(uint_to_bits(&self.slot_number.unwrap(), Some(14)))
         } else if self.slot_timeout.unwrap() == 1 {
-            Ok(String::from("000") + &uint_to_bits(get_current_datetime().hour(), Some(5)) + &uint_to_bits(get_current_datetime().minute(), Some(6)))
+            Ok(String::from("000") + &uint_to_bits(&get_current_datetime().hour(), Some(5)) + &uint_to_bits(&get_current_datetime().minute(), Some(6)))
         } else if self.slot_timeout.unwrap() == 0 && self.slot_offset.is_some() {
-            Ok(uint_to_bits(self.slot_offset.unwrap(), Some(14)))
+            Ok(uint_to_bits(&self.slot_offset.unwrap(), Some(14)))
         } else {
             Err("Combinaison d'arguments incohérente.")
         }
@@ -264,14 +264,14 @@ impl CommunicationState {
         match self.cstype {
             CSTypes::SOTDMA => {
                 if self.slot_timeout.is_some() && (self.slot_offset.is_some() || (self.utc_hour.is_some() && self.utc_minute.is_some()) || self.slot_number.is_some() || self.received_stations.is_some())  {
-                    Ok(uint_to_bits(self.sync_state, Some(2)) + &uint_to_bits(self.slot_timeout.unwrap(), Some(3)) + &self.build_sub_message().unwrap())
+                    Ok(uint_to_bits(&self.sync_state, Some(2)) + &uint_to_bits(&self.slot_timeout.unwrap(), Some(3)) + &self.build_sub_message().unwrap())
                 } else {
                     Err("Combinaison d'attributs incohérente.")
                 }
             },
             CSTypes::ITDMA => {
                 if self.slot_increment.is_some() && self.number_of_slots.is_some() && self.keep_flag.is_some() {
-                    Ok(uint_to_bits(self.sync_state, Some(2)) + &uint_to_bits(self.slot_increment.unwrap(), Some(13)) + &uint_to_bits(self.number_of_slots.unwrap(), Some(3)) + &uint_to_bits(if self.keep_flag.unwrap() {1} else {0}, Some(1)))
+                    Ok(uint_to_bits(&self.sync_state, Some(2)) + &uint_to_bits(&self.slot_increment.unwrap(), Some(13)) + &uint_to_bits(&self.number_of_slots.unwrap(), Some(3)) + &uint_to_bits(if self.keep_flag.unwrap() {&1} else {&0}, Some(1)))
                 } else {
                     Err("Combinaison d'attributs incohérente.")
                 }
@@ -359,9 +359,9 @@ impl Message {
 
     pub fn build_payload(msg_type: u8, data: &str, communication_state: Option<CommunicationState>) -> String {
         if communication_state.is_none() {
-            String::from(uint_to_bits(msg_type, Some(6)) + "11" + data)
+            String::from(uint_to_bits(&msg_type, Some(6)) + "11" + data)
         } else {
-            String::from(uint_to_bits(msg_type, Some(6)) + "11" + data + &communication_state.unwrap().build().unwrap())
+            String::from(uint_to_bits(&msg_type, Some(6)) + "11" + data + &communication_state.unwrap().build().unwrap())
         }
     }
 
@@ -384,38 +384,42 @@ impl Message {
                 let computed_crc: String = Message::compute_crc_string(payload); // ATTENTION ! A remplacer après le POC car ici, calcule le checksum de la string représentant le binaire et pas le binaire directement
 
                 if msg_crc == computed_crc {
-                    let boat_info: BoatInfo = BoatInfo {
-                        mmsi: AtomicU32::new(u32::from_str_radix(&data[0..30], 2).unwrap()),
-                        imo_number: RwLock::new(None),
-                        call_sign: RwLock::new(None),
-                        name: RwLock::new(None),
-                        type_of_ship_and_cargo_type: RwLock::new(None),
-                        position_accuracy: RwLock::new(Some(u8::from_str_radix(&data[52..53], 2).unwrap())),
-                        ais_version: RwLock::new(None),
-                        type_of_epf_device: RwLock::new(None),
-                        a: RwLock::new(None),
-                        b: RwLock::new(None),
-                        c: RwLock::new(None),
-                        d: RwLock::new(None),
-                        destination: RwLock::new(None),
-                        navigational_status: RwLock::new(Some(u8::from_str_radix(&data[30..34], 2).unwrap())),
-                        time_stamp: RwLock::new(Some(u8::from_str_radix(&data[129..135], 2).unwrap())),
-                        eta_month: RwLock::new(None),
-                        eta_day: RwLock::new(None),
-                        eta_hour: RwLock::new(None),
-                        eta_minute: RwLock::new(None),
-                        maximum_present_static_draught: RwLock::new(None),
-                        dte: RwLock::new(None),
-                        spare: RwLock::new(Some(u8::from_str_radix(&data[137..140], 2).unwrap())),
-                        special_maneuvre_indicator: RwLock::new(Some(u8::from_str_radix(&data[135..137], 2).unwrap())),
-                        raim_flag: RwLock::new(Some(u8::from_str_radix(&data[140..141], 2).unwrap())),
-                        latitude: RwLock::new(Some(u32::from_str_radix(&data[53..81], 2).unwrap())),
-                        longitude: RwLock::new(Some(u32::from_str_radix(&data[81..108], 2).unwrap())),
-                        course_over_ground: RwLock::new(Some(u16::from_str_radix(&data[108..120], 2).unwrap())),
-                        speed_over_ground: RwLock::new(Some(u16::from_str_radix(&data[42..52], 2).unwrap())),
-                        rate_of_turn: RwLock::new(Some(u8::from_str_radix(&data[34..42], 2).unwrap())),
-                        true_heading: RwLock::new(Some(u16::from_str_radix(&data[120..129], 2).unwrap()))
-                    };
+                    let static_data: StaticData = StaticData::init(
+                        Some(u32::from_str_radix(&data[0..30], 2).unwrap()),
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(u8::from_str_radix(&data[52..53], 2).unwrap()),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None);
+
+                    let voyage_data: VoyageData = VoyageData::init(
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(u8::from_str_radix(&data[140..141], 2).unwrap()));
+                    
+                    let navigation_data: NavigationData = NavigationData::init(
+                        Some(u8::from_str_radix(&data[30..34], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[129..135], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[135..137], 2).unwrap()),
+                        Some(u32::from_str_radix(&data[53..81], 2).unwrap()),
+                        Some(u32::from_str_radix(&data[81..108], 2).unwrap()),
+                        Some(u16::from_str_radix(&data[108..120], 2).unwrap()),
+                        Some(u16::from_str_radix(&data[42..52], 2).unwrap()),
+                        Some(i8::from_str_radix(&data[34..42], 2).unwrap()),
+                        Some(u16::from_str_radix(&data[120..129], 2).unwrap()));
+                    
+                    let boat_info: BoatInfo = BoatInfo::init(Some(static_data), Some(voyage_data), Some(navigation_data));
 
                     Ok((msg_type, data, Some(communication_state), msg_crc, boat_info))
                 } else {
@@ -429,38 +433,31 @@ impl Message {
                 let computed_crc: String = Message::compute_crc_string(payload); // ATTENTION ! A remplacer après le POC car ici, calcule le checksum de la string représentant le binaire et pas le binaire directement
             
                 if msg_crc == computed_crc {
-                    let boat_info: BoatInfo = BoatInfo {
-                        mmsi: AtomicU32::new(u32::from_str_radix(&data[0..30], 2).unwrap()),
-                        imo_number:RwLock::new(Some(u32::from_str_radix(&data[32..62], 2).unwrap())),
-                        call_sign:RwLock::new(Some(bits_to_string(&data[62..104]))),
-                        name:RwLock::new(Some(bits_to_string(&data[104..224]))),
-                        type_of_ship_and_cargo_type:RwLock::new(Some(u8::from_str_radix(&data[224..232], 2).unwrap())),
-                        position_accuracy:RwLock::new(None),
-                        ais_version:RwLock::new(Some(u8::from_str_radix(&data[30..32], 2).unwrap())),
-                        type_of_epf_device:RwLock::new(Some(u8::from_str_radix(&data[262..266], 2).unwrap())),
-                        a:RwLock::new(Some(u16::from_str_radix(&data[232..241], 2).unwrap())),
-                        b:RwLock::new(Some(u16::from_str_radix(&data[241..250], 2).unwrap())),
-                        c:RwLock::new(Some(u8::from_str_radix(&data[250..256], 2).unwrap())),
-                        d:RwLock::new(Some(u8::from_str_radix(&data[256..262], 2).unwrap())),
-                        destination:RwLock::new(Some(bits_to_string(&data[294..414]))),
-                        navigational_status:RwLock::new(None),
-                        time_stamp:RwLock::new(None),
-                        eta_month:RwLock::new(Some(u8::from_str_radix(&data[282..286], 2).unwrap())),
-                        eta_day:RwLock::new(Some(u8::from_str_radix(&data[277..282], 2).unwrap())),
-                        eta_hour:RwLock::new(Some(u8::from_str_radix(&data[272..277], 2).unwrap())),
-                        eta_minute:RwLock::new(Some(u8::from_str_radix(&data[266..272], 2).unwrap())),
-                        maximum_present_static_draught:RwLock::new(Some(u8::from_str_radix(&data[286..294], 2).unwrap())),
-                        dte:RwLock::new(Some(u8::from_str_radix(&data[414..415], 2).unwrap())),
-                        spare:RwLock::new(Some(u8::from_str_radix(&data[415..416], 2).unwrap())),
-                        special_maneuvre_indicator:RwLock::new(None),
-                        raim_flag:RwLock::new(None),
-                        latitude:RwLock::new(None),
-                        longitude:RwLock::new(None),
-                        course_over_ground:RwLock::new(None),
-                        speed_over_ground:RwLock::new(None),
-                        rate_of_turn:RwLock::new(None),
-                        true_heading:RwLock::new(None)
-                    };
+                    let static_data: StaticData = StaticData::init(
+                        Some(u32::from_str_radix(&data[0..30], 2).unwrap()),
+                        Some(u32::from_str_radix(&data[32..62], 2).unwrap()),
+                        Some(bits_to_string(&data[62..104])),
+                        Some(bits_to_string(&data[104..224])),
+                        Some(u8::from_str_radix(&data[224..232], 2).unwrap()),
+                        None,
+                        Some(u8::from_str_radix(&data[30..32], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[262..266], 2).unwrap()),
+                        Some(u16::from_str_radix(&data[232..241], 2).unwrap()),
+                        Some(u16::from_str_radix(&data[241..250], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[250..256], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[256..262], 2).unwrap()));
+
+                    let voyage_data: VoyageData = VoyageData::init(
+                        Some(bits_to_string(&data[294..414])),
+                        Some(u8::from_str_radix(&data[282..286], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[277..282], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[272..277], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[266..272], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[286..294], 2).unwrap()),
+                        Some(u8::from_str_radix(&data[414..415], 2).unwrap()),
+                        None);
+                    
+                    let boat_info: BoatInfo = BoatInfo::init(Some(static_data), Some(voyage_data), None);
 
                     Ok((msg_type, data, None, msg_crc, boat_info))
                 } else {

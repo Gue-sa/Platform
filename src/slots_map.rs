@@ -57,11 +57,11 @@ impl SlotsMap {
     }
 
 
-    pub fn slot_owner(&self, si: u16) -> u32 {
+    pub fn slot_owner(&self, si: u16) -> Option<u32> {
         self.slots.read().unwrap()[si as usize].owner
     }
 
-    pub fn slot_timeout(&self, si: u16) -> i16 {
+    pub fn slot_timeout(&self, si: u16) -> Option<u8> {
         self.slots.read().unwrap()[si as usize].timeout
     }
 
@@ -86,8 +86,8 @@ impl SlotsMap {
     }
 
 
-    pub fn book_slot(&self, si: u16, mmsi: u32, timeout: Option<i16>, assigned: Option<bool>) -> () {
-        self.slots.write().unwrap()[si as usize].book(mmsi, timeout.unwrap_or(-1), assigned.unwrap_or(false));
+    pub fn book_slot(&self, si: u16, mmsi: u32, timeout: Option<u8>, assigned: Option<bool>) -> () {
+        self.slots.write().unwrap()[si as usize].book(mmsi, timeout, assigned.unwrap_or(false));
     }
 
 
@@ -226,7 +226,7 @@ impl SlotsMap {
 
         let slots_range: Box<[u16]> = self.slots_idx_range(ref_si, end_si, channel);
 
-        let available_slots: Vec<u16> = slots_range.iter().filter(|idx: &&u16| self.slot_owner(**idx) == self.mmsi).copied().collect();
+        let available_slots: Vec<u16> = slots_range.iter().filter(|idx: &&u16| self.slot_owner(**idx) == Some(self.mmsi)).copied().collect();
 
         if available_slots.len() > 0 {
             Ok(available_slots.into_boxed_slice())

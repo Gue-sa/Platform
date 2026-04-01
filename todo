@@ -1,7 +1,7 @@
 * Refactor ce qui a été marqué
 * Implémenter des Result partout où on peut
 * Vérifier que les Result gèrent bien les erreurs
-* Remplacer les .unwrap() et !panic()
+* Remplacer les .unwrap() et !panic() par des ? et autres gestions d'erreurs correctes
 * Gestion des erreurs
 * Remplacer les threads par du tokio
 * faire de la mutabilité intérieure

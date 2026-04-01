@@ -240,6 +240,7 @@ impl AisRunner {
         let tmo_max: u8 = self.state.tmo_max();
 
         let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max) as u8;
+
         let mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
         self.state.slots_map().book_slot(next_nts, mmsi, Some(timeout), Some(false));
         
@@ -247,20 +248,14 @@ impl AisRunner {
     }
 
 
-    pub fn get_next_nts(&self) -> Result<u16, &'static str> {
+    pub fn get_next_nts(&self) -> Result<u16, String> {
         let next_ns: u16 = self.get_next_ns();
         let si: u16 = self.state.si();
-        let nts: u16 = self.state.nts().unwrap();
         let start_si: u16 = (next_ns + SLOTS_PER_MINUTE - si.div_euclid(2)) % SLOTS_PER_MINUTE;
-        let channel: Channel = if nts < SLOTS_PER_MINUTE {Channel::C87B} else {Channel::C88B};
 
-        let available_ss: Box<[u16]> = self.state.slots_map().scan_for_self_owned_slots(Some(si), Some(start_si), Channel::Any).unwrap();
+        let available_ss: Box<[u16]> = self.state.slots_map().scan_for_self_owned_slots(Some(si), Some(start_si), Channel::Any)?;
         
-        if available_ss.len() > 0 {
-            Ok(*available_ss.choose(&mut rand::rng()).unwrap())
-        } else {
-            Err("Aucun slot déjà réservé n'est disponible avec les paramètres sélectionnés.")
-        }
+        Ok(*available_ss.choose(&mut rand::rng()).unwrap())
     }
 
 
@@ -382,12 +377,10 @@ impl AisRunner {
             self.state.slots_map().use_slot(nts);
             self.state.increase_t_counter();
             self.set_next_ns();
-            
+
             match self.get_next_nts() {
                 Ok(next_nts) => self.state.set_nts(Some(next_nts)),
                 Err(e) => {
-                    self.state.increase_t_counter();
-                    self.set_next_ns();
                     let next_nts: u16 = self.set_next_nts();
                     let nts: u16 = self.state.nts().unwrap();
                     let offset: u16 = SlotsMap::slot_offset(Some(next_nts), nts);
@@ -418,13 +411,29 @@ impl AisRunner {
                 self.state.slots_map().use_slot(nts);
                 self.state.increase_t_counter();
                 self.set_next_ns();
-                let next_nts: u16 = self.get_next_nts().unwrap();
-                self.state.set_nts(Some(next_nts));
-                let tmo_min: u8 = self.state.tmo_min();
-                let tmo_max: u8 = self.state.tmo_max();
-                let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max);
-                let mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
-                self.state.slots_map().book_slot(new_nts, mmsi, Some(timeout), None);
+
+                match self.get_next_nts() {
+                    Ok(next_nts) => {
+                        self.state.set_nts(Some(next_nts));
+                        let tmo_min: u8 = self.state.tmo_min();
+                        let tmo_max: u8 = self.state.tmo_max();
+                        let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max);
+                        let mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
+                        self.state.slots_map().book_slot(new_nts, mmsi, Some(timeout), None);
+                    },
+                    Err(e) => {
+                        let next_nts: u16 = self.set_next_nts();
+
+                        log(format!("NTS manquant détecté. Réservation du NTS {} pour le remplacer.", next_nts).yellow());
+
+                        self.state.set_nts(Some(next_nts));
+                        let tmo_min: u8 = self.state.tmo_min();
+                        let tmo_max: u8 = self.state.tmo_max();
+                        let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max);
+                        let mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
+                        self.state.slots_map().book_slot(new_nts, mmsi, Some(timeout), None);
+                    }
+                }
             } else {
                 self.send(msg_type, None, None, None);
                 let nts: u16 = self.state.nts().unwrap();
@@ -435,8 +444,6 @@ impl AisRunner {
                 match self.get_next_nts() {
                     Ok(next_nts) => self.state.set_nts(Some(next_nts)),
                     Err(e) => {
-                        self.state.increase_t_counter();
-                        self.set_next_ns();
                         let next_nts: u16 = self.set_next_nts();
                         let nts: u16 = self.state.nts().unwrap();
                         let offset: u16 = SlotsMap::slot_offset(Some(next_nts), nts);

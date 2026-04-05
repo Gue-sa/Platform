@@ -20,13 +20,9 @@ fn main() {
 
     //loop{}
 
-    let boxe: Box<[u8]> = Box::<[u8]>::from([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 248, 164, 50, 235]);
-    //let mut heh1: BitPacker<String> = BitPacker::from_str("a", None).unwrap();
-    //let heh2: BitPacker<String> = BitPacker::from_str("a", None).unwrap();
-    //let heh: BitPacker<String> = BitPacker::<String>::parse_str(boxe).unwrap();
-    let mut heh1: BitPacker<u8> = BitPacker::from_int(1, None).unwrap();
-    let heh2: BitPacker<u8> = BitPacker::from_int(1, None).unwrap();
-    //let heh: BitPacker<i128> = BitPacker::parse_int(boxe).unwrap();
-    let _ = heh1.concat_int(heh2);
-    println!("{:?}", heh1);
+    let heh1: BitPacker = BitPacker::from_str("a", None).unwrap();
+    let heh2: BitPacker = BitPacker::from_str("a", None).unwrap();
+    let heh: BitPacker = heh1 + heh2;
+    
+    println!("{:?}", heh.extract_int::<i128>(None, None).unwrap());
 }

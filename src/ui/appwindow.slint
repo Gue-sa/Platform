@@ -1,0 +1,27 @@
+import { Button, VerticalBox, LineEdit } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    callback request-close();
+
+    in-out property<string> boat-name: "Nom du Navire";
+    in-out property<int> boat-mmsi: 0;
+    
+    width: 480px;
+    height: 320px;
+    title: "Tableau de Bord AIS";
+
+    VerticalBox {
+        Text {
+            text: root.boat-name;
+            font-size: 24px;
+            color: blue;
+        }
+        Text {
+            text: "MMSI : " + root.boat-mmsi;
+        }
+        Button {
+            text: "Quitter";
+            clicked => { root.request-close(); }
+        }
+    }
+}

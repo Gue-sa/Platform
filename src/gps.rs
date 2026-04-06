@@ -41,7 +41,7 @@ impl Gps {
                         log(format!("Position mise à jour depuis le GPS : {latitude} | {longitude}").white().italic());
                     },
                     _ = interval.tick() => {
-                        let _ = self.antenna_tx.send(BitPacker::from_str(&BOAT_IP.to_string(), None).unwrap());
+                        let _ = self.antenna_tx.send(BitPacker::from_str(&BOAT_IP.to_string(), None).unwrap()).await;
                     }
                 };
             }

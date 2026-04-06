@@ -43,6 +43,11 @@ impl Boat {
     }
 
 
+    pub fn info(&self) -> Arc<BoatInfo> {
+        self.boat_info.clone()
+    }
+
+
     pub async fn start(self) -> () {
         self.antenna_87_b.start().await;
         self.antenna_88_b.start().await;

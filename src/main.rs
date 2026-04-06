@@ -15,9 +15,7 @@ mod display;
 
 #[tokio::main]
 async fn main() {
-    let boat: Boat = Boat::init();
+    let boat: Boat = Boat::init().await;
     
-    boat.start();
-
-    loop{}
+    boat.start().await;
 }

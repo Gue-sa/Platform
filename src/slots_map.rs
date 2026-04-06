@@ -1,7 +1,7 @@
-use std::{array, sync::{Arc, RwLock}, thread};
+use std::{array, sync::{Arc, RwLock}, time::{SystemTime, UNIX_EPOCH}};
 
-use chrono::Timelike;
 use rand::seq::IndexedRandom;
+use tokio::time::{Duration, Instant, interval_at};
 
 use crate::{common::{types::*, constants::*, utils::*}, slot::Slot};
 
@@ -22,24 +22,29 @@ impl SlotsMap {
         let slots_cleanup_clone: Arc<RwLock<[Slot; 4500]>> = Arc::clone(&slots_map.slots);
 
         tokio::spawn(async move {
-            let mut last_update_minute: u32 = get_current_datetime().minute();
-
             loop {
-                if get_current_datetime().minute() != last_update_minute {
-                    last_update_minute = get_current_datetime().minute();
-
-                    for slot in slots_cleanup_clone.write().unwrap().iter_mut() {
-                        match slot.frames_since_last_use {
-                            -2 => {
-                                if !slot.is_free() {
-                                    slot.release();
-                                }
-                            },
-                            3 => slot.release(),
-                            _ => slot.frames_since_last_use += 1
-                        }
+                for slot in slots_cleanup_clone.write().unwrap().iter_mut() {
+                    match slot.frames_since_last_use {
+                        -2 => {
+                            if !slot.is_free() {
+                                slot.release();
+                            }
+                        },
+                        3 => slot.release(),
+                        _ => slot.frames_since_last_use += 1
                     }
                 }
+
+                let now_nanos: u128 = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos();
+
+                let nanos_until_next_minute: u128 = 60_000_000_000 - (now_nanos % 60_000_000_000);
+
+                let start_instant = Instant::now() + Duration::from_nanos(nanos_until_next_minute as u64);
+
+                let _ = interval_at(start_instant, Duration::from_secs(60)).tick().await;
             }
         });
 

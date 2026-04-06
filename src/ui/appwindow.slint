@@ -1,27 +1,82 @@
-import { Button, VerticalBox, LineEdit } from "std-widgets.slint";
+import { Button, VerticalBox, LineEdit, Palette, HorizontalBox } from "std-widgets.slint";
 
 export component AppWindow inherits Window {
     callback request-close();
 
-    in-out property<string> boat-name: "Nom du Navire";
+    in-out property<string> boat-name: "default";
     in-out property<int> boat-mmsi: 0;
+    in-out property <int> boat-imo: 0;
+    in-out property <string> boat-type: "default";
+    in-out property <int> boat-longitude: 0;
+    in-out property <int> boat-latitude: 0;
+    in-out property <int> boat-heading: 0;
+    in-out property <int> boat-speed: 0;
+    in-out property <int> boat-turn-rate: 0;
+    in-out property <string> boat-destination: "default";
+    in-out property <int> boat-eta-month: 12;
+    in-out property <int> boat-eta-day: 31;
+    in-out property <int> boat-eta-hour: 12;
+    in-out property <int> boat-eta-minute: 59;
     
     width: 480px;
     height: 320px;
-    title: "Tableau de Bord AIS";
+    title: "Tableau de Bord";
 
-    VerticalBox {
-        Text {
-            text: root.boat-name;
-            font-size: 24px;
-            color: blue;
+    background: white;
+
+    HorizontalBox {
+        VerticalBox {
+            Text {
+                text: "Nom :\n  " + boat-name;
+                color: black;
+            }
+
+            Text {
+                text: "MMSI :\n " + boat-mmsi;
+                color: black;
+            }
+
+            Text {
+                text: "IMO :\n  " + boat-imo;
+                color: black;
+            }
+
+            Text {
+                text: "Type de navire :\n   " + boat-type;
+                color: black;
+            }
         }
-        Text {
-            text: "MMSI : " + root.boat-mmsi;
-        }
-        Button {
-            text: "Quitter";
-            clicked => { root.request-close(); }
+
+        VerticalBox {
+            Text {
+                text: "Position :\n " + boat-latitude + " / " + boat-longitude;
+                color: black;
+            }
+
+            Text {
+                text: "Cap :\n  " + boat-heading + " °";
+                color: black;
+            }
+
+            Text {
+                text: "Vitesse :\n  " + boat-speed + " kt";
+                color: black;
+            }
+
+            Text {
+                text: "Taux de virage :\n   " + boat-turn-rate + " °/s";
+                color: black;
+            }
+
+            Text {
+                text: "Destination :\n  " + boat-destination;
+                color: black;
+            }
+
+            Text {
+                text: "ETA :\n  " + boat-eta-day + " / " + boat-eta-month + ", " + boat-eta-hour + " h " + boat-eta-minute + " min    ";
+                color: black;
+            }
         }
     }
 }

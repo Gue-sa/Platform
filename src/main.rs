@@ -53,8 +53,7 @@ async fn main() {
 
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_handle_clone.upgrade() {
-                    ui.set_boat_name(name.to_shared_string());
-                    ui.set_boat_mmsi(mmsi as i32);
+                    //ui.set_boat_mmsi(mmsi as i32);
                 }
             });
         }

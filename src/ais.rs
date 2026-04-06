@@ -3,7 +3,7 @@ use std::{sync::{Arc, Mutex, RwLock, atomic::{AtomicI64, AtomicU8, AtomicU16, At
 use colored::*;
 use rand::{Rng, seq::IndexedRandom};
 
-use crate::{antenna::Packet, boat_info::BoatInfo, boats_registry::{self, BoatsInfoRegistry}, common::{bitpacker::BitPacker, constants::*, types::*, utils::*}, impl_arc_access, impl_atomic_access, impl_mutex_access, impl_rwlock_access, message::{CommunicationState, Message}, slots_map::SlotsMap};
+use crate::{antenna::Packet, boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, common::{bitpacker::BitPacker, constants::*, types::*, utils::*}, impl_arc_access, impl_atomic_access, impl_mutex_access, impl_rwlock_access, message::{CommunicationState, Message}, slots_map::SlotsMap};
 
 
 pub struct AisState {
@@ -110,7 +110,7 @@ impl AisRunner {
 
 
     pub fn listen(self: Arc<Self>) -> () {
-        thread::spawn(move || {
+        tokio::spawn(async move {
             loop {
                 if let Ok(rx_guard) = self.ais_rx.lock() {
                     for packet in rx_guard.try_iter() {
@@ -466,7 +466,7 @@ impl AisRunner {
 
 
     pub fn sotdma(self: Arc<Self>) -> () {
-        thread::spawn(move || {
+        tokio::spawn(async move {
             log("Initialisation du SOTDMA...".yellow());
             self.sotdma_init();
             log("Initialisation du SOTMA terminée.".yellow());

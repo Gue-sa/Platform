@@ -25,7 +25,7 @@ impl Gps {
 
 
     pub fn listen(self: Arc<Self>) -> () {
-        thread::spawn(move || {
+        tokio::spawn(async move {
             if let Ok(rx_guard) = self.rx.lock() {
                 loop {
                     for msg in rx_guard.try_iter() {
@@ -43,7 +43,7 @@ impl Gps {
 
 
     pub fn updater(self: Arc<Self>) -> () {
-        thread::spawn(move || {
+        tokio::spawn(async move {
             loop {
                 let _ = self.antenna_tx.send(BitPacker::from_str(&BOAT_IP.to_string(), None).unwrap());
                 thread::sleep(Duration::from_secs(1));

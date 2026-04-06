@@ -1,4 +1,4 @@
-use crate::{boat::Boat, common::bitpacker::BitPacker};
+use crate::boat::Boat;
 
 mod common;
 mod ais;
@@ -13,16 +13,11 @@ mod gps;
 mod display;
 
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let boat: Boat = Boat::init();
     
     boat.start();
 
     loop{}
-
-    //let heh1: BitPacker = BitPacker::from_str("a", None).unwrap();
-    //let heh2: BitPacker = BitPacker::from_str("a", None).unwrap();
-    //let heh: BitPacker = heh1 + heh2;
-    
-    //println!("{:?}", heh.extract_int::<i128>(None, None).unwrap());
 }

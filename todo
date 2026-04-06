@@ -4,9 +4,10 @@
 * Remplacer les .unwrap() et !panic() par des ? et autres gestions d'erreurs correctes, ajouter des Result<(), &'static str>s
 * Remplacer les threads par du tokio
 * condvar + clock thread
-* refactor le systeme de messages qui est DEGUEULASSE
 * changement de rr
 * mettre les fields en privé
 * mettre les si en usize quand nécessaire
 * implémenter partout où c'est possible Display, Debug, Index et IndexMut
 * Rendre le code beau
+* Enlever les tx là où ils sont pas utiles
+* Reecrire le + pour être plus performant et implémenter +=

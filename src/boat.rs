@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock, mpsc::channel};
 
-use crate::{ais::AisRunner, antenna::{Antenna, Packet}, boat_info::BoatInfo, boats_registry::{self, BoatsInfoRegistry}, common::bitpacker::BitPacker, gps::{self, Gps}};
+use crate::{ais::AisRunner, antenna::{Antenna, Packet}, boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, common::bitpacker::BitPacker, gps::Gps};
 
 pub struct Boat {
     boat_info: Arc<BoatInfo>,

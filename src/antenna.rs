@@ -1,6 +1,4 @@
-use std::{io, net::{ IpAddr, Ipv4Addr, SocketAddr, UdpSocket}, sync::{Arc, Mutex, mpsc::{Receiver, Sender, channel}}, thread};
-
-use local_ip_address::list_afinet_netifas;
+use std::{io, net::{ IpAddr, Ipv4Addr, SocketAddr, UdpSocket}, sync::{Arc, Mutex, mpsc::{Receiver, Sender}}, thread};
 
 use crate::common::{bitpacker::BitPacker, constants::*, types::*};
 
@@ -59,7 +57,7 @@ impl Antenna {
     pub fn start(self: Arc<Self>) -> () {
         self.send(BitPacker::from_str("hello", None).unwrap());
 
-        thread::spawn(move || {
+        tokio::spawn(async move {
             loop {
                 if let Ok(msg) = self.ant_rx.lock().unwrap().try_recv() {
                     self.send(msg);

@@ -21,7 +21,7 @@ impl SlotsMap {
 
         let slots_cleanup_clone: Arc<RwLock<[Slot; 4500]>> = Arc::clone(&slots_map.slots);
 
-        thread::spawn(move || {
+        tokio::spawn(async move {
             let mut last_update_minute: u32 = get_current_datetime().minute();
 
             loop {

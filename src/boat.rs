@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock, mpsc::channel};
 
-use crate::{ais::AisRunner, antenna::{Antenna, Packet}, boat_info::BoatInfo, boats_registry::{self, BoatsInfoRegistry}, gps::{self, Gps}};
+use crate::{ais::AisRunner, antenna::{Antenna, Packet}, boat_info::BoatInfo, boats_registry::{self, BoatsInfoRegistry}, common::bitpacker::BitPacker, gps::{self, Gps}};
 
 pub struct Boat {
     boat_info: Arc<BoatInfo>,
@@ -16,10 +16,10 @@ pub struct Boat {
 impl Boat {
     pub fn init() -> Self {
         let (ais_tx, ais_rx) = channel::<Packet>();
-        let (gps_tx, gps_rx) = channel::<String>();
-        let (c_87_b_tx, c_87_b_rx) = channel::<String>();
-        let (c_88_b_tx, c_88_b_rx) = channel::<String>();
-        let (c_gps_tx, c_gps_rx) = channel::<String>();
+        let (gps_tx, gps_rx) = channel::<BitPacker>();
+        let (c_87_b_tx, c_87_b_rx) = channel::<BitPacker>();
+        let (c_88_b_tx, c_88_b_rx) = channel::<BitPacker>();
+        let (c_gps_tx, c_gps_rx) = channel::<BitPacker>();
 
         let ant1: Antenna = Antenna::init(Some(161975000), Some(ais_tx.clone()), None, c_87_b_tx.clone(), c_87_b_rx);
         let ant2: Antenna = Antenna::init(Some(161975001), Some(ais_tx.clone()), None, c_88_b_tx.clone(), c_88_b_rx);

@@ -9,3 +9,4 @@
 * mettre les fields en privé
 * mettre les si en usize quand nécessaire
 * implémenter partout où c'est possible Display, Debug, Index et IndexMut
+* Rendre le code beau

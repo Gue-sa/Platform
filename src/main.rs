@@ -14,15 +14,15 @@ mod display;
 
 
 fn main() {
-    //let boat: Boat = Boat::init();
+    let boat: Boat = Boat::init();
     
-    //boat.start();
+    boat.start();
 
-    //loop{}
+    loop{}
 
-    let heh1: BitPacker = BitPacker::from_str("a", None).unwrap();
-    let heh2: BitPacker = BitPacker::from_str("a", None).unwrap();
-    let heh: BitPacker = heh1 + heh2;
+    //let heh1: BitPacker = BitPacker::from_str("a", None).unwrap();
+    //let heh2: BitPacker = BitPacker::from_str("a", None).unwrap();
+    //let heh: BitPacker = heh1 + heh2;
     
-    println!("{:?}", heh.extract_int::<i128>(None, None).unwrap());
+    //println!("{:?}", heh.extract_int::<i128>(None, None).unwrap());
 }

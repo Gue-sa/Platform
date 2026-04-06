@@ -3,7 +3,7 @@ use std::{sync::{Arc, Mutex, RwLock, atomic::{AtomicI64, AtomicU8, AtomicU16, At
 use colored::*;
 use rand::{Rng, seq::IndexedRandom};
 
-use crate::{antenna::Packet, boat_info::BoatInfo, boats_registry::{self, BoatsInfoRegistry}, common::{constants::*, types::*, utils::*}, impl_atomic_access, impl_rwlock_access, impl_mutex_access, impl_arc_access, message::{CommunicationState, Message}, slots_map::SlotsMap};
+use crate::{antenna::Packet, boat_info::BoatInfo, boats_registry::{self, BoatsInfoRegistry}, common::{bitpacker::BitPacker, constants::*, types::*, utils::*}, impl_arc_access, impl_atomic_access, impl_mutex_access, impl_rwlock_access, message::{CommunicationState, Message}, slots_map::SlotsMap};
 
 
 pub struct AisState {
@@ -11,7 +11,7 @@ pub struct AisState {
     boats_registry: Arc<RwLock<BoatsInfoRegistry>>,
     slots_map: SlotsMap,
 
-    recv_stations: AtomicU8,
+    recv_stations: AtomicU16,
     sync_state: AtomicU8,
     last_msg5_timestamp: AtomicI64,
 
@@ -32,8 +32,8 @@ pub struct AisRunner {
     state: AisState,
     ais_tx: Sender<Packet>,
     ais_rx: Mutex<Receiver<Packet>>,
-    c_87_b_tx: Sender<String>,
-    c_88_b_tx: Sender<String>
+    c_87_b_tx: Sender<BitPacker>,
+    c_88_b_tx: Sender<BitPacker>
 }
 
 
@@ -45,7 +45,7 @@ impl AisState {
             boat_info: boat_info,
             boats_registry: boats_registry,
             slots_map: SlotsMap::init(mmsi),
-            recv_stations: AtomicU8::new(0),
+            recv_stations: AtomicU16::new(0),
             sync_state: AtomicU8::new(0),
             last_msg5_timestamp: AtomicI64::new(-1),
             sotdma_nss: Mutex::from(None),
@@ -80,7 +80,7 @@ impl AisState {
     impl_arc_access!(boat_info, Arc<BoatInfo>, boat_info, set_boat_info);
     impl_rwlock_access!(boats_registry, BoatsInfoRegistry, boats_registry, set_boats_registry);
 
-    impl_atomic_access!(recv_stations, u8, recv_stations, set_recv_stations);
+    impl_atomic_access!(recv_stations, u16, recv_stations, set_recv_stations);
     impl_atomic_access!(sync_state, u8, sync_state, set_sync_state);
     impl_atomic_access!(last_msg5_timestamp, i64, last_msg5_timestamp, set_last_msg5_timestamp);
     impl_atomic_access!(sotdma_ri, u32, ri, set_ri);
@@ -98,7 +98,7 @@ impl AisState {
 
 
 impl AisRunner {
-    pub fn init(tx: Sender<Packet>, rx: Receiver<Packet>, c_87_b_tx: Sender<String>, c_88_b_tx: Sender<String>, boat_info: Arc<BoatInfo>, boats_registry: Arc<RwLock<BoatsInfoRegistry>>) -> Self {
+    pub fn init(tx: Sender<Packet>, rx: Receiver<Packet>, c_87_b_tx: Sender<BitPacker>, c_88_b_tx: Sender<BitPacker>, boat_info: Arc<BoatInfo>, boats_registry: Arc<RwLock<BoatsInfoRegistry>>) -> Self {
         Self {
             state: AisState::init(boat_info, boats_registry),
             ais_tx: tx,
@@ -115,8 +115,8 @@ impl AisRunner {
                 if let Ok(rx_guard) = self.ais_rx.lock() {
                     for packet in rx_guard.try_iter() {
                         match packet.channel {
-                            Channel::C87B => self.handle_transmission(&packet.message, Channel::C87B),
-                            Channel::C88B => self.handle_transmission(&packet.message, Channel::C88B),
+                            Channel::C87B => self.handle_transmission(packet.message, Channel::C87B),
+                            Channel::C88B => self.handle_transmission(packet.message, Channel::C88B),
                             _ => todo!()
                         }
                     }  
@@ -126,17 +126,17 @@ impl AisRunner {
     }
 
 
-    pub fn handle_transmission(&self, msg: &str, channel: Channel) -> () {
+    pub fn handle_transmission(&self, msg: BitPacker , channel: Channel) -> () {
         let t_s: u16 = SlotsMap::current_slot_number(channel);
-        let (msg_type, _, communication_state, _, boat_info) = Message::parse(msg).unwrap();
-        let boat_mmsi: u32 = boat_info.get_static_data().mmsi;
+        let msg: Message = Message::from_bits(msg).unwrap();
+        let boat_mmsi: u32 = msg.boat_info.get_static_data().mmsi;
         let self_mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
         
-        if boat_mmsi != self_mmsi && IMPLEMENTED_MSGS.binary_search(&msg_type).is_ok() {
+        if boat_mmsi != self_mmsi && IMPLEMENTED_MSGS.binary_search(&msg.message_type).is_ok() {
             if self.state.boats_registry().is_registered(&boat_mmsi) {
-                self.state.boats_registry.write().unwrap().update(boat_info.clone());
+                self.state.boats_registry.write().unwrap().update(msg.boat_info.clone());
             } else {
-                self.state.boats_registry.write().unwrap().register(boat_info.clone());
+                self.state.boats_registry.write().unwrap().register(msg.boat_info.clone());
             }
 
             let slots_map: &SlotsMap = self.state.slots_map();
@@ -150,8 +150,8 @@ impl AisRunner {
                     slots_map.mark_slot_as_used(t_s);
                 }
 
-                if [1, 2].binary_search(&msg_type).is_ok() {
-                    let cs_timeout: u8 = communication_state.clone().unwrap().slot_timeout().unwrap();
+                if [1, 2].binary_search(&msg.message_type).is_ok() {
+                    let cs_timeout: u8 = msg.communication_state.clone().unwrap().slot_timeout.unwrap();
                     
                     if t_s_owner.is_none() && cs_timeout > 0 {
                         slots_map.book_slot(t_s, self_mmsi, Some(cs_timeout), None);
@@ -162,15 +162,15 @@ impl AisRunner {
                     }
 
                     if cs_timeout == 0 {
-                        let cs_offset: u16 = communication_state.clone().unwrap().slot_offset().unwrap();
+                        let cs_offset: u16 = msg.communication_state.clone().unwrap().slot_offset.unwrap();
                         let rsv_s: u16 = SlotsMap::offseted_slot(t_s, cs_offset);
 
                         slots_map.book_slot(rsv_s, boat_mmsi, Some(cs_timeout), None);
                         slots_map.release_slot(t_s);
                     }
-                } else if msg_type == 3 {
-                    let cs_keep_flag: bool = communication_state.clone().unwrap().keep_flag.unwrap();
-                    let cs_slot_increment: u16 = communication_state.clone().unwrap().slot_increment().unwrap();
+                } else if msg.message_type == 3 {
+                    let cs_keep_flag: bool = msg.communication_state.clone().unwrap().keep_flag.unwrap();
+                    let cs_slot_increment: u16 = msg.communication_state.clone().unwrap().slot_increment.unwrap();
 
                     if cs_keep_flag == false {
                         slots_map.release_slot(t_s);
@@ -185,7 +185,7 @@ impl AisRunner {
                 } 
             }
 
-            log(format!("Message {} reçu du navire {} : {:?}.", msg_type, boat_mmsi, boat_info.clone()).blue());
+            log(format!("Message {} reçu du navire {} : {:?}.", msg.message_type, boat_mmsi, msg.boat_info.clone()).blue());
         }
     }
 
@@ -260,19 +260,19 @@ impl AisRunner {
 
 
     pub fn send(&self, msg_type: u8, keep_flag: Option<bool>, offset: Option<u16>, slots_nbr: Option<u8>) -> () {
-        let ant_tx:&Sender<String>  = if self.state.nts().unwrap() < SLOTS_PER_MINUTE {&self.c_87_b_tx} else {&self.c_88_b_tx};
+        let ant_tx: &Sender<BitPacker>  = if self.state.nts().unwrap() < SLOTS_PER_MINUTE {&self.c_87_b_tx} else {&self.c_88_b_tx};
 
         let sync_state: u8 = self.state.sync_state();
         let nts: u16 = self.state.nts().unwrap();
 
         let timeout: Option<u8> = self.state.slots_map().slot_timeout(nts);
-        let recv_stations: u8 = self.state.recv_stations();
+        let recv_stations: u16 = self.state.recv_stations();
 
-        let com_state: Option<CommunicationState> = if NO_CS_MSGS.binary_search(&msg_type).is_err() {Some(CommunicationState::init(msg_type, Some(sync_state), timeout, offset, Some(nts), Some(recv_stations), offset, slots_nbr, keep_flag))} else {None};
-
-        let msg: Message = Message::init(None, Some(self.state.boat_info().as_ref().clone()), Some(msg_type), com_state).unwrap();
+        let com_state: Option<CommunicationState> = if NO_CS_MSGS.binary_search(&msg_type).is_err() {Some(CommunicationState::init(msg_type, sync_state, timeout, offset, Some(nts), Some(recv_stations), offset, slots_nbr, keep_flag).unwrap())} else {None};
         
-        let _ = ant_tx.send(msg.build());
+        let msg: Message = Message::from_info(self.state.boat_info().as_ref().clone(), msg_type, com_state).unwrap();
+
+        let _ = ant_tx.send(msg.build().unwrap());
 
         log(format!("Message {} envoyé avec succès sur le slot {}.", msg_type, self.state.nts().unwrap()).green());
     }

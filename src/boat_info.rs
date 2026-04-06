@@ -1,6 +1,6 @@
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, atomic::AtomicU32};
 
-use crate::{common::utils::{string_to_bits, uint_to_bits}, impl_atomic_access, impl_rwlock_access};
+use crate::{common::{bitpacker::BitPacker, utils::{string_to_bits, uint_to_bits}}, impl_atomic_access, impl_rwlock_access};
 
 
 #[derive(Debug, Clone)]
@@ -162,39 +162,39 @@ impl BoatInfo {
     }
 
 
-    pub fn get_as_bits(&self, field_name: &str, msg_type: u8) -> String {
+    pub fn get_as_bits(&self, field_name: &str, msg_type: u8) -> Result<BitPacker, &'static str> {
         match field_name {
-            "mmsi" => uint_to_bits(&self.get_static_data().mmsi, Some(30)),
-            "navigational_status" => uint_to_bits(&self.get_navigation_data().navigational_status, Some(4)),
-            "rate_of_turn" => uint_to_bits(&self.get_navigation_data().rate_of_turn, Some(8)),
-            "speed_over_ground" => uint_to_bits(&self.get_navigation_data().speed_over_ground, Some(10)),
-            "position_accuracy" => uint_to_bits(&self.get_static_data().position_accuracy, Some(1)),
-            "longitude" => uint_to_bits(&self.get_navigation_data().longitude, Some(28)),
-            "latitude" => uint_to_bits(&self.get_navigation_data().latitude, Some(27)),
-            "course_over_ground" => uint_to_bits(&self.get_navigation_data().course_over_ground, Some(12)),
-            "true_heading" => uint_to_bits(&self.get_navigation_data().true_heading, Some(9)),
-            "time_stamp" => uint_to_bits(&self.get_navigation_data().time_stamp, Some(6)),
-            "special_maneuvre_indicator" => uint_to_bits(&self.get_navigation_data().special_maneuvre_indicator, Some(2)),
-            "raim_flag" => uint_to_bits(&self.get_voyage_data().raim_flag, Some(1)),
-            "ais_version" => uint_to_bits(&self.get_static_data().ais_version, Some(2)),
-            "imo_number" => uint_to_bits(&self.get_static_data().imo_number, Some(30)),
-            "type_of_ship_and_cargo_type" => uint_to_bits(&self.get_static_data().type_of_ship_and_cargo_type, Some(8)),
-            "b" => uint_to_bits(&self.get_static_data().b, Some(9)),
-            "a" => uint_to_bits(&self.get_static_data().a, Some(9)),
-            "c" => uint_to_bits(&self.get_static_data().c, Some(6)),
-            "d" => uint_to_bits(&self.get_static_data().d, Some(6)),
-            "type_of_epf_device" => uint_to_bits(&self.get_static_data().type_of_epf_device, Some(4)),
-            "eta_month" => uint_to_bits(&self.get_voyage_data().eta_month, Some(4)),
-            "eta_day" => uint_to_bits(&self.get_voyage_data().eta_day, Some(5)),
-            "eta_hour" => uint_to_bits(&self.get_voyage_data().eta_hour, Some(5)),
-            "eta_minute" => uint_to_bits(&self.get_voyage_data().eta_minute, Some(6)),
-            "maximum_present_static_draught" => uint_to_bits(&self.get_voyage_data().maximum_present_static_draught, Some(8)),
-            "dte" => uint_to_bits(&self.get_voyage_data().dte, Some(1)),
-            "spare" => uint_to_bits(&self.get_static_data().spare, Some(if msg_type == 5 {1} else {3})),
-            "call_sign" => string_to_bits(&self.get_static_data().call_sign, Some(42)),
-            "name" => string_to_bits(&self.get_static_data().name, Some(120)),
-            "destination" => string_to_bits(&self.get_voyage_data().destination, Some(120)),
-            _ => String::new(),
+            "mmsi" => Ok(BitPacker::from_int::<u32>(self.get_static_data().mmsi, Some(30))?),
+            "navigational_status" => Ok(BitPacker::from_int::<u8>(self.get_navigation_data().navigational_status, Some(4))?),
+            "rate_of_turn" => Ok(BitPacker::from_int::<i8>(self.get_navigation_data().rate_of_turn, Some(8))?),
+            "speed_over_ground" => Ok(BitPacker::from_int::<u16>(self.get_navigation_data().speed_over_ground, Some(10))?),
+            "position_accuracy" => Ok(BitPacker::from_int::<u8>(self.get_static_data().position_accuracy, Some(1))?),
+            "longitude" => Ok(BitPacker::from_int::<u32>(self.get_navigation_data().longitude, Some(28))?),
+            "latitude" => Ok(BitPacker::from_int::<u32>(self.get_navigation_data().latitude, Some(27))?),
+            "course_over_ground" => Ok(BitPacker::from_int::<u16>(self.get_navigation_data().course_over_ground, Some(12))?),
+            "true_heading" => Ok(BitPacker::from_int::<u16>(self.get_navigation_data().true_heading, Some(9))?),
+            "time_stamp" => Ok(BitPacker::from_int::<u8>(self.get_navigation_data().time_stamp, Some(6))?),
+            "special_maneuvre_indicator" => Ok(BitPacker::from_int::<u8>(self.get_navigation_data().special_maneuvre_indicator, Some(2))?),
+            "raim_flag" => Ok(BitPacker::from_int::<u8>(self.get_voyage_data().raim_flag, Some(1))?),
+            "ais_version" => Ok(BitPacker::from_int::<u8>(self.get_static_data().ais_version, Some(2))?),
+            "imo_number" => Ok(BitPacker::from_int::<u32>(self.get_static_data().imo_number, Some(30))?),
+            "type_of_ship_and_cargo_type" => Ok(BitPacker::from_int::<u8>(self.get_static_data().type_of_ship_and_cargo_type, Some(8))?),
+            "b" => Ok(BitPacker::from_int::<u16>(self.get_static_data().b, Some(9))?),
+            "a" => Ok(BitPacker::from_int::<u16>(self.get_static_data().a, Some(9))?),
+            "c" => Ok(BitPacker::from_int::<u8>(self.get_static_data().c, Some(6))?),
+            "d" => Ok(BitPacker::from_int::<u8>(self.get_static_data().d, Some(6))?),
+            "type_of_epf_device" => Ok(BitPacker::from_int::<u8>(self.get_static_data().type_of_epf_device, Some(4))?),
+            "eta_month" => Ok(BitPacker::from_int::<u8>(self.get_voyage_data().eta_month, Some(4))?),
+            "eta_day" => Ok(BitPacker::from_int::<u8>(self.get_voyage_data().eta_day, Some(5))?),
+            "eta_hour" => Ok(BitPacker::from_int::<u8>(self.get_voyage_data().eta_hour, Some(5))?),
+            "eta_minute" => Ok(BitPacker::from_int::<u8>(self.get_voyage_data().eta_minute, Some(6))?),
+            "maximum_present_static_draught" => Ok(BitPacker::from_int::<u8>(self.get_voyage_data().maximum_present_static_draught, Some(8))?),
+            "dte" => Ok(BitPacker::from_int::<u8>(self.get_voyage_data().dte, Some(1))?),
+            "spare" => Ok(BitPacker::from_int::<u8>(self.get_static_data().spare, Some(if msg_type == 5 {1} else {3}))?),
+            "call_sign" => Ok(BitPacker::from_str(&self.get_static_data().call_sign, Some(42))?),
+            "name" => Ok(BitPacker::from_str(&self.get_static_data().name, Some(120))?),
+            "destination" => Ok(BitPacker::from_str(&self.get_voyage_data().destination, Some(120))?),
+            _ => Err("Champ inconnu.")
         }
     }
 }

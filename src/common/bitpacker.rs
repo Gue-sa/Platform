@@ -5,7 +5,7 @@ use num_traits::PrimInt;
 use crate::common::utils;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BitPacker {
     bits: Vec<u8>,
     bits_len: usize
@@ -119,7 +119,7 @@ impl BitPacker {
     
     
     pub fn from_str(value: &str, bits_len: Option<usize>) -> Result<Self, &'static str> {
-        let bits_len: usize = 6 * value.len();
+        let bits_len: usize = bits_len.unwrap_or(6 * value.len());
         let bytes_len: usize = bits_len.div_ceil(8);
 
         let mut bitpacker: BitPacker = Self {
@@ -178,9 +178,9 @@ impl BitPacker {
 
         let int_slice: BitPacker = self.slice(Some(start_i), Some(end_i))?;
 
-        for i in start_i..=end_i {
+        for i in 0..int_slice.bits_len {
            if int_slice[i] == 1 {
-                value = value | (T::one() << (i % 8));
+                value = value | (T::one() << i);
             }
         }
 
@@ -207,8 +207,10 @@ impl BitPacker {
             }
 
             if i % 6 == 5 {
-                extracted_str += &utils::char6(char_ord).to_string();
-                char_ord = 0;
+                if char_ord != 0 {
+                    extracted_str += &utils::char6(char_ord).to_string();
+                    char_ord = 0;
+                }
             }
         };
 

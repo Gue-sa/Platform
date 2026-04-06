@@ -18,4 +18,42 @@ pub const C88B_EM_PORT: u16 = 7777;
 pub const GPS_REC_PORT: u16 = 8888;
 pub const GPS_EM_PORT: u16 = 9999;
 
+pub const MSG123_FIELDS: [&str; 13] = [
+    "mmsi",
+    "navigational_status",
+    "rate_of_turn",
+    "speed_over_ground",
+    "position_accuracy",
+    "longitude",
+    "latitude",
+    "course_over_ground",
+    "true_heading",
+    "time_stamp",
+    "special_maneuvre_indicator",
+    "spare",
+    "raim_flag"
+];
+
+pub const MSG5_FIELDS: [&str; 19] = [
+    "mmsi",
+    "ais_version",
+    "imo_number",
+    "call_sign",
+    "name",
+    "type_of_ship_and_cargo_type",
+    "a",
+    "b",
+    "c",
+    "d",
+    "type_of_epf_device",
+    "eta_minute",
+    "eta_hour",
+    "eta_day",
+    "eta_month",
+    "maximum_present_static_draught",
+    "destination",
+    "dte",
+    "spare"
+];
+
 pub const BOAT_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(10,0,0,1));

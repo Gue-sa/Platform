@@ -1,7 +1,12 @@
-use chrono::{DateTime, Local, Timelike};
-use colored::ColoredString;
+use std::{fs::{File, OpenOptions}, io::{BufReader, Write}, sync::Mutex};
+
+use chrono::{DateTime, Datelike, Local, Timelike};
+use colored::{ColoredString, Colorize};
 
 use crate::common::constants::*;
+
+
+static LOG_FILE_LOCK: Mutex<()> = Mutex::new(());
 
 
 pub fn char6(ord: u8) -> char {
@@ -38,6 +43,16 @@ pub fn datetime_to_slots_idx(datetime: Option<DateTime<Local>>) -> [u16; 2] {
 
 
 pub fn log(msg: ColoredString) -> () {
-    let slots: [u16; 2] = datetime_to_slots_idx(None);
-    println!("[{}, {}] : {}", slots[0], slots[1], msg);
+    let cdt: DateTime<Local> = get_current_datetime();
+    let slots: [u16; 2] = datetime_to_slots_idx(Some(cdt));
+    let log_msg: String = format!("({}, {}), {}/{}/{} {}h:{}mn:{}s :\n\t{}\n", slots[0], slots[1], cdt.day(), cdt.month(), cdt.hour(), cdt.hour(), cdt.minute(), cdt.second(), msg.clone());
+    let file_log_msg: String = format!("\n        {}\n({}, {}), {}/{}/{} {}h:{}mn:{}s:", msg.clear(), slots[0], slots[1], cdt.day(), cdt.month(), cdt.hour(), cdt.hour(), cdt.minute(), cdt.second());
+
+    let lock: std::sync::MutexGuard<'_, ()> = LOG_FILE_LOCK.lock().unwrap();
+
+    let mut log_file: File = OpenOptions::new().create(true).append(true).open("./logs.log").unwrap();
+
+    let _ = writeln!(log_file, "{file_log_msg}");
+
+    println!("{log_msg}");
 }

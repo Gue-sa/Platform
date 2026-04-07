@@ -1,4 +1,5 @@
 /target
-./todo
+todo
 /.vscode
 .env
+logs.log

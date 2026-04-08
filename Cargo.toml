@@ -12,8 +12,10 @@ dashmap = "6.1.0"
 num-traits = "0.2.19"
 rand = "0.9.2"
 rev_lines = "0.3.0"
+serde = "1.0.228"
 slint = "1.15.1"
 tokio = {version = "1.51.0", features = ["full"]}
+toml = "1.1.2"
 
 [build-dependencies]
 slint-build = "1.15.1"

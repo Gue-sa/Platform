@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::{Semaphore, RwLock, mpsc::*};
 
-use crate::{ais::AisRunner, antenna::{Antenna, Packet}, boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, common::bitpacker::BitPacker, gps::Gps};
+use crate::{ais::AisRunner, antenna::{Antenna, Packet}, boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, common::bitpacker::BitPacker, gps::Gps, ui::Ui};
 
 pub struct Boat {
     boat_info: Arc<BoatInfo>,
@@ -10,7 +10,8 @@ pub struct Boat {
     gps: Gps,
     antenna_87_b: Antenna,
     antenna_88_b: Antenna,
-    gps_antenna: Antenna
+    gps_antenna: Antenna,
+    ui: Ui
 }
 
 
@@ -32,13 +33,16 @@ impl Boat {
         let ais: AisRunner = AisRunner::init(ais_tx.clone(), ais_rx, c_87_b_tx.clone(), c_88_b_tx.clone(), Arc::clone(&boat_info), boats_registry);
         let gps: Gps = Gps::init(Arc::clone(&boat_info), gps_rx, gps_tx.clone(), c_gps_tx.clone());
 
+        let ui: Ui = Ui::init(boat_info.clone());
+
         Self {
             boat_info: boat_info,
             ais: ais,
             gps: gps,
             antenna_87_b: ant1,
             antenna_88_b: ant2,
-            gps_antenna: ant3
+            gps_antenna: ant3,
+            ui: ui
         }
     }
 
@@ -48,11 +52,15 @@ impl Boat {
     }
 
 
-    pub async fn start(self) -> () {
-        self.antenna_87_b.start().await;
-        self.antenna_88_b.start().await;
-        self.gps_antenna.start().await;
-        self.gps.start().await;
-        self.ais.start().await;
+    pub fn start(self) -> () {
+        tokio::spawn(async move {
+            self.antenna_87_b.start().await;
+            self.antenna_88_b.start().await;
+            self.gps_antenna.start().await;
+            self.gps.start().await;
+            self.ais.start().await;
+        });
+
+        self.ui.start();
     }
 }

@@ -1,3 +1,5 @@
 fn main() {
-    slint_build::compile("src/ui/appwindow.slint").unwrap();
+    let config: slint_build::CompilerConfiguration = slint_build::CompilerConfiguration::default().with_style("native".into());
+
+    slint_build::compile_with_config("src/ui/appwindow.slint", config).unwrap();
 }

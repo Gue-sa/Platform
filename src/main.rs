@@ -1,21 +1,20 @@
-use std::sync::Arc;
-
 use crate::harbourmaster::Harbourmaster;
 
-
 mod common;
-mod gps;
 mod harbourmaster;
-mod station;
-mod clients_registry;
+mod harbourmaster_ais;
 mod antenna;
+mod clients_registry;
+mod gps;
+mod station;
+mod shared;
 
 
-fn main() {
-    let harbourmaster = Harbourmaster::init();
-    Arc::new(harbourmaster).start();
+#[tokio::main]
+async fn main() -> () {
+    let harbourmaster: Harbourmaster = Harbourmaster::init().await;
 
-    loop {
-        
-    }
+    harbourmaster.start().await;
+
+    std::thread::park();
 }

@@ -1,4 +1,4 @@
-use crate::common::{types::*, constants::*};
+use crate::{common::{constants::*, types::*}, shared::common::{constants::SLOTS_PER_MINUTE, types::Channel}};
 
 
 #[derive(Debug)]

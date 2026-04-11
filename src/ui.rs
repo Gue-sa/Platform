@@ -4,7 +4,7 @@ use colored::*;
 use rev_lines::RevLines;
 use slint::{ModelRc, SharedString, VecModel, Weak, ToSharedString};
 
-use crate::{boat_info::{BoatInfo, NavigationData, StaticData, VoyageData}, common::utils::log};
+use crate::{common::utils::log, shared::boat_info::{BoatInfo, NavigationData, StaticData, VoyageData}};
 
 slint::include_modules!();
 

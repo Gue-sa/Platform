@@ -1,27 +1,12 @@
-use std::{fs::{File, OpenOptions}, io::{BufReader, Write}, sync::Mutex};
+use std::{fs::{File, OpenOptions}, io::Write, sync::Mutex};
 
 use chrono::{DateTime, Datelike, Local, Timelike};
 use colored::{ColoredString, Colorize};
 
-use crate::common::constants::*;
+use crate::shared::common::constants::SLOTS_PER_MINUTE;
 
 
 static LOG_FILE_LOCK: Mutex<()> = Mutex::new(());
-
-
-pub fn char6(ord: u8) -> char {
-    SIX_BITS_ASCII_ALPHABET[usize::from(ord - 1)] as char
-}
-
-
-pub fn ord6(char: char) -> u8 {
-    let index = SIX_BITS_ASCII_ALPHABET.iter().position(|&c| c == char as u8);
-
-    match index {
-        Some(ord) => ord as u8 + 1,
-        None => 1
-    }
-}
 
 
 pub fn get_current_datetime() -> DateTime<Local> {

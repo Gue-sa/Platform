@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::{Semaphore, RwLock, mpsc::*};
 
-use crate::{ais::AisRunner, antenna::{Antenna, AisPacket}, boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, gps::Gps, shared::bitpacker::BitPacker, systemstate::SystemState, ui::Ui};
+use crate::{ais::AisRunner, gps::Gps, shared::{antenna::{AisPacket, Antenna}, bitpacker::BitPacker, boat_info::BoatInfo, boats_registry::BoatsInfoRegistry}, systemstate::SystemState, ui::Ui};
 
 pub struct Boat {
     boat_info: Arc<BoatInfo>,

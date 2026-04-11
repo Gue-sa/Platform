@@ -1,6 +1,6 @@
 use dashmap::{DashMap, mapref::one::Ref};
 
-use crate::boat_info::BoatInfo;
+use crate::shared::boat_info::BoatInfo;
 
 
 pub struct BoatsInfoRegistry {

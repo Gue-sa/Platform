@@ -2,7 +2,7 @@ use std::ops::{Add, Index};
 
 use num_traits::PrimInt;
 
-use crate::common::{types::{BitPackerError, BitPackerResult}, utils};
+use crate::{common::utils, shared::common::{types::{BitPackerError, BitPackerResult}, utils::{char6, ord6}}};
 
 
 #[derive(Debug, Clone)]
@@ -128,7 +128,7 @@ impl BitPacker {
         };
 
         for (i, c) in value.chars().enumerate() {
-            let ord: u8 = utils::ord6(c);
+            let ord: u8 = ord6(c);
             let _ = bitpacker.write_bits::<u8>(ord, Some(i * 6));
         }
 
@@ -220,7 +220,7 @@ impl BitPacker {
 
             if i % 6 == 5 {
                 if char_ord != 0 {
-                    extracted_str += &utils::char6(char_ord).to_string();
+                    extracted_str += &char6(char_ord).to_string();
                     char_ord = 0;
                 }
             }

@@ -3,18 +3,15 @@ use crate::boat::Boat;
 
 mod common;
 mod ais;
-mod antenna;
 mod boat;
-mod message;
 mod slot;
 mod slots_map;
-mod boat_info;
-mod boats_registry;
 mod gps;
-mod display;
+mod voyage;
 mod ui;
 mod systemstate;
 mod shared;
+mod satcom;
 
 
 #[tokio::main]

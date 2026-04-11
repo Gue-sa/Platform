@@ -5,7 +5,7 @@ use tokio::{sync::{Mutex, Notify, mpsc::*}, time::{Duration, Instant, interval_a
 use colored::*;
 use rand::{Rng, seq::IndexedRandom};
 
-use crate::{antenna::AisPacket, boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, common::{constants::*, types::*, utils::*}, impl_arc_access, impl_atomic_access, impl_mutex_access, impl_option_access, impl_tokio_mutex_access, impl_tokio_rwlock_access, message::{CommunicationState, Message}, shared::bitpacker::BitPacker, slots_map::SlotsMap, systemstate::SystemState};
+use crate::{common::{types::*, utils::*}, impl_arc_access, impl_atomic_access, shared::{antenna::AisPacket, bitpacker::BitPacker, boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, common::{constants::{IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE, SOTDMA_CS_MSGS}, types::Channel}, message::{CommunicationState, Message}}, slots_map::SlotsMap, systemstate::SystemState};
 
 
 pub struct AisState {

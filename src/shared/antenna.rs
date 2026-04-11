@@ -2,7 +2,7 @@ use std::{net::{IpAddr, Ipv4Addr, SocketAddr}, sync::{Arc, Mutex}};
 
 use tokio::{net::UdpSocket, sync::mpsc::{Receiver, Sender}};
 
-use crate::{common::{constants::*, types::*}, shared::bitpacker::BitPacker};
+use crate::{common::{constants::*, types::*}, shared::{bitpacker::BitPacker, common::{constants::{C87B_EM_PORT, C87B_REC_PORT, C88B_EM_PORT, C88B_REC_PORT, GPS_EM_PORT, GPS_REC_PORT}, types::Channel}}};
 
 
 pub struct AisPacket {

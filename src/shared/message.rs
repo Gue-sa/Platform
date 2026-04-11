@@ -1,7 +1,7 @@
 use chrono::Timelike;
 use crc::{CRC_16_IBM_SDLC, Crc};
 
-use crate::{boat_info::{BoatInfo, NavigationData, StaticData, VoyageData}, common::{constants::{IMPLEMENTED_MSGS, MSG5_FIELDS, MSG123_FIELDS, NO_CS_MSGS, SOTDMA_CS_MSGS}, types::*, utils::*}, shared::bitpacker::BitPacker};
+use crate::{common::utils::*, shared::{bitpacker::BitPacker, boat_info::{BoatInfo, NavigationData, StaticData, VoyageData}, common::{constants::{MSG5_FIELDS, MSG123_FIELDS, SOTDMA_CS_MSGS}, types::{CSTypes, MessageError, MessageResult}}}};
 
 
 #[derive(Clone, Debug)]

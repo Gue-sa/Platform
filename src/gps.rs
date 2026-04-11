@@ -4,7 +4,7 @@ use tokio::{sync::mpsc::*, time::Duration};
 
 use colored::*;
 
-use crate::{boat_info::BoatInfo, common::{constants::{BOAT_IP, BOAT_IPV4}, types::GpsError, utils::log}, shared::bitpacker::BitPacker, systemstate::SystemState};
+use crate::{common::utils::log, shared::{bitpacker::BitPacker, boat_info::BoatInfo, common::constants::BOAT_IPV4}, systemstate::SystemState};
 
 
 pub struct Gps {

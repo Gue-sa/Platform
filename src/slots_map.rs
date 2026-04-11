@@ -173,7 +173,7 @@ impl SlotsMap {
 
 
     // A refactor !
-    pub fn scan_for_free_slots(&self, length: Option<u16>, ref_si: Option<u16>, slots_count: Option<u8>, channel: Channel) -> Result<Box<[u16]>, &'static str> {
+    pub fn scan_for_free_slots(&self, length: Option<u16>, ref_si: Option<u16>, slots_count: Option<u8>, channel: Channel) -> Box<[u16]> {
         let length: u16 = length.unwrap_or(1);
         let ref_si: u16 = ref_si.unwrap_or(SlotsMap::current_slot_number(channel.clone()));
         let end_si: u16 = SlotsMap::offseted_slot(ref_si, length);
@@ -183,13 +183,8 @@ impl SlotsMap {
             Channel::C87B | Channel::C88B => {
                 let slots_range: Box<[u16]> = self.slots_idx_range(ref_si, end_si, channel);
                 let available_slots: Box<[u16]> = self.extract_available_slots_idx(slots_range);
-                let is_selection_feasible: bool = available_slots.len() >= 4.max(slots_count as usize);
 
-                if is_selection_feasible {
-                    Ok(Box::from(available_slots))
-                } else {
-                    Err("La sélection est impossible : nombre de slots disponible < 4 dans la configuration demandée.")
-                }
+                Box::from(available_slots)
             },
             Channel::Any => {
                 let c_87_b_slots_range: Box<[u16]> = self.slots_idx_range(ref_si, end_si, Channel::C87B);
@@ -204,27 +199,27 @@ impl SlotsMap {
 
                     match chosen_channel {
                         Channel::C87B => {
-                            Ok(Box::from(available_87_b_slots))
+                            Box::from(available_87_b_slots)
                         },
                         Channel::C88B => {
-                            Ok(Box::from(available_88_b_slots))
+                            Box::from(available_88_b_slots)
                         },
-                        _ => Err("La sélection est impossible : nombre de slots disponible < 4 dans la configuration demandée.")
+                        _ => Box::from([])
                     }
                 } else if is_87_b_selection_feasible {
-                    Ok(Box::from(available_87_b_slots))
+                    Box::from(available_87_b_slots)
                 } else if is_88_b_selection_feasible {
-                    Ok(Box::from(available_88_b_slots))
+                    Box::from(available_88_b_slots)
                 } else {
-                    Err("La sélection est impossible : nombre de slots disponible < 4 dans la configuration demandée.")
+                    Box::from([])
                 }
             },
-            _ => Err("Channel invalide.")
+            _ => Box::from([])
         }
     }
 
 
-    pub fn scan_for_self_owned_slots(&self, length: Option<u16>, ref_si: Option<u16>, channel: Channel) -> Result<Box<[u16]>, String> {
+    pub fn scan_for_self_owned_slots(&self, length: Option<u16>, ref_si: Option<u16>, channel: Channel) -> Box<[u16]> {
         let length: u16 = length.unwrap_or(SLOTS_PER_MINUTE - 1);
         let ref_si: u16 = ref_si.unwrap_or(0);
         let end_si: u16 = SlotsMap::offseted_slot(ref_si, length);
@@ -233,10 +228,6 @@ impl SlotsMap {
 
         let available_slots: Vec<u16> = slots_range.iter().filter(|idx: &&u16| self.slot_owner(**idx) == Some(self.mmsi)).copied().collect();
 
-        if available_slots.len() > 0 {
-            Ok(available_slots.into_boxed_slice())
-        } else {
-            Err(format!("Aucun slot déjà réservé dans l'intervalle spécifiée. (start_si = {}, end_si = {})", ref_si, end_si))
-        }
+        available_slots.into_boxed_slice()
     }
 }

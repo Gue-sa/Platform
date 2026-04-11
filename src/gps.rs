@@ -1,27 +1,29 @@
-use std::sync::Arc;
+use std::{net::Ipv4Addr, sync::Arc, u32};
 
 use tokio::{sync::mpsc::*, time::Duration};
 
 use colored::*;
 
-use crate::{boat_info::BoatInfo, common::{bitpacker::BitPacker, constants::BOAT_IP, utils::log}};
+use crate::{boat_info::BoatInfo, common::{constants::{BOAT_IP, BOAT_IPV4}, types::GpsError, utils::log}, shared::bitpacker::BitPacker, systemstate::SystemState};
 
 
 pub struct Gps {
     boat_info: Arc<BoatInfo>,
     rx: Receiver<BitPacker>,
     tx: Sender<BitPacker>,
-    antenna_tx: Sender<BitPacker>
+    antenna_tx: Sender<BitPacker>,
+    system_state: Arc<SystemState>
 }
 
 
 impl Gps {
-    pub fn init(boat_info: Arc<BoatInfo>, rx: Receiver<BitPacker>, tx: Sender<BitPacker>, antenna_tx: Sender<BitPacker>) -> Self {
+    pub fn init(boat_info: Arc<BoatInfo>, rx: Receiver<BitPacker>, tx: Sender<BitPacker>, antenna_tx: Sender<BitPacker>, system_state: Arc<SystemState>) -> Self {
         Self {
             boat_info: boat_info,
             rx: rx,
             tx: tx,
-            antenna_tx: antenna_tx
+            antenna_tx: antenna_tx,
+            system_state: system_state
         }
     }
 
@@ -33,15 +35,14 @@ impl Gps {
             loop {
                 tokio::select! {
                     Some(msg) = self.rx.recv() => {
-                        let latitude: u32 = msg.extract_int::<u32>(None, Some(31)).unwrap();
-                        let longitude: u32 = msg.extract_int::<u32>(Some(32), None).unwrap();
+                        if let Ok(latitude) = msg.extract_int::<u32>(None, Some(31)) && let Ok(longitude) = msg.extract_int::<u32>(Some(32), None) {
+                            self.boat_info.update_positon(Some(latitude), Some(longitude));
 
-                        self.boat_info.update_positon(Some(latitude), Some(longitude));
-
-                        log(format!("Position mise à jour depuis le GPS : {latitude} | {longitude}").white().italic());
+                            log(format!("Position mise à jour depuis le GPS : {latitude} | {longitude}").white().italic());
+                        }
                     },
                     _ = interval.tick() => {
-                        let _ = self.antenna_tx.send(BitPacker::from_str(&BOAT_IP.to_string(), None).unwrap()).await;
+                        let _ = self.antenna_tx.send(BitPacker::from_int(Ipv4Addr::to_bits(BOAT_IPV4), Some(32))).await;
                     }
                 };
             }

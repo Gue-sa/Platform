@@ -13,6 +13,8 @@ mod boats_registry;
 mod gps;
 mod display;
 mod ui;
+mod systemstate;
+mod shared;
 
 
 #[tokio::main]

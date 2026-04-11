@@ -2,10 +2,10 @@ use std::{net::{IpAddr, Ipv4Addr, SocketAddr}, sync::{Arc, Mutex}};
 
 use tokio::{net::UdpSocket, sync::mpsc::{Receiver, Sender}};
 
-use crate::common::{bitpacker::BitPacker, constants::*, types::*};
+use crate::{common::{constants::*, types::*}, shared::bitpacker::BitPacker};
 
 
-pub struct Packet {
+pub struct AisPacket {
     pub channel: Channel,
     pub message: BitPacker
 }
@@ -15,16 +15,15 @@ pub struct Antenna {
     pub freq: Option<u32>,
     pub channel: Channel,
     pub socket: UdpSocket,
-    pub ant_tx: Sender<BitPacker>,
     ant_rx: Receiver<BitPacker>,
-    pub ais_tx: Option<Sender<Packet>>,
+    pub ais_tx: Option<Sender<AisPacket>>,
     pub gps_tx: Option<Sender<BitPacker>>,
     rec_port: u16,
     em_port: u16
 }
 
 
-impl Packet {
+impl AisPacket {
     pub fn from(msg: BitPacker, chn: Channel) -> Self {
         Self {
             channel: chn,
@@ -35,7 +34,7 @@ impl Packet {
 
 
 impl Antenna {
-    pub async fn init(freq: Option<u32>, ais_tx: Option<Sender<Packet>>, gps_tx: Option<Sender<BitPacker>>, tx: Sender<BitPacker>, rx: Receiver<BitPacker>) -> Self {
+    pub async fn init(freq: Option<u32>, ais_tx: Option<Sender<AisPacket>>, gps_tx: Option<Sender<BitPacker>>, rx: Receiver<BitPacker>) -> Self {
         let channel: Channel = if freq == Some(161975000) { Channel::C87B } else if freq == Some(161975001) { Channel::C88B } else { Channel::GPS };
         let em_port: u16 = if matches!(channel, Channel::C87B) { C87B_REC_PORT } else if matches!(channel, Channel::C88B) { C88B_REC_PORT } else { GPS_REC_PORT };
         let rec_port: u16 = if matches!(channel, Channel::C87B) { C87B_EM_PORT } else if matches!(channel, Channel::C88B) { C88B_EM_PORT } else { GPS_EM_PORT };
@@ -45,7 +44,6 @@ impl Antenna {
             freq: freq,
             channel: if freq == Some(161975000) { Channel::C87B } else if freq == Some(161975001) { Channel::C88B } else { Channel::GPS },
             socket: socket,
-            ant_tx: tx,
             ant_rx: rx,
             ais_tx: ais_tx,
             gps_tx: gps_tx,
@@ -57,13 +55,13 @@ impl Antenna {
 
     pub async fn send(&self, msg: BitPacker) -> () {
         //let server_ip: IpAddr = *list_afinet_netifas().unwrap().iter().find(|(nom, _)| nom == "wlan0").map(|(_, ip)| ip).unwrap();
-        let server_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+        let server_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 1, 1));
         let _ = self.socket.send_to(msg.bits(), SocketAddr::new(server_ip, self.em_port)).await.unwrap();
     }
 
 
     pub async fn start(mut self) -> () {
-        self.send(BitPacker::from_str("hello", None).unwrap()).await;
+        self.send(BitPacker::from_str("hello", None)).await;
 
         tokio::spawn(async move {
             let mut buf: [u8; 512] = [0; 512];
@@ -72,12 +70,12 @@ impl Antenna {
                 tokio::select! {
                     result = self.socket.recv_from(&mut buf) => {
                         let (size, source) = result.unwrap();
-                        let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8 - 1)).unwrap();
+                        let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8));
 
-                        if msg.bits() != BitPacker::from_str("hello", None).unwrap().bits() {
+                        if msg.bits() != BitPacker::from_str("hello", None).bits() {
                             match self.channel {
                                 Channel::C87B | Channel::C88B => {
-                                    let _ = self.ais_tx.clone().unwrap().send(Packet::from(msg, self.channel)).await;
+                                    let _ = self.ais_tx.clone().unwrap().send(AisPacket::from(msg, self.channel)).await;
                                 },
                                 Channel::GPS => {
                                     let _ = self.gps_tx.clone().unwrap().send(msg).await;

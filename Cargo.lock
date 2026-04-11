@@ -10,6 +10,7 @@ dependencies = [
  "colored",
  "crc",
  "dashmap",
+ "fontconfig",
  "num-traits",
  "rand",
  "rev_lines",
@@ -1480,6 +1481,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d9237c6d82152100c691fb77ea18037b402bcc7257d2c876a4ffac81bc22a1c"
 dependencies = [
  "bytemuck",
+]
+
+[[package]]
+name = "fontconfig"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b19c4bca8c705ea23bfb3e3403a9e699344d1ee3205b631f03fe4dbf1e52429f"
+dependencies = [
+ "yeslogic-fontconfig-sys",
 ]
 
 [[package]]

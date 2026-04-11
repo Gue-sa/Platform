@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr};
 
-pub const SIX_BITS_ASCII_ALPHABET: &[u8; 64] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/";
+pub const SIX_BITS_ASCII_ALPHABET: &[u8; 64] = b"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?";
 
 pub const SLOTS_PER_MINUTE: u16 = 2250;
 pub const SLOTS_DURATION: f64 = 60. / SLOTS_PER_MINUTE as f64;
@@ -56,4 +56,5 @@ pub const MSG5_FIELDS: [&str; 19] = [
     "spare"
 ];
 
-pub const BOAT_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(10,0,0,1));
+pub const BOAT_IPV4: Ipv4Addr = Ipv4Addr::new(10,0,1,2);
+pub const BOAT_IP: IpAddr = IpAddr::V4(BOAT_IPV4);

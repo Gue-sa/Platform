@@ -2,7 +2,7 @@ use std::ops::{Add, Index};
 
 use num_traits::PrimInt;
 
-use crate::common::utils;
+use crate::common::{types::{BitPackerError, BitPackerResult}, utils};
 
 
 #[derive(Debug, Clone)]
@@ -58,29 +58,29 @@ impl Add for BitPacker {
             }
         }
 
-        BitPacker::from_slice(&bits, Some(bits_len)).unwrap()
+        BitPacker::from_slice(&bits, Some(bits_len))
     }
 }
 
 
 impl BitPacker {
-    fn write_bit(&mut self, index: usize, value: u8) -> Result<(), &'static str> {
-        if value != 0 && value != 1 {
-            Err("Valeur de bit illégale.")
-        } else {
-            let byte_idx: usize = self.bits.len() - 1 - index.div_euclid(8) as usize;
-            let bit_idx: usize = (index % 8) as usize;
-
-            if (self[index] == 1 && value == 0) || (self[index] == 0 && value == 1) {
-                self.bits[byte_idx] ^= 1 << bit_idx;
-            }
-
-            Ok(())
+    fn write_bit(&mut self, index: usize, value: u8) -> BitPackerResult<()> {
+        if index >= self.bits_len {
+            return Err(BitPackerError::IndexOutOfBounds)
         }
+
+        let byte_idx: usize = self.bits.len() - 1 - index.div_euclid(8) as usize;
+        let bit_idx: usize = (index % 8) as usize;
+
+        if (self[index] == 1 && value == 0) || (self[index] == 0 && value == 1) {
+            self.bits[byte_idx] ^= 1 << bit_idx;
+        }
+
+        Ok(())
     }
 
 
-    fn write_bits<T2: PrimInt>(&mut self, value: T2, start_i: Option<usize>) -> Result<(), &'static str> {
+    fn write_bits<T2: PrimInt>(&mut self, value: T2, start_i: Option<usize>) -> BitPackerResult<()> {
         if value != T2::zero() {
             let start_i: usize = start_i.unwrap_or(0);
             let end_i: usize = start_i + std::mem::size_of::<T2>() * 8 - value.leading_zeros() as usize - 1;
@@ -103,7 +103,7 @@ impl BitPacker {
     }
 
 
-    pub fn from_int<T: PrimInt>(value: T, bits_len: Option<usize>) -> Result<Self, &'static str> {
+    pub fn from_int<T: PrimInt>(value: T, bits_len: Option<usize>) -> Self {
         let bits_len: usize = bits_len.unwrap_or(std::mem::size_of::<T>() * 8 - value.leading_zeros() as usize);
         let bytes_len: usize = bits_len.div_ceil(8);
 
@@ -112,13 +112,13 @@ impl BitPacker {
             bits_len: bits_len
         };
 
-        let _ = bitpacker.write_bits::<T>(value, None)?;
+        let _ = bitpacker.write_bits::<T>(value, None);
 
-        Ok(bitpacker)
+        bitpacker
     }
     
     
-    pub fn from_str(value: &str, bits_len: Option<usize>) -> Result<Self, &'static str> {
+    pub fn from_str(value: &str, bits_len: Option<usize>) -> Self {
         let bits_len: usize = bits_len.unwrap_or(6 * value.len());
         let bytes_len: usize = bits_len.div_ceil(8);
 
@@ -129,24 +129,28 @@ impl BitPacker {
 
         for (i, c) in value.chars().enumerate() {
             let ord: u8 = utils::ord6(c);
-            let _ = bitpacker.write_bits::<u8>(ord, Some(i * 6))?;
+            let _ = bitpacker.write_bits::<u8>(ord, Some(i * 6));
         }
 
-        Ok(bitpacker)
+        bitpacker
     }
 
 
-    pub fn from_slice(bits: &[u8], bits_len: Option<usize>) -> Result<Self, &'static str> {
-        Ok(Self {
+    pub fn from_slice(bits: &[u8], bits_len: Option<usize>) -> Self {
+        Self {
             bits: Vec::from(bits),
             bits_len: bits_len.unwrap_or(bits.len())
-        })
+        }
     }
 
 
-    pub fn slice(&self, start_i: Option<usize>, end_i: Option<usize>) -> Result<BitPacker, &'static str> {
+    pub fn slice(&self, start_i: Option<usize>, end_i: Option<usize>) -> BitPackerResult<Self> {
         let start_i: usize = start_i.unwrap_or(0);
         let end_i: usize = end_i.unwrap_or(self.bits_len - 1);
+
+        if start_i >= self.bits_len || end_i >= self.bits_len {
+            return Err(BitPackerError::IndexOutOfBounds)
+        }
 
         let bits_len: usize = end_i - start_i + 1;
         let bytes_len: usize = bits_len.div_ceil(8);
@@ -164,15 +168,19 @@ impl BitPacker {
             }
         }
 
-        let bitpacker: BitPacker = BitPacker::from_slice(&bits, Some(bits_len))?;
+        let bitpacker: BitPacker = BitPacker::from_slice(&bits, Some(bits_len));
 
         Ok(bitpacker)
     }
     
 
-    pub fn extract_int<T: PrimInt>(&self, start_i: Option<usize>, end_i: Option<usize>) -> Result<T, &'static str> {
+    pub fn extract_int<T: PrimInt>(&self, start_i: Option<usize>, end_i: Option<usize>) -> BitPackerResult<T> {
         let start_i: usize = start_i.unwrap_or(0);
         let end_i: usize = end_i.unwrap_or(self.bits_len - 1);
+
+        if start_i >= self.bits_len || end_i >= self.bits_len {
+            return Err(BitPackerError::IndexOutOfBounds)
+        }
         
         let mut value: T = T::zero();
 
@@ -188,9 +196,13 @@ impl BitPacker {
     }
 
 
-    pub fn extract_str(&self, start_i: Option<usize>, end_i: Option<usize>) -> Result<String, &'static str> {
+    pub fn extract_str(&self, start_i: Option<usize>, end_i: Option<usize>) -> BitPackerResult<String> {
         let start_i: usize = start_i.unwrap_or(0);
         let end_i: usize = end_i.unwrap_or(self.bits_len - 1);
+
+        if start_i >= self.bits_len || end_i >= self.bits_len {
+            return Err(BitPackerError::IndexOutOfBounds)
+        }
         
         let bits_len: usize = end_i - start_i + 1;
         let bits_len: usize = bits_len - bits_len % 6;

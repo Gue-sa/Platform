@@ -5,3 +5,6 @@ pub mod boats_registry;
 pub mod ais_message;
 pub mod voyage_order;
 pub mod satcom_message;
+pub mod slot;
+pub mod slots_map;
+pub mod satcom;

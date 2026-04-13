@@ -3,11 +3,10 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::{Semaphore, mpsc::*};
 
 use crate::{
-    board_computer::{self, BoardComputer},
+    board_computer::BoardComputer,
     boat_ais::AisRunner,
     boat_antenna::{AisPacket, Antenna},
     boat_gps::Gps,
-    satcom::SatCom,
     shared::{
         bitpacker::BitPacker,
         boat_info::BoatInfo,
@@ -19,6 +18,7 @@ use crate::{
             },
             types::*,
         },
+        satcom::SatCom,
         satcom_message::SatComMessage,
     },
     systemstate::SystemState,

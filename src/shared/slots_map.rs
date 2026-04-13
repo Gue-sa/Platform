@@ -9,8 +9,7 @@ use tokio::time::{Duration, Instant, interval_at};
 
 use crate::{
     common::utils::*,
-    shared::common::{constants::SLOTS_PER_MINUTE, types::Channel},
-    slot::Slot,
+    shared::{common::{constants::SLOTS_PER_MINUTE, types::Channel}, slot::Slot},
 };
 
 pub struct SlotsMap {

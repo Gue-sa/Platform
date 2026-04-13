@@ -17,7 +17,7 @@ pub struct BoardComputer {
     pub voyage: Arc<RwLock<Option<Voyage>>>,
     pub rx: Receiver<SatComMessage>,
     pub satcom_tx: Sender<SatComMessage>,
-    pub voyage_order_review: Option<VoyageOrder>,
+    pub voyage_order_revision: Option<VoyageOrder>,
 }
 
 impl BoardComputer {
@@ -32,7 +32,7 @@ impl BoardComputer {
             voyage: voyage,
             rx: rx,
             satcom_tx: satcom_tx,
-            voyage_order_review: None
+            voyage_order_revision: None
         }
     }
 
@@ -98,11 +98,11 @@ impl BoardComputer {
     }
 
     pub fn drop_voyage_order_revision(&mut self) -> () {
-        self.voyage_order_review = None;
+        self.voyage_order_revision = None;
     }
 
     pub fn adopt_voyage_order_revision(&mut self) -> () {
-        let order: VoyageOrder = self.voyage_order_review.as_ref().unwrap().clone();
+        let order: VoyageOrder = self.voyage_order_revision.as_ref().unwrap().clone();
 
         self.adopt_voyage_order(order);
 
@@ -113,7 +113,7 @@ impl BoardComputer {
         *self.voyage.write().unwrap() = None;
     }
 
-    pub async fn start(mut self) -> () {
+    pub async fn start(mut self) -> () { // ATTENTION : tout ce qui touche à la révision d'ordres de voyage en cours de route est très hasardeux, pour ne pas dire 0% fonctionnel.
         loop {
             match self.rx.recv().await {
                 Some(satcom_message) => {
@@ -176,7 +176,7 @@ impl BoardComputer {
                                 if self.matches_status(Some(VoyageStatus::Accepted))
                                     || self.matches_status(Some(VoyageStatus::InExecution))
                                 {
-                                    self.voyage_order_review = satcom_message.order_review.clone();
+                                    self.voyage_order_revision = satcom_message.order_review.clone();
                                     self.update_voyage_status(VoyageStatus::UnderRevision);
                                     msg_template.order_version = satcom_message.order_review.unwrap().version;
                                     let _ = self.satcom_tx.send(msg_template.clone()).await;

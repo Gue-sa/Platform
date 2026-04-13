@@ -13,13 +13,14 @@ use rand::{Rng, seq::IndexedRandom};
 
 use crate::{
     boat_antenna::AisPacket,
-    common::{types::*, utils::*},
+    common::utils::*,
     impl_arc_access, impl_atomic_access,
     shared::{
         ais_message::{CommunicationState, Message},
         bitpacker::BitPacker,
         boat_info::BoatInfo,
         boats_registry::BoatsInfoRegistry,
+        slots_map::SlotsMap,
         common::{
             constants::{
                 IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE, SOTDMA_CS_MSGS,
@@ -27,7 +28,6 @@ use crate::{
             types::{AisError, AisResult, Channel},
         },
     },
-    slots_map::SlotsMap,
     systemstate::SystemState,
 };
 
@@ -671,10 +671,10 @@ impl AisRunner {
 
     pub async fn start(self) -> () {
         let runner_arc: Arc<AisRunner> = Arc::new(self);
-        let c87b_runner_arc = runner_arc.clone();
-        let c88b_runner_arc = runner_arc.clone();
-        let sotdma_runner_arc = runner_arc.clone();
-        let clock_runner_arc = runner_arc.clone();
+        let c87b_runner_arc: Arc<AisRunner> = runner_arc.clone();
+        let c88b_runner_arc: Arc<AisRunner> = runner_arc.clone();
+        let sotdma_runner_arc: Arc<AisRunner> = runner_arc.clone();
+        let clock_runner_arc: Arc<AisRunner> = runner_arc.clone();
 
         tokio::spawn(async move {
             clock_runner_arc.clone().master_clock().await;

@@ -4,29 +4,33 @@ use tokio::{sync::mpsc::*, time::Duration};
 
 use colored::*;
 
-use crate::{common::utils::log, shared::{bitpacker::BitPacker, boat_info::BoatInfo, common::constants::BOAT_IPV4}, systemstate::SystemState};
-
+use crate::{
+    common::{constants::BOAT_IPV4, utils::log},
+    shared::{bitpacker::BitPacker, boat_info::BoatInfo},
+    systemstate::SystemState,
+};
 
 pub struct Gps {
     boat_info: Arc<BoatInfo>,
     rx: Receiver<BitPacker>,
-    tx: Sender<BitPacker>,
     antenna_tx: Sender<BitPacker>,
-    system_state: Arc<SystemState>
+    system_state: Arc<SystemState>,
 }
 
-
 impl Gps {
-    pub fn init(boat_info: Arc<BoatInfo>, rx: Receiver<BitPacker>, tx: Sender<BitPacker>, antenna_tx: Sender<BitPacker>, system_state: Arc<SystemState>) -> Self {
+    pub fn init(
+        boat_info: Arc<BoatInfo>,
+        rx: Receiver<BitPacker>,
+        antenna_tx: Sender<BitPacker>,
+        system_state: Arc<SystemState>,
+    ) -> Self {
         Self {
             boat_info: boat_info,
             rx: rx,
-            tx: tx,
             antenna_tx: antenna_tx,
-            system_state: system_state
+            system_state: system_state,
         }
     }
-
 
     pub async fn start(mut self) -> () {
         tokio::spawn(async move {

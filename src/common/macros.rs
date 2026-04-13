@@ -6,11 +6,11 @@ macro_rules! impl_atomic_access {
         }
 
         pub fn $setter_name(&self, new_val: $t) -> () {
-            self.$field.store(new_val, std::sync::atomic::Ordering::Relaxed);
+            self.$field
+                .store(new_val, std::sync::atomic::Ordering::Relaxed);
         }
     };
 }
-
 
 #[macro_export]
 macro_rules! impl_mutex_access {
@@ -26,7 +26,6 @@ macro_rules! impl_mutex_access {
     };
 }
 
-
 #[macro_export]
 macro_rules! impl_tokio_mutex_access {
     ($field:ident, $t:ty, $getter_name:ident, $setter_name:ident) => {
@@ -40,7 +39,6 @@ macro_rules! impl_tokio_mutex_access {
         }
     };
 }
-
 
 #[macro_export]
 macro_rules! impl_rwlock_access {
@@ -56,7 +54,6 @@ macro_rules! impl_rwlock_access {
     };
 }
 
-
 #[macro_export]
 macro_rules! impl_tokio_rwlock_access {
     ($field:ident, $t:ty, $getter_name:ident, $setter_name:ident) => {
@@ -71,7 +68,6 @@ macro_rules! impl_tokio_rwlock_access {
     };
 }
 
-
 #[macro_export]
 macro_rules! impl_arc_access {
     ($field:ident, $t:ty, $getter_name:ident, $setter_name:ident) => {
@@ -85,14 +81,13 @@ macro_rules! impl_arc_access {
     };
 }
 
-
 #[macro_export]
 macro_rules! impl_option_access {
     ($field:ident, $t:ty, $getter_name:ident, $setter_name:ident) => {
         pub fn $getter_name(&self) -> Option<$t> {
             self.$field
         }
-        
+
         pub fn $setter_name(&self, new_val: $t) -> () {
             let mut $field: Option<$t> = self.$field;
             $field = Some(new_val);

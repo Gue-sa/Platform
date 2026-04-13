@@ -1,5 +1,7 @@
-use crate::{common::{constants::*, types::*}, shared::common::{constants::SLOTS_PER_MINUTE, types::Channel}};
-
+use crate::{
+    common::{constants::*, types::*},
+    shared::common::{constants::SLOTS_PER_MINUTE, types::Channel},
+};
 
 #[derive(Debug)]
 pub struct Slot {
@@ -8,9 +10,8 @@ pub struct Slot {
     pub assigned: bool,
     pub owner: Option<u32>,
     pub timeout: Option<u8>,
-    pub frames_since_last_use: i8
+    pub frames_since_last_use: i8,
 }
-
 
 impl Slot {
     pub fn init(number: u16) -> Self {
@@ -20,10 +21,9 @@ impl Slot {
             assigned: false,
             owner: None,
             timeout: None,
-            frames_since_last_use: -2
+            frames_since_last_use: -2,
         }
     }
-
 
     pub fn idx_to_channel(slot_idx: u16) -> Result<Channel, &'static str> {
         if slot_idx < SLOTS_PER_MINUTE {
@@ -35,11 +35,9 @@ impl Slot {
         }
     }
 
-
     pub fn mark_as_used(&mut self) -> () {
         self.frames_since_last_use = -1;
     }
-
 
     pub fn book(&mut self, mmsi: u32, timeout: Option<u8>, assigned: bool) -> () {
         if self.owner.is_none() {
@@ -50,7 +48,6 @@ impl Slot {
         }
     }
 
-
     pub fn release(&mut self) -> () {
         self.owner = None;
         self.timeout = None;
@@ -58,17 +55,15 @@ impl Slot {
         self.frames_since_last_use = -2;
     }
 
-
     pub fn tick(&mut self) -> () {
         self.mark_as_used();
-        
+
         if self.timeout.unwrap() == 0 {
             self.release();
         } else if 0 < self.timeout.unwrap() {
             self.timeout = Some(self.timeout.unwrap() - 1);
         }
     }
-
 
     pub fn is_free(&self) -> bool {
         self.owner.is_none()

@@ -8,7 +8,7 @@ use crate::{common::utils, shared::common::{types::{BitPackerError, BitPackerRes
 #[derive(Debug, Clone)]
 pub struct BitPacker {
     bits: Vec<u8>,
-    bits_len: usize
+    pub bits_len: usize
 }
 
 

@@ -1,22 +1,22 @@
 use crate::boat::Boat;
 
-
-mod common;
-mod ais;
 mod boat;
+mod boat_ais;
+mod boat_antenna;
+mod boat_gps;
+mod common;
+mod satcom;
+mod shared;
 mod slot;
 mod slots_map;
-mod gps;
-mod voyage;
-mod ui;
 mod systemstate;
-mod shared;
-mod satcom;
-
+mod ui;
+mod voyage;
+mod board_computer;
 
 #[tokio::main]
 async fn main() {
     let boat: Boat = Boat::init().await;
 
-    boat.start();
+    boat.start().await;
 }

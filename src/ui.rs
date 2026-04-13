@@ -2,19 +2,20 @@ use std::{fs::File, io::BufReader, rc::Rc, sync::Arc};
 
 use colored::*;
 use rev_lines::RevLines;
-use slint::{ModelRc, SharedString, VecModel, Weak, ToSharedString};
+use slint::{ModelRc, SharedString, ToSharedString, VecModel, Weak};
 
-use crate::{common::utils::log, shared::boat_info::{BoatInfo, NavigationData, StaticData, VoyageData}};
+use crate::{
+    common::utils::log,
+    shared::boat_info::{BoatInfo, NavigationData, StaticData, VoyageData},
+};
 
 slint::include_modules!();
-
 
 pub struct Ui {
     ui: AppWindow,
     ui_handle: Weak<AppWindow>,
-    boat_info: Arc<BoatInfo>
+    boat_info: Arc<BoatInfo>,
 }
-
 
 impl Ui {
     fn get_last_logs_entries(count: usize) -> ModelRc<SharedString> {
@@ -32,18 +33,16 @@ impl Ui {
         Rc::new(unwraped_logs).clone().into()
     }
 
-
     pub fn init(boat_info: Arc<BoatInfo>) -> Self {
         let ui: AppWindow = AppWindow::new().expect("REASON");
         let ui_handle: slint::Weak<AppWindow> = ui.as_weak();
-        
+
         Self {
             ui: ui,
             ui_handle: ui_handle,
-            boat_info: boat_info
+            boat_info: boat_info,
         }
     }
-
 
     pub fn start(&self) -> () {
         let ui_handle_clone: slint::Weak<AppWindow> = self.ui_handle.clone();
@@ -55,7 +54,8 @@ impl Ui {
         });
 
         tokio::spawn(async move {
-            let mut interval: tokio::time::Interval = tokio::time::interval(tokio::time::Duration::from_nanos(80_000_000 / 3));
+            let mut interval: tokio::time::Interval =
+                tokio::time::interval(tokio::time::Duration::from_nanos(80_000_000 / 3));
 
             loop {
                 interval.tick().await;
@@ -63,7 +63,7 @@ impl Ui {
                 let static_data: StaticData = boat_info_clone.get_static_data();
                 let voyage_data: VoyageData = boat_info_clone.get_voyage_data();
                 let nav_data: NavigationData = boat_info_clone.get_navigation_data();
-                
+
                 let name: String = static_data.name;
                 let mmsi: u32 = static_data.mmsi;
                 let imo: u32 = static_data.imo_number;

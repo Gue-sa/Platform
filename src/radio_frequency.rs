@@ -4,11 +4,10 @@ use dashmap::DashSet;
 
 use tokio::net::UdpSocket;
 
-use crate::{bitpacker::BitPacker, clients_registry::ClientsRegistry, common::{constants::*, types::*}};
+use crate::{clients_registry::ClientsRegistry, common::constants::HARBOURMASTER_IP, shared::{bitpacker::BitPacker, common::{constants::*, types::*}}};
 
 
 pub struct RadioFrequency {
-    pub freq: Option<u32>,
     pub channel: Channel,
     pub socket: UdpSocket,
     pub clients: ClientsRegistry,
@@ -19,13 +18,8 @@ pub struct RadioFrequency {
 
 
 impl RadioFrequency {
-    pub async fn init(freq: Option<u32>) -> Self {
-        let channel: Channel = if freq == Some(161975000) { Channel::C87B } else if freq == Some(161975001) { Channel::C88B } else { Channel::GPS };
-        let em_port: u16 = if matches!(channel, Channel::C87B) { C87B_EM_PORT } else if matches!(channel, Channel::C88B) { C88B_EM_PORT } else { GPS_EM_PORT };
-        let rec_port: u16 = if matches!(channel, Channel::C87B) { C87B_REC_PORT } else if matches!(channel, Channel::C88B) { C88B_REC_PORT } else { GPS_REC_PORT };
-
+    pub async fn init(channel: Channel, em_port: u16, rec_port: u16) -> Self {
         Self {
-            freq: freq,
             channel: channel,
             socket: UdpSocket::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0,0,0,0)), rec_port)).await.unwrap(),
             clients: ClientsRegistry::init(),
@@ -43,9 +37,9 @@ impl RadioFrequency {
     }
 
 
-    pub async fn handle_gps_request(&self, client: IpAddr) -> () {
-        let _ = self.socket.send_to(client.to_string().as_bytes(), SocketAddr::new(HARBOURMASTER_IP, GPS_EM_PORT)).await;
-        self.pending_gps_clients.insert(client);
+    pub async fn handle_gps_request(&self, msg: BitPacker) -> () {
+        let _ = self.socket.send_to(msg.bits(), SocketAddr::new(HARBOURMASTER_IP, GPS_EM_PORT)).await;
+        self.pending_gps_clients.insert(IpAddr::V4(Ipv4Addr::from_bits(msg.extract_int::<u32>(None, None).unwrap())));
     }
 
 
@@ -66,18 +60,22 @@ impl RadioFrequency {
                 let result = self.socket.recv_from(&mut buf).await;
 
                 let (size, source) = result.unwrap();
-                let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8 - 1)).unwrap();
+                let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8));
+
+                println!("{:?}", msg);
 
                 self.clients.register_client(source.ip());
 
-                if matches!(self.channel, Channel::GPS) {
-                    if source.ip() != HARBOURMASTER_IP {
-                        self.handle_gps_request(source.ip()).await;
+                if msg.bits() != BitPacker::from_str("hello", None).bits() {
+                    if matches!(self.channel, Channel::GPS) {
+                        if source.ip() != HARBOURMASTER_IP {
+                            self.handle_gps_request(msg).await;
+                        } else {
+                            self.handle_gps_response(msg).await;
+                        }
                     } else {
-                        self.handle_gps_response(msg).await;
+                        self.relay(&msg.bits()).await;
                     }
-                } else if msg.bits() != BitPacker::from_str("hello", None).unwrap().bits() {
-                    self.relay(&msg.bits()).await;
                 }
             }
         });

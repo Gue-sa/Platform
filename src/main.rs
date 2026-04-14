@@ -2,10 +2,8 @@ use crate::boat::Boat;
 
 mod boat;
 mod boat_ais;
-mod boat_antenna;
 mod boat_gps;
 mod common;
-mod shared;
 mod systemstate;
 mod ui;
 mod voyage;

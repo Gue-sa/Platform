@@ -1,5 +1,5 @@
 [package]
-name = "ProjetBateauRust"
+name = "boat"
 version = "0.1.0"
 edition = "2024"
 build = "build.rs"
@@ -17,6 +17,7 @@ serde = "1.0.228"
 slint = "1.15.1"
 tokio = {version = "1.51.0", features = ["full"]}
 toml = "1.1.2"
+shared = { path = "../shared" }
 
 [build-dependencies]
 slint-build = "1.15.1"

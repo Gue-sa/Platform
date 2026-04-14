@@ -1,20 +1,20 @@
 use std::sync::{Arc, RwLock};
 
+use shared::{
+    boat_info::BoatInfo,
+    boats_registry::BoatsInfoRegistry,
+    common::types::{SatComMessageType, VoyageStatus},
+    satcom_message::SatComMessage,
+    voyage_order::VoyageOrder,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{
-    shared::{
-        boat_info::BoatInfo,
-        common::types::{SatComMessageType, VoyageStatus},
-        satcom_message::SatComMessage,
-        voyage_order::VoyageOrder,
-    },
-    voyage::Voyage,
-};
+use crate::voyage::Voyage;
 
 pub struct BoardComputer {
     pub boat_info: Arc<BoatInfo>,
-    pub voyage: Arc<RwLock<Option<Voyage>>>,
+    pub boats_registry: Arc<BoatsInfoRegistry>,
+    pub voyage: Option<Voyage>,
     pub rx: Receiver<SatComMessage>,
     pub satcom_tx: Sender<SatComMessage>,
     pub voyage_order_revision: Option<VoyageOrder>,
@@ -23,43 +23,45 @@ pub struct BoardComputer {
 impl BoardComputer {
     pub fn new(
         boat_info: Arc<BoatInfo>,
-        voyage: Arc<RwLock<Option<Voyage>>>,
+        boats_registry: Arc<BoatsInfoRegistry>,
+        voyage: Option<Voyage>,
         rx: Receiver<SatComMessage>,
         satcom_tx: Sender<SatComMessage>,
     ) -> Self {
         Self {
             boat_info: boat_info,
+            boats_registry: boats_registry,
             voyage: voyage,
             rx: rx,
             satcom_tx: satcom_tx,
-            voyage_order_revision: None
+            voyage_order_revision: None,
         }
     }
 
     pub fn order_id(&self) -> u32 {
-        self.voyage.read().unwrap().as_ref().unwrap().order.id
+        self.voyage.as_ref().unwrap().order.id
     }
 
     pub fn order_version(&self) -> u8 {
-        self.voyage.read().unwrap().as_ref().unwrap().order.version
+        self.voyage.as_ref().unwrap().order.version
     }
 
     pub fn has_voyage(&self) -> bool {
-        self.voyage.read().unwrap().is_some()
+        self.voyage.is_some()
     }
 
-    pub fn update_voyage(&self, new_voyage: Voyage) -> () {
-        *self.voyage.write().unwrap() = Some(new_voyage);
+    pub fn update_voyage(&mut self, new_voyage: Voyage) -> () {
+        self.voyage = Some(new_voyage);
     }
 
-    pub fn update_voyage_status(&self, status: VoyageStatus) -> () {
-        if let Some(ref mut voyage) = *self.voyage.write().unwrap() {
+    pub fn update_voyage_status(&mut self, status: VoyageStatus) -> () {
+        if let Some(ref mut voyage) = self.voyage {
             voyage.set_status(status);
         }
     }
 
     pub fn voyage_status(&self) -> Option<VoyageStatus> {
-        if let Some(ref voyage) = *self.voyage.read().unwrap() {
+        if let Some(ref voyage) = self.voyage {
             Some(voyage.status.clone())
         } else {
             None
@@ -69,13 +71,13 @@ impl BoardComputer {
     pub fn matches_status(&self, status: Option<VoyageStatus>) -> bool {
         match status {
             Some(status_value) => {
-                if let Some(ref voyage) = *self.voyage.read().unwrap() {
+                if let Some(ref voyage) = self.voyage {
                     return voyage.status == status_value;
                 } else {
                     false
                 }
             }
-            None => self.voyage.read().unwrap().is_none(),
+            None => self.voyage.is_none(),
         }
     }
 
@@ -109,11 +111,12 @@ impl BoardComputer {
         self.drop_voyage_order_revision();
     }
 
-    pub fn end_voyage(&self) -> () {
-        *self.voyage.write().unwrap() = None;
+    pub fn end_voyage(&mut self) -> () {
+        self.voyage = None;
     }
 
-    pub async fn start(mut self) -> () { // ATTENTION : tout ce qui touche à la révision d'ordres de voyage en cours de route est très hasardeux, pour ne pas dire 0% fonctionnel.
+    pub async fn start(mut self) -> () {
+        // ATTENTION : tout ce qui touche à la révision d'ordres de voyage en cours de route est très hasardeux, pour ne pas dire 0% fonctionnel.
         loop {
             match self.rx.recv().await {
                 Some(satcom_message) => {
@@ -176,9 +179,11 @@ impl BoardComputer {
                                 if self.matches_status(Some(VoyageStatus::Accepted))
                                     || self.matches_status(Some(VoyageStatus::InExecution))
                                 {
-                                    self.voyage_order_revision = satcom_message.order_review.clone();
+                                    self.voyage_order_revision =
+                                        satcom_message.order_review.clone();
                                     self.update_voyage_status(VoyageStatus::UnderRevision);
-                                    msg_template.order_version = satcom_message.order_review.unwrap().version;
+                                    msg_template.order_version =
+                                        satcom_message.order_review.unwrap().version;
                                     let _ = self.satcom_tx.send(msg_template.clone()).await;
                                     self.adopt_voyage_order_revision();
                                     self.update_voyage_status(VoyageStatus::Accepted);

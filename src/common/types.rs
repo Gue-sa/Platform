@@ -1,4 +1,4 @@
-use crate::shared::common::types::{AisMessageError, BitPackerError};
+use shared::common::types::BitPackerError;
 
 pub enum GpsError {
     MalformedResponse,

@@ -6,27 +6,9 @@ use std::{
 
 use chrono::{DateTime, Datelike, Local, Timelike};
 use colored::{ColoredString, Colorize};
-
-use crate::shared::common::constants::SLOTS_PER_MINUTE;
+use shared::common::utils::{datetime_to_slots_idx, get_current_datetime};
 
 static LOG_FILE_LOCK: Mutex<()> = Mutex::new(());
-
-pub fn get_current_datetime() -> DateTime<Local> {
-    Local::now()
-}
-
-pub fn get_timestamp(datetime: Option<DateTime<Local>>) -> i64 {
-    let datetime: DateTime<Local> = datetime.unwrap_or(Local::now());
-    datetime.timestamp()
-}
-
-pub fn datetime_to_slots_idx(datetime: Option<DateTime<Local>>) -> [u16; 2] {
-    let datetime: DateTime<Local> = datetime.unwrap_or(Local::now());
-    let si: u16 = ((datetime.second() * 1000 + datetime.timestamp_subsec_millis())
-        * SLOTS_PER_MINUTE as u32
-        / 60_000) as u16;
-    [si, si + SLOTS_PER_MINUTE]
-}
 
 pub fn log(msg: ColoredString) -> () {
     let cdt: DateTime<Local> = get_current_datetime();

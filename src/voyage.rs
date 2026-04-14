@@ -1,4 +1,4 @@
-use crate::shared::{common::types::VoyageStatus, voyage_order::VoyageOrder};
+use shared::{common::types::VoyageStatus, voyage_order::VoyageOrder};
 
 #[derive(Debug, Clone)]
 pub struct VoyageSegment {

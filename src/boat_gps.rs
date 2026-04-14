@@ -1,23 +1,23 @@
 use std::{net::Ipv4Addr, sync::Arc, u32};
 
+use shared::{bitpacker::BitPacker, boat_info::BoatInfo};
 use tokio::{sync::mpsc::*, time::Duration};
 
 use colored::*;
 
 use crate::{
     common::{constants::BOAT_IPV4, utils::log},
-    shared::{bitpacker::BitPacker, boat_info::BoatInfo},
     systemstate::SystemState,
 };
 
-pub struct Gps {
+pub struct BoatGps {
     boat_info: Arc<BoatInfo>,
     rx: Receiver<BitPacker>,
     antenna_tx: Sender<BitPacker>,
     system_state: Arc<SystemState>,
 }
 
-impl Gps {
+impl BoatGps {
     pub fn init(
         boat_info: Arc<BoatInfo>,
         rx: Receiver<BitPacker>,

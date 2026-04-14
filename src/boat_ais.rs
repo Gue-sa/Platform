@@ -3,6 +3,21 @@ use std::sync::{
     atomic::{AtomicI64, AtomicU8, AtomicU16, AtomicU32, AtomicU64, Ordering::Relaxed},
 };
 
+use shared::{
+    ais_message::{CommunicationState, Message},
+    bitpacker::BitPacker,
+    boat_info::BoatInfo,
+    boats_registry::BoatsInfoRegistry,
+    common::{
+        constants::{
+            IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE, SOTDMA_CS_MSGS,
+        },
+        types::{AisError, AisPacket, AisResult, Channel},
+        utils::get_timestamp,
+    },
+    impl_arc_access, impl_atomic_access,
+    slots_map::SlotsMap,
+};
 use tokio::{
     sync::{Mutex, Notify, mpsc::*},
     time::{Duration, Instant, interval_at},
@@ -11,34 +26,16 @@ use tokio::{
 use colored::*;
 use rand::{Rng, seq::IndexedRandom};
 
-use crate::{
-    boat_antenna::AisPacket,
-    common::utils::*,
-    impl_arc_access, impl_atomic_access,
-    shared::{
-        ais_message::{CommunicationState, Message},
-        bitpacker::BitPacker,
-        boat_info::BoatInfo,
-        boats_registry::BoatsInfoRegistry,
-        slots_map::SlotsMap,
-        common::{
-            constants::{
-                IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE, SOTDMA_CS_MSGS,
-            },
-            types::{AisError, AisResult, Channel},
-        },
-    },
-    systemstate::SystemState,
-};
+use crate::{common::utils::*, systemstate::SystemState};
 
-pub struct AisState {
+pub struct BoatAisState {
     c_87_b_tx: Sender<BitPacker>,
     c_88_b_tx: Sender<BitPacker>,
 
     clock_pulse: Notify,
 
     boat_info: Arc<BoatInfo>,
-    boats_registry: BoatsInfoRegistry,
+    boats_registry: Arc<BoatsInfoRegistry>,
     slots_map: SlotsMap,
 
     recv_stations: AtomicU16,
@@ -58,17 +55,17 @@ pub struct AisState {
     system_state: Arc<SystemState>,
 }
 
-pub struct AisRunner {
-    state: AisState,
+pub struct BoatAisRunner {
+    state: BoatAisState,
     ais_rx: Mutex<Receiver<AisPacket>>,
 }
 
-impl AisState {
+impl BoatAisState {
     pub fn init(
         c_87_b_tx: Sender<BitPacker>,
         c_88_b_tx: Sender<BitPacker>,
         boat_info: Arc<BoatInfo>,
-        boats_registry: BoatsInfoRegistry,
+        boats_registry: Arc<BoatsInfoRegistry>,
         system_state: Arc<SystemState>,
     ) -> Self {
         let mmsi: u32 = boat_info.get_static_data().mmsi;
@@ -131,17 +128,17 @@ impl AisState {
     impl_atomic_access!(sotdma_nts, u16, nts, set_nts);
 }
 
-impl AisRunner {
+impl BoatAisRunner {
     pub fn init(
         rx: Receiver<AisPacket>,
         c_87_b_tx: Sender<BitPacker>,
         c_88_b_tx: Sender<BitPacker>,
         boat_info: Arc<BoatInfo>,
-        boats_registry: BoatsInfoRegistry,
+        boats_registry: Arc<BoatsInfoRegistry>,
         system_state: Arc<SystemState>,
     ) -> Self {
         Self {
-            state: AisState::init(
+            state: BoatAisState::init(
                 c_87_b_tx.clone(),
                 c_88_b_tx.clone(),
                 boat_info,
@@ -193,7 +190,7 @@ impl AisRunner {
             let t_s_owner: Option<u32> = slots_map.slot_owner(t_s);
             let t_s_timeout: Option<u8> = slots_map.slot_timeout(t_s);
 
-            if t_s_owner.is_none() || t_s_owner == Some(self_mmsi) {
+            if t_s_owner.is_none() || t_s_owner == Some(boat_mmsi) {
                 if t_s_timeout.is_some() {
                     slots_map.use_slot(t_s);
                 } else {
@@ -209,7 +206,7 @@ impl AisRunner {
                         .unwrap();
 
                     if t_s_owner.is_none() && cs_timeout > 0 {
-                        slots_map.book_slot(t_s, self_mmsi, Some(cs_timeout), None);
+                        slots_map.book_slot(t_s, boat_mmsi, Some(cs_timeout), None);
                     } else if t_s_timeout.is_none() || cs_timeout > 0 {
                         slots_map.slots.write().unwrap()[t_s as usize].timeout = Some(cs_timeout);
                     } else if t_s_timeout == Some(0) || cs_timeout == 0 {
@@ -670,11 +667,11 @@ impl AisRunner {
     }
 
     pub async fn start(self) -> () {
-        let runner_arc: Arc<AisRunner> = Arc::new(self);
-        let c87b_runner_arc: Arc<AisRunner> = runner_arc.clone();
-        let c88b_runner_arc: Arc<AisRunner> = runner_arc.clone();
-        let sotdma_runner_arc: Arc<AisRunner> = runner_arc.clone();
-        let clock_runner_arc: Arc<AisRunner> = runner_arc.clone();
+        let runner_arc: Arc<BoatAisRunner> = Arc::new(self);
+        let c87b_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
+        let c88b_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
+        let sotdma_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
+        let clock_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
 
         tokio::spawn(async move {
             clock_runner_arc.clone().master_clock().await;

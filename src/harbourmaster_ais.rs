@@ -8,7 +8,7 @@ use shared::{
     bitpacker::BitPacker,
     boats_registry::BoatsInfoRegistry,
     common::{
-        constants::IMPLEMENTED_MSGS,
+        constants::{HARBOURMASTER_MMSI, IMPLEMENTED_MSGS},
         types::{AisError, AisPacket, AisResult, Channel},
     },
     impl_atomic_access,
@@ -35,7 +35,7 @@ impl HarbourmasterAisState {
     pub fn init(boats_registry: Arc<BoatsInfoRegistry>) -> Self {
         Self {
             boats_registry: boats_registry,
-            slots_map: SlotsMap::init(0b111111111111111111111111111111),
+            slots_map: SlotsMap::init(HARBOURMASTER_MMSI),
             recv_stations: AtomicU16::new(0),
             sync_state: AtomicU8::new(0),
         }
@@ -62,7 +62,7 @@ impl HarbourmasterAisRunner {
         let msg: Message = Message::from_bits(msg)?;
         let boat_mmsi: u32 = msg.boat_info.get_static_data().mmsi;
 
-        if boat_mmsi != 0b111111111111111111111111111111
+        if boat_mmsi != HARBOURMASTER_MMSI
             && IMPLEMENTED_MSGS.binary_search(&msg.message_type).is_ok()
         {
             if self.state.boats_registry.is_registered(&boat_mmsi) {

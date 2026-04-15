@@ -1,0 +1,15 @@
+[package]
+name = "harbourmaster"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.44"
+colored = "3.1.1"
+crc = "3.4.0"
+dashmap = "6.1.0"
+num-traits = "0.2.19"
+opencv = "0.98.2"
+rand = "0.10.1"
+tokio = {version = "1.51.0", features = ["full"]}
+shared = { path = "../shared" }

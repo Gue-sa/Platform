@@ -5,7 +5,7 @@ use shared::{
     boats_registry::BoatsInfoRegistry,
     common::types::{SatComMessageType, VoyageStatus},
     satcom_message::SatComMessage,
-    voyage_order::VoyageOrder,
+    voyage_order::{VoyageOrder, VoyageOrderBody},
 };
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -39,11 +39,11 @@ impl BoardComputer {
     }
 
     pub fn order_id(&self) -> u32 {
-        self.voyage.as_ref().unwrap().order.id
+        self.voyage.as_ref().unwrap().order.header.id
     }
 
     pub fn order_version(&self) -> u8 {
-        self.voyage.as_ref().unwrap().order.version
+        self.voyage.as_ref().unwrap().order.header.version
     }
 
     pub fn has_voyage(&self) -> bool {
@@ -91,11 +91,11 @@ impl BoardComputer {
         ));
 
         self.boat_info.update_voyage_data(
-            Some(order.destination),
-            Some(order.eta_month),
-            Some(order.eta_day),
-            Some(order.eta_hour),
-            Some(order.eta_minute),
+            Some(order.body.destination),
+            Some(order.body.eta_month),
+            Some(order.body.eta_day),
+            Some(order.body.eta_hour),
+            Some(order.body.eta_minute),
         );
     }
 
@@ -124,8 +124,7 @@ impl BoardComputer {
                         let mut msg_template: SatComMessage = SatComMessage::new(
                             self.boat_info.get_static_data().mmsi,
                             satcom_message.source,
-                            satcom_message.order_id,
-                            satcom_message.order_version,
+                            satcom_message.order_header.clone(),
                             SatComMessageType::Acknowledgement,
                             None,
                         );
@@ -135,12 +134,15 @@ impl BoardComputer {
                                 self.satcom_tx.send(msg_template.clone()).await;
 
                                 if !self.has_voyage() {
-                                    let voyage_order: VoyageOrder =
-                                        satcom_message.order_review.unwrap();
+                                    let voyage_order: VoyageOrder = VoyageOrder {
+                                        header: satcom_message.order_header,
+                                        body: satcom_message.order_body_review.unwrap(),
+                                    };
 
                                     self.adopt_voyage_order(voyage_order);
 
                                     self.update_voyage_status(VoyageStatus::Accepted);
+
                                     msg_template.message_type = SatComMessageType::Acceptation;
                                     self.satcom_tx.send(msg_template).await;
                                 } else {
@@ -149,51 +151,81 @@ impl BoardComputer {
                                 }
                             }
                             SatComMessageType::Acknowledgement => {
-                                if self.matches_status(Some(VoyageStatus::RevisionSubmitted)) {
+                                if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
+                                    && satcom_message.order_header
+                                        == self.voyage_order_revision.clone().unwrap().header
+                                {
                                     self.update_voyage_status(VoyageStatus::UnderRevision);
-                                } else if self.matches_status(Some(VoyageStatus::Accepted)) {
+                                } else if self.matches_status(Some(VoyageStatus::Accepted))
+                                    && satcom_message.order_header
+                                        == self.voyage_order_revision.clone().unwrap().header
+                                {
                                     self.update_voyage_status(VoyageStatus::InExecution);
+
                                     msg_template.message_type = SatComMessageType::Executing;
                                     self.satcom_tx.send(msg_template).await;
                                 }
                             }
                             SatComMessageType::Acceptation => {
-                                if self.matches_status(Some(VoyageStatus::UnderRevision)) {
+                                if self.matches_status(Some(VoyageStatus::UnderRevision))
+                                    && satcom_message.order_header
+                                        == self.voyage_order_revision.clone().unwrap().header
+                                {
                                     self.adopt_voyage_order_revision();
+
                                     self.update_voyage_status(VoyageStatus::InExecution);
+
                                     msg_template.message_type = SatComMessageType::Executing;
                                     self.satcom_tx.send(msg_template).await;
                                 }
                             }
                             SatComMessageType::Refusal => {
-                                if self.matches_status(Some(VoyageStatus::UnderRevision)) {
+                                if self.matches_status(Some(VoyageStatus::UnderRevision))
+                                    && satcom_message.order_header
+                                        == self.voyage_order_revision.clone().unwrap().header
+                                {
                                     self.satcom_tx.send(msg_template.clone()).await;
+
                                     self.drop_voyage_order_revision();
+
                                     self.update_voyage_status(VoyageStatus::InExecution);
+
                                     msg_template.message_type = SatComMessageType::Executing;
-                                    msg_template.order_version = self.order_version();
+                                    msg_template.order_header.version = self.order_version();
                                     self.satcom_tx.send(msg_template).await;
                                 }
                             }
                             SatComMessageType::Revision => {
-                                if self.matches_status(Some(VoyageStatus::Accepted))
-                                    || self.matches_status(Some(VoyageStatus::InExecution))
+                                if (self.matches_status(Some(VoyageStatus::Accepted))
+                                    || self.matches_status(Some(VoyageStatus::InExecution)))
+                                    && satcom_message.order_header
+                                        == self.voyage_order_revision.clone().unwrap().header
                                 {
-                                    self.voyage_order_revision =
-                                        satcom_message.order_review.clone();
+                                    self.voyage_order_revision = Some(VoyageOrder {
+                                        header: satcom_message.order_header.clone(),
+                                        body: satcom_message.order_body_review.clone().unwrap(),
+                                    });
+
                                     self.update_voyage_status(VoyageStatus::UnderRevision);
-                                    msg_template.order_version =
-                                        satcom_message.order_review.unwrap().version;
+
+                                    msg_template.order_header = satcom_message.order_header;
                                     self.satcom_tx.send(msg_template.clone()).await;
+
                                     self.adopt_voyage_order_revision();
+
                                     self.update_voyage_status(VoyageStatus::Accepted);
+
                                     msg_template.message_type = SatComMessageType::Acceptation;
                                     self.satcom_tx.send(msg_template).await;
                                 }
                             }
                             SatComMessageType::EndOfVoyage => {
-                                if self.matches_status(Some(VoyageStatus::Completed)) {
+                                if self.matches_status(Some(VoyageStatus::Completed))
+                                    && satcom_message.order_header
+                                        == self.voyage_order_revision.clone().unwrap().header
+                                {
                                     self.update_voyage_status(VoyageStatus::Finished);
+
                                     self.satcom_tx.send(msg_template.clone()).await;
                                 }
                             }

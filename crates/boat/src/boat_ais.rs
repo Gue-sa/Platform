@@ -153,7 +153,7 @@ impl BoatAisRunner {
         log("Horloge SOTDMA lancée.".yellow());
 
         loop {
-            let now = std::time::SystemTime::now()
+            let now: Duration = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap();
 
@@ -365,6 +365,7 @@ impl BoatAisRunner {
         keep_flag: Option<bool>,
         offset: Option<u16>,
         slots_nbr: Option<u8>,
+        slot: u16
     ) -> () {
         let ant_tx: &Sender<BitPacker> = if self.state.nts() < SLOTS_PER_MINUTE {
             &self.state.c_87_b_tx
@@ -373,9 +374,8 @@ impl BoatAisRunner {
         };
 
         let sync_state: u8 = self.state.sync_state();
-        let nts: u16 = self.state.nts();
 
-        let timeout: Option<u8> = self.state.slots_map().slot_timeout(nts);
+        let timeout: Option<u8> = self.state.slots_map().slot_timeout(slot);
         let recv_stations: u16 = self.state.recv_stations();
 
         let com_state: Option<CommunicationState> = if NO_CS_MSGS.binary_search(&msg_type).is_err()
@@ -385,7 +385,7 @@ impl BoatAisRunner {
                 sync_state,
                 timeout,
                 offset,
-                Some(nts),
+                Some(slot),
                 Some(recv_stations),
                 offset,
                 slots_nbr,
@@ -403,7 +403,7 @@ impl BoatAisRunner {
         log(format!(
             "Message {} envoyé avec succès sur le slot {}.",
             msg_type,
-            self.state.nts()
+            slot
         )
         .green());
     }
@@ -456,16 +456,16 @@ impl BoatAisRunner {
         msg_type: u8,
         lme_itinc: u16,
         lme_itsl: u8,
-        lme_itkp: bool,
+        lme_itkp: bool
     ) -> AisResult<()> {
         if ITDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
             self.wait_for_slot(t_s).await?;
-            self.send(msg_type, Some(lme_itkp), Some(lme_itinc), Some(lme_itsl))
+            self.send(msg_type, Some(lme_itkp), Some(lme_itinc), Some(lme_itsl), t_s)
                 .await;
             self.state.slots_map().use_slot(t_s);
         } else if NO_CS_MSGS.binary_search(&msg_type).is_ok() {
             self.wait_for_slot(t_s).await?;
-            self.send(msg_type, None, None, None).await;
+            self.send(msg_type, None, None, None, t_s).await;
             self.state.slots_map().use_slot(t_s);
         } else {
             return Err(AisError::AisMessage(AisMessageError::UnknownMessageType));
@@ -561,7 +561,7 @@ impl BoatAisRunner {
 
                     tokio::spawn(async move {
                         self.wait_for_slot(msg5_slot).await;
-                        self.send(5, None, None, None).await;
+                        self.send(5, None, None, None, msg5_slot).await;
                     });
                 } else if self.state.slots_map().slot_timeout(nts) == Some(0) {
                     let new_nts: u16 = self.book_new_nts(ns, true)?;
@@ -572,7 +572,7 @@ impl BoatAisRunner {
 
                     self.wait_for_nts().await?;
 
-                    self.send(1, None, Some(offset), None).await;
+                    self.send(1, None, Some(offset), None, nts).await;
                     self.state.slots_map().use_slot(nts);
 
                     self.state.increase_t_counter();
@@ -581,7 +581,7 @@ impl BoatAisRunner {
                 } else {
                     self.wait_for_nts().await?;
 
-                    self.send(1, None, None, None).await;
+                    self.send(1, None, None, None, nts).await;
                     self.state.slots_map().use_slot(nts);
 
                     self.state.increase_t_counter();

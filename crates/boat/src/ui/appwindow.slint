@@ -1,0 +1,226 @@
+import { Button, VerticalBox, LineEdit, Palette, HorizontalBox, ListView } from "std-widgets.slint";
+
+
+export global BoatData {
+    in-out property<string> boat-name: "default";
+    in-out property<int> boat-mmsi: 0;
+    in-out property <int> boat-imo: 0;
+    in-out property <int> boat-type: 0;
+    in-out property <int> boat-longitude: 0;
+    in-out property <int> boat-latitude: 0;
+    in-out property <int> boat-heading: 0;
+    in-out property <int> boat-speed: 0;
+    in-out property <int> boat-turn-rate: 0;
+    in-out property <string> boat-destination: "default";
+    in-out property <int> boat-eta-month: 12;
+    in-out property <int> boat-eta-day: 31;
+    in-out property <int> boat-eta-hour: 12;
+    in-out property <int> boat-eta-minute: 59;
+
+    in-out property <[string]> log_msgs: [];
+
+    in-out property <int> active-page: 0;
+}
+
+
+export component ConfigView inherits Rectangle {
+    callback request-close();
+
+    in-out property <bool> ais-started: false;
+    in-out property <bool> nav-started: false;
+    in-out property <bool> gps-started: false;
+
+    VerticalBox {
+        HorizontalBox {
+            VerticalBox {
+                Button {
+                    text: "Démarrer le GPS";
+                    enabled: !root.gps-started ? true : false;
+                    clicked => {
+                        if (!root.gps-started) {
+                            root.gps-started = true;
+                        }
+                    }
+                }
+
+                Button {
+                    text: "Démarrer l'émission AIS";
+                    enabled: !root.ais-started && root.gps-started ? true : false;
+                    clicked => {
+                        if (!root.ais-started) {
+                            root.ais-started = true;
+                        }
+                    }
+                }
+
+                Button {
+                    text: "Démarrer la navigation";
+                    enabled: root.ais-started && !root.nav-started ? true : false;
+                    clicked => {
+                        if (!root.nav-started) {
+                            root.nav-started = true;
+                        }
+                    }
+                }
+            }
+
+            VerticalBox {
+                Button {
+                    text: "Stopper le GPS";
+                    enabled: root.gps-started && !root.nav-started && !root.ais-started ? true : false;
+                    clicked => {
+                        if (root.gps-started) {
+                            root.gps-started = false;
+                        }
+                    }
+                }
+
+                Button {
+                    text: "Stopper l'émission AIS";
+                    enabled: root.ais-started && !root.nav-started ? true : false;
+                    clicked => {
+                        if (root.ais-started) {
+                            root.ais-started = false;
+                        }
+                    }
+                }
+
+                Button {
+                    text: "Stopper la navigation";
+                    enabled: root.nav-started ? true : false;
+                    clicked => {
+                        if (root.nav-started) {
+                            root.nav-started = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        HorizontalBox {
+            Button {
+                text: "Quitter le système";
+                clicked => {
+                    root.request-close();
+                }
+            }
+        }
+    }
+}
+
+
+export component DataView inherits Rectangle {
+    HorizontalBox {
+        VerticalBox {
+            Text {
+                text: "Nom :\n" + BoatData.boat-name;
+            }
+
+            Text {
+                text: "MMSI :\n" + BoatData.boat-mmsi;
+            }
+
+            Text {
+                text: "IMO :\n" + BoatData.boat-imo;
+            }
+
+            Text {
+                text: "Type de navire :\n" + BoatData.boat-type;
+            }
+        }
+
+        VerticalBox {
+            Text {
+                text: "Position :\n" + BoatData.boat-latitude + " / " + BoatData.boat-longitude;
+            }
+
+            Text {
+                text: "Cap :\n" + BoatData.boat-heading + " °";
+            }
+
+            Text {
+                text: "Vitesse :\n" + BoatData.boat-speed + " kt";
+            }
+
+            Text {
+                text: "Taux de virage :\n" + BoatData.boat-turn-rate + " °/s";
+            }
+
+            Text {
+                text: "Destination :\n" + BoatData.boat-destination;
+            }
+
+            Text {
+                text: "ETA :\n" + BoatData.boat-eta-day + " / " + BoatData.boat-eta-month + ", " + BoatData.boat-eta-hour + " h " + BoatData.boat-eta-minute + " min";
+            }
+        }
+    }
+}
+
+
+export component AisView inherits Rectangle {
+    VerticalBox {
+        ListView {
+            for entry in BoatData.log_msgs : Text {
+                text: entry;
+            }
+        }
+    }
+}
+
+
+export component GpsView inherits Rectangle {
+    Rectangle {
+        background: red;
+    }
+}
+
+export component NavBar {
+    HorizontalBox {
+        Button {
+            text: "Configuration";
+            clicked => { BoatData.active-page = 0; }
+        }
+
+        Button {
+            text: "Données";
+            clicked => { BoatData.active-page = 1; }
+        }
+
+        Button {
+            text: "AIS";
+            clicked => { BoatData.active-page = 2; }
+        }
+
+        Button {
+            text: "GPS";
+            clicked => { BoatData.active-page = 3; }
+        }
+    }
+}
+
+
+export component AppWindow inherits Window {
+    icon: @image-url("assets/absolute-absolute-foshu-4042990837.png");
+
+    callback close();
+    
+    width: 480px;
+    height: 320px;
+    title: "Tableau de Bord";
+
+    no-frame: false;
+
+    full-screen: false;
+
+    VerticalBox {
+        NavBar {}
+
+        Rectangle {
+            if (BoatData.active-page == 0) : ConfigView { request-close => { root.close(); } }
+            if (BoatData.active-page == 1) : DataView {}
+            if (BoatData.active-page == 2) : AisView {}
+            if (BoatData.active-page == 3) : GpsView {}
+        }
+    }
+}

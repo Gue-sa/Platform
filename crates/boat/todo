@@ -1,0 +1,15 @@
+* Refactor ce qui a été marqué
+* Implémenter des Result partout où on peut
+* Vérifier que les Result gèrent bien les erreurs
+* Remplacer les .unwrap() et !panic() par des ? et autres gestions d'erreurs correctes, ajouter des Result<(), &'static str>s
+* Remplacer les threads par du tokio
+* condvar + clock thread
+* changement de rr
+* mettre les fields en privé
+* mettre les si en usize quand nécessaire
+* implémenter partout où c'est possible Display, Debug, Index et IndexMut
+* Rendre le code beau
+* Enlever les tx là où ils sont pas utiles
+* Reecrire le + pour être plus performant et implémenter +=
+* Gestion d'erreur de dépassement de slot
+* Modifier send pour qu'on puisse lui donner le vrai nts

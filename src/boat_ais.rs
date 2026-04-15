@@ -20,7 +20,7 @@ use shared::{
 };
 use tokio::{
     sync::{Mutex, Notify, mpsc::*},
-    time::{Duration, Instant, interval_at},
+    time::Duration,
 };
 
 use colored::*;
@@ -158,14 +158,14 @@ impl BoatAisRunner {
                 .unwrap();
 
             let total_ns: u64 = now.as_nanos() as u64;
-            
+
             let current_slot_idx: u64 = (total_ns * 3) / 80_000_000;
-            
+
             let next_slot_idx: u64 = current_slot_idx + 1;
             let next_slot_start_ns: u64 = (next_slot_idx * 80_000_000) / 3;
-            
+
             let delay_ns: u64 = next_slot_start_ns.saturating_sub(total_ns);
-            
+
             tokio::time::sleep(Duration::from_nanos(delay_ns)).await;
 
             self.state.clock_pulse.notify_waiters();
@@ -268,7 +268,12 @@ impl BoatAisRunner {
             let slot_distance: u16 = SlotsMap::slot_offset(None, slot_idx);
 
             if slot_distance > last_slots_distance {
-                println!("{} {} {}", SlotsMap::current_slot_number(Channel::C87B), slot_idx, slot_distance);
+                println!(
+                    "{} {} {}",
+                    SlotsMap::current_slot_number(Channel::C87B),
+                    slot_idx,
+                    slot_distance
+                );
 
                 return Err(ClockError::SlotOvershoot);
             } else {
@@ -533,7 +538,7 @@ impl BoatAisRunner {
             Ok(next_nts) => {
                 if last_msg5_timestamp == -1 || get_timestamp(None) - last_msg5_timestamp >= 356 {
                     let msg5_slot: u16 = self.book_new_nts(next_ns, false)?;
-                    
+
                     self.state.slots_map().release_slot(msg5_slot);
 
                     let offset: u16 = SlotsMap::slot_offset(Some(nts), msg5_slot);

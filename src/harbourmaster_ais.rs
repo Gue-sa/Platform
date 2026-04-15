@@ -155,7 +155,7 @@ impl HarbourmasterAisRunner {
                                     println!(
                                         "{}",
                                         format!(
-                                            "Message {} reçu du navire {} : {:?}.",
+                                            "Message {} reçu du navire {} : {:#?}.",
                                             msg.message_type,
                                             msg.boat_info.get_static_data().mmsi,
                                             msg.boat_info.clone()
@@ -178,7 +178,7 @@ impl HarbourmasterAisRunner {
                                     println!(
                                         "{}",
                                         format!(
-                                            "Message {} reçu du navire {} : {:?}.",
+                                            "Message {} reçu du navire {} : {:#?}.",
                                             msg.message_type,
                                             msg.boat_info.get_static_data().mmsi,
                                             msg.boat_info.clone()

@@ -45,13 +45,13 @@ impl HarbourmasterGps {
         tokio::spawn(async move {
             let mut cam: VideoCapture = VideoCapture::new(0, CAP_ANY).unwrap();
 
-            //let _ = cam.set(CAP_PROP_FRAME_WIDTH, 1920.);
-            //let _ = cam.set(CAP_PROP_FRAME_HEIGHT, 1080.);
+            //cam.set(CAP_PROP_FRAME_WIDTH, 1920.);
+            //cam.set(CAP_PROP_FRAME_HEIGHT, 1080.);
 
-            let _ = cam.set(CAP_PROP_BUFFERSIZE, 1.);
+            cam.set(CAP_PROP_BUFFERSIZE, 1.);
 
-            let _ = cam.set(videoio::CAP_PROP_AUTO_EXPOSURE, 1.);
-            let _ = cam.set(CAP_PROP_EXPOSURE, -3.).unwrap();
+            cam.set(videoio::CAP_PROP_AUTO_EXPOSURE, 1.);
+            cam.set(CAP_PROP_EXPOSURE, -3.).unwrap();
 
             let mut frame: Mat = Mat::default();
             let mut flipped_frame: Mat = Mat::default();
@@ -163,7 +163,7 @@ impl HarbourmasterGps {
                                 // let final_x = center_x * 2;
                             }
 
-                            let _ = pos_tx.send([center_x, center_y]).await;
+                            pos_tx.send([center_x, center_y]).await;
 
                             println!("Rectangle rouge détecté en [{}, {}]", center_x, center_y);
 
@@ -202,7 +202,7 @@ impl HarbourmasterGps {
     }
 
     pub async fn start(mut self) -> () {
-        let _ = self.detect(self.pos_tx.clone());
+        self.detect(self.pos_tx.clone());
 
         tokio::spawn(async move {
             loop {
@@ -216,7 +216,7 @@ impl HarbourmasterGps {
 
                         let res: BitPacker = BitPacker::from_int(self.latitude, Some(32)) + BitPacker::from_int(self.longitude, Some(32)) + msg;
 
-                        let _ = self.antenna_tx.send(res).await;
+                        self.antenna_tx.send(res).await;
                     }
                 }
             }

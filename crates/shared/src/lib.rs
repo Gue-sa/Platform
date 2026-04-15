@@ -1,0 +1,11 @@
+pub mod common;
+pub mod ais_message;
+pub mod antenna;
+pub mod bitpacker;
+pub mod boat_info;
+pub mod boats_registry;
+pub mod satcom_message;
+pub mod satcom;
+pub mod slot;
+pub mod slots_map;
+pub mod voyage_order;

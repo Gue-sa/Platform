@@ -9,10 +9,10 @@ use shared::{
     boat_info::BoatInfo,
     boats_registry::BoatsInfoRegistry,
     common::{
-        constants::{
-            IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE, SOTDMA_CS_MSGS,
+        constants::{IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE},
+        types::{
+            AisError, AisMessageError, AisPacket, AisResult, Channel, ClockError, ClockResult,
         },
-        types::{AisError, AisPacket, AisResult, Channel},
         utils::get_timestamp,
     },
     impl_arc_access, impl_atomic_access,
@@ -150,25 +150,24 @@ impl BoatAisRunner {
     }
 
     pub async fn master_clock(&self) {
-        let slot_duration_ns: u64 = 80_000_000 / 3;
-
-        let now_utc: Duration = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap();
-
-        let ns_since_current_minute: u64 = (now_utc.as_nanos() % 60_000_000_000) as u64;
-        let next_slot_start_ns: u64 =
-            ((ns_since_current_minute / slot_duration_ns) + 1) * slot_duration_ns;
-        let first_tick_delay: u64 = next_slot_start_ns - ns_since_current_minute;
-
-        let first_tick: Instant = Instant::now() + Duration::from_nanos(first_tick_delay);
-        let mut interval: tokio::time::Interval =
-            interval_at(first_tick, Duration::from_nanos(slot_duration_ns));
-
-        log("Horloge SOTDMA synchronisée sur l'heure UTC.".yellow());
+        log("Horloge SOTDMA lancée.".yellow());
 
         loop {
-            interval.tick().await;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap();
+
+            let total_ns: u64 = now.as_nanos() as u64;
+            
+            let current_slot_idx: u64 = (total_ns * 3) / 80_000_000;
+            
+            let next_slot_idx: u64 = current_slot_idx + 1;
+            let next_slot_start_ns: u64 = (next_slot_idx * 80_000_000) / 3;
+            
+            let delay_ns: u64 = next_slot_start_ns.saturating_sub(total_ns);
+            
+            tokio::time::sleep(Duration::from_nanos(delay_ns)).await;
+
             self.state.clock_pulse.notify_waiters();
         }
     }
@@ -254,51 +253,76 @@ impl BoatAisRunner {
         Ok(msg)
     }
 
-    pub async fn wait_for_slot(&self, slot_idx: u16) -> () {
-        // A utiliser dans thread sender !
+    pub async fn wait_for_slot(&self, slot_idx: u16) -> ClockResult<()> {
+        let mut last_slots_distance: u16 = SlotsMap::slot_offset(None, slot_idx);
+
         let channel: Channel = if slot_idx < SLOTS_PER_MINUTE {
             Channel::C87B
         } else {
             Channel::C88B
         };
+
         while SlotsMap::current_slot_number(channel) != slot_idx {
             self.state.clock_pulse.notified().await;
+
+            let slot_distance: u16 = SlotsMap::slot_offset(None, slot_idx);
+
+            if slot_distance > last_slots_distance {
+                println!("{} {} {}", SlotsMap::current_slot_number(Channel::C87B), slot_idx, slot_distance);
+
+                return Err(ClockError::SlotOvershoot);
+            } else {
+                last_slots_distance = slot_distance;
+            }
         }
+
+        Ok(())
     }
 
-    pub async fn wait_for_nts(&self) -> () {
+    pub async fn wait_for_nts(&self) -> ClockResult<()> {
         let nts: u16 = self.state.nts();
-        let _ = self.wait_for_slot(nts).await;
+        self.wait_for_slot(nts).await
     }
 
-    pub fn set_initial_nss_and_ns(&self) -> () {
-        let initial_nss_and_ns: u16 = self.ratdma_slot_selection(Channel::C87B, 1).unwrap();
-        let _ = self.state.set_ns(initial_nss_and_ns);
-        let _ = self.state.set_nss(initial_nss_and_ns);
-    }
-
-    pub fn get_next_ns(&self) -> u16 {
+    pub fn upcoming_ns(&self) -> u16 {
         let nss: u16 = self.state.nss();
         let t_counter: u64 = self.state.t_counter();
         let ni: u16 = self.state.ni();
         ((nss as u64 + t_counter * ni as u64) % SLOTS_PER_MINUTE as u64) as u16
     }
 
-    pub fn set_next_ns(&self) -> () {
-        let next_ns: u16 = self.get_next_ns();
-        self.state.set_ns(next_ns);
+    pub fn upcoming_nts(&self) -> AisResult<u16> {
+        let upcoming_ns: u16 = self.upcoming_ns();
+        let si: u16 = self.state.si();
+        let start_si: u16 = (upcoming_ns + SLOTS_PER_MINUTE - si.div_euclid(2)) % SLOTS_PER_MINUTE;
+
+        let available_ss: Box<[u16]> = self.state.slots_map().scan_for_self_owned_slots(
+            Some(si),
+            Some(start_si),
+            Channel::Any,
+        );
+
+        if available_ss.len() == 0 {
+            return Err(AisError::NoOwnedSlot);
+        }
+
+        Ok(*available_ss.choose(&mut rand::rng()).unwrap())
     }
 
-    pub fn set_next_nts(&self) -> AisResult<u16> {
+    pub fn book_new_nts(&self, ns: u16, keep_nts_channel: bool) -> AisResult<u16> {
         let nts: u16 = self.state.nts();
+        let si: u16 = self.state.si();
 
-        let rsv_chn: Channel = if nts < SLOTS_PER_MINUTE {
+        let rsv_chn: Channel = if nts < SLOTS_PER_MINUTE && keep_nts_channel {
+            Channel::C87B
+        } else if nts >= SLOTS_PER_MINUTE && keep_nts_channel {
+            Channel::C88B
+        } else if nts < SLOTS_PER_MINUTE && !keep_nts_channel {
             Channel::C88B
         } else {
             Channel::C87B
         };
-        let ns: u16 = self.state.ns();
-        let si: u16 = self.state.si();
+
         let mut start_si: u16 =
             (ns + SLOTS_PER_MINUTE + SLOTS_PER_MINUTE - si.div_euclid(2)) % SLOTS_PER_MINUTE;
 
@@ -328,24 +352,6 @@ impl BoatAisRunner {
             .book_slot(next_nts, mmsi, Some(timeout), Some(false));
 
         Ok(next_nts)
-    }
-
-    pub fn get_next_nts(&self) -> AisResult<u16> {
-        let next_ns: u16 = self.get_next_ns();
-        let si: u16 = self.state.si();
-        let start_si: u16 = (next_ns + SLOTS_PER_MINUTE - si.div_euclid(2)) % SLOTS_PER_MINUTE;
-
-        let available_ss: Box<[u16]> = self.state.slots_map().scan_for_self_owned_slots(
-            Some(si),
-            Some(start_si),
-            Channel::Any,
-        );
-
-        if available_ss.len() == 0 {
-            return Err(AisError::NoOwnedSlot);
-        }
-
-        Ok(*available_ss.choose(&mut rand::rng()).unwrap())
     }
 
     pub async fn send(
@@ -387,7 +393,7 @@ impl BoatAisRunner {
         let msg: Message =
             Message::from_info(self.state.boat_info().as_ref().clone(), msg_type, com_state);
 
-        let _ = ant_tx.send(msg.build()).await;
+        ant_tx.send(msg.build()).await;
 
         log(format!(
             "Message {} envoyé avec succès sur le slot {}.",
@@ -446,26 +452,32 @@ impl BoatAisRunner {
         lme_itinc: u16,
         lme_itsl: u8,
         lme_itkp: bool,
-    ) -> () {
+    ) -> AisResult<()> {
         if ITDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
-            self.wait_for_slot(t_s).await;
-            let _ = self
-                .send(msg_type, Some(lme_itkp), Some(lme_itinc), Some(lme_itsl))
+            self.wait_for_slot(t_s).await?;
+            self.send(msg_type, Some(lme_itkp), Some(lme_itinc), Some(lme_itsl))
                 .await;
             self.state.slots_map().use_slot(t_s);
         } else if NO_CS_MSGS.binary_search(&msg_type).is_ok() {
-            self.wait_for_slot(t_s).await;
-            let _ = self.send(msg_type, None, None, None).await;
+            self.wait_for_slot(t_s).await?;
+            self.send(msg_type, None, None, None).await;
             self.state.slots_map().use_slot(t_s);
+        } else {
+            return Err(AisError::AisMessage(AisMessageError::UnknownMessageType));
         }
+
+        Ok(())
     }
 
     pub async fn sotdma_net_entry(&self) -> AisResult<()> {
-        self.set_initial_nss_and_ns();
-        let next_nts: u16 = self.set_next_nts()?;
+        let initial_nss_and_ns: u16 = self.ratdma_slot_selection(Channel::C87B, 1).unwrap();
+        self.state.set_ns(initial_nss_and_ns);
+        self.state.set_nss(initial_nss_and_ns);
+
+        let next_nts: u16 = self.book_new_nts(initial_nss_and_ns, true)?;
         self.state.set_nts(next_nts);
         log(format!("Premier NTS réservé : {}", self.state.nts()).yellow());
-        self.wait_for_nts().await;
+        self.wait_for_nts().await?;
 
         Ok(())
     }
@@ -473,161 +485,136 @@ impl BoatAisRunner {
     pub async fn sotdma_first_frame(&self) -> AisResult<()> {
         let mut virtual_offset: Option<u16> = None;
         let ref_nts: u16 = self.state.nts();
+        let si: u16 = self.state.si();
+
         while virtual_offset.is_none() || virtual_offset != Some(0) {
-            self.set_next_ns();
-            let next_nts: u16 = self.set_next_nts()?;
-            let si: u16 = self.state.si();
             let nts: u16 = self.state.nts();
+            let next_ns: u16 = self.upcoming_ns();
+
+            let next_nts: u16 = self.book_new_nts(next_ns, false)?;
             let offset: u16 = SlotsMap::slot_offset(Some(nts), next_nts);
+
             virtual_offset = if SlotsMap::absolute_slot_distance(Some(next_nts), ref_nts) >= si {
                 Some(offset)
             } else {
                 Some(0)
             };
-            let t_s: u16 = self.state.nts();
-            let _ = self.itdma(t_s, 3, virtual_offset.unwrap(), 1, true).await;
-            self.state.increase_t_counter();
 
-            log(format!("NTS réservé pour le prochain message 3 : {}.", next_nts).yellow());
+            self.itdma(nts, 3, virtual_offset.unwrap(), 1, true).await?;
+
+            self.state.increase_t_counter();
+            self.state.set_ns(next_ns);
 
             if virtual_offset.unwrap() != 0 {
                 self.state.set_nts(next_nts);
+
+                log(format!("NTS réservé pour le prochain message 3 : {}.", next_nts).yellow());
             } else {
                 self.state.slots_map().release_slot(next_nts);
+
                 self.state.set_nts(ref_nts);
-                self.state.decrease_t_counter();
             }
         }
 
         Ok(())
     }
 
-    pub async fn sotdma_continuous(&self, msg_type: u8) -> () {
-        // A refactor !
-        if NO_CS_MSGS.binary_search(&msg_type).is_ok() {
-            self.wait_for_nts().await;
-            let _ = self.send(msg_type, None, None, None).await;
-            let nts: u16 = self.state.nts();
-            self.state.slots_map().use_slot(nts);
-            self.state.increase_t_counter();
-            self.set_next_ns();
+    pub async fn sotdma_continuous(self: Arc<Self>) -> AisResult<()> {
+        // Ici, on arrive avec les NS / NTS du message qu'on va envoyer juste après et qu'on doit encore construire
+        let nts: u16 = self.state.nts().clone();
+        let ns: u16 = self.state.ns().clone();
+        let si: u16 = self.state.si();
 
-            match self.get_next_nts() {
-                Ok(next_nts) => self.state.set_nts(next_nts),
-                Err(e) => {
-                    if let Ok(next_nts) = self.set_next_nts() {
-                        let nts: u16 = self.state.nts();
-                        let offset: u16 = SlotsMap::slot_offset(Some(next_nts), nts);
+        let next_ns: u16 = self.upcoming_ns();
 
-                        log(format!(
-                            "NTS manquant détecté. Réservation du NTS {} pour le remplacer.",
-                            next_nts
-                        )
-                        .yellow());
+        let last_msg5_timestamp: i64 = self.state.last_msg5_timestamp();
 
-                        self.wait_for_nts().await;
-                        let _ = self.itdma(nts, 3, offset, 1, true).await;
-                        self.state.set_nts(next_nts);
-                    }
+        match self.upcoming_nts() {
+            Ok(next_nts) => {
+                if last_msg5_timestamp == -1 || get_timestamp(None) - last_msg5_timestamp >= 356 {
+                    let msg5_slot: u16 = self.book_new_nts(next_ns, false)?;
+                    
+                    self.state.slots_map().release_slot(msg5_slot);
+
+                    let offset: u16 = SlotsMap::slot_offset(Some(nts), msg5_slot);
+
+                    log(format!(
+                        "Réservation du slot {} pour émettre le prochain message 5.",
+                        msg5_slot
+                    )
+                    .yellow());
+
+                    self.wait_for_nts().await?;
+
+                    self.itdma(nts, 3, offset, 1, true).await?;
+
+                    self.state.increase_t_counter();
+                    self.state.set_ns(next_ns);
+                    self.state.set_nts(next_nts);
+
+                    self.state.set_last_msg5_timestamp(get_timestamp(None));
+
+                    tokio::spawn(async move {
+                        self.wait_for_slot(msg5_slot).await;
+                        self.send(5, None, None, None).await;
+                    });
+                } else if self.state.slots_map().slot_timeout(nts) == Some(0) {
+                    let new_nts: u16 = self.book_new_nts(ns, true)?;
+
+                    log(format!("NTS {} arrivé à expiration : remplacement par le slot {} après le prochain message.", nts, new_nts).yellow());
+
+                    let offset: u16 = SlotsMap::slot_offset(Some(nts), new_nts);
+
+                    self.wait_for_nts().await?;
+
+                    self.send(1, None, Some(offset), None).await;
+                    self.state.slots_map().use_slot(nts);
+
+                    self.state.increase_t_counter();
+                    self.state.set_ns(next_ns);
+                    self.state.set_nts(next_nts);
+                } else {
+                    self.wait_for_nts().await?;
+
+                    self.send(1, None, None, None).await;
+                    self.state.slots_map().use_slot(nts);
+
+                    self.state.increase_t_counter();
+                    self.state.set_ns(next_ns);
+                    self.state.set_nts(next_nts);
                 }
             }
-        } else if SOTDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
-            self.wait_for_nts().await;
-            let nts: u16 = self.state.nts();
-            if self.state.slots_map().slot_timeout(nts) == Some(0) {
-                let nts_channel: Channel = if nts < SLOTS_PER_MINUTE {
-                    Channel::C87B
-                } else {
-                    Channel::C88B
-                };
-                let ns: u16 = self.state.ns();
-                let si: u16 = self.state.si();
-                let start_si: u16 = (ns + SLOTS_PER_MINUTE - si.div_euclid(2)) % SLOTS_PER_MINUTE;
-                let available_nts: Box<[u16]> = self.state.slots_map().scan_for_free_slots(
-                    Some(si),
-                    Some(start_si),
-                    None,
-                    nts_channel,
-                );
+            Err(_) => {
+                let new_nts: u16 = self.book_new_nts(next_ns, false)?;
+                let offset: u16 = SlotsMap::slot_offset(Some(nts), new_nts);
 
-                let new_nts: u16 = *available_nts.choose(&mut rand::rng()).unwrap();
+                log(format!(
+                    "NTS manquant détecté. Réservation du NTS {} pour le remplacer.",
+                    new_nts
+                )
+                .yellow());
 
-                log(format!("NTS {} arrivé à expiration : remplacement par le slot {} après le prochain message.", nts, new_nts).yellow());
+                self.wait_for_nts().await?;
 
-                let offset: u16 = SlotsMap::slot_offset(None, new_nts);
-                let _ = self.send(msg_type, None, Some(offset), None).await;
-                self.state.slots_map().use_slot(nts);
+                self.itdma(nts, 3, offset, 1, true).await?;
+
                 self.state.increase_t_counter();
-                self.set_next_ns();
-
-                match self.get_next_nts() {
-                    Ok(next_nts) => {
-                        self.state.set_nts(next_nts);
-                        let tmo_min: u8 = self.state.tmo_min();
-                        let tmo_max: u8 = self.state.tmo_max();
-                        let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max);
-                        let mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
-                        self.state
-                            .slots_map()
-                            .book_slot(new_nts, mmsi, Some(timeout), None);
-                    }
-                    Err(e) => {
-                        if let Ok(next_nts) = self.set_next_nts() {
-                            log(format!(
-                                "NTS manquant détecté. Réservation du NTS {} pour le remplacer.",
-                                next_nts
-                            )
-                            .yellow());
-
-                            self.state.set_nts(next_nts);
-                            let tmo_min: u8 = self.state.tmo_min();
-                            let tmo_max: u8 = self.state.tmo_max();
-                            let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max);
-                            let mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
-                            self.state
-                                .slots_map()
-                                .book_slot(new_nts, mmsi, Some(timeout), None);
-                        }
-                    }
-                }
-            } else {
-                let _ = self.send(msg_type, None, None, None).await;
-                let nts: u16 = self.state.nts();
-                self.state.slots_map().use_slot(nts);
-                self.state.increase_t_counter();
-                self.set_next_ns();
-
-                match self.get_next_nts() {
-                    Ok(next_nts) => self.state.set_nts(next_nts),
-                    Err(e) => {
-                        if let Ok(next_nts) = self.set_next_nts() {
-                            let nts: u16 = self.state.nts();
-                            let offset: u16 = SlotsMap::slot_offset(Some(next_nts), nts);
-
-                            log(format!(
-                                "NTS manquant détecté. Réservation du NTS {} pour le remplacer.",
-                                next_nts
-                            )
-                            .yellow());
-
-                            self.wait_for_nts().await;
-                            let _ = self.itdma(nts, 3, offset, 1, true).await;
-                            self.state.set_nts(next_nts);
-                        }
-                    }
-                }
+                self.state.set_ns(next_ns);
+                self.state.set_nts(new_nts);
             }
         }
+
+        Ok(())
     }
 
     pub fn sotdma_change_rr(&self) -> () {
         todo!()
     }
 
-    pub async fn sotdma(&self) -> AisResult<()> {
+    pub async fn sotdma(self: Arc<Self>) -> AisResult<()> {
         log("Initialisation du SOTDMA...".yellow());
 
-        let _ = tokio::time::sleep(Duration::from_secs(0)).await;
+        tokio::time::sleep(Duration::from_secs(0)).await;
 
         log("Initialisation du SOTMA terminée.".yellow());
 
@@ -644,19 +631,25 @@ impl BoatAisRunner {
 
             match self.sotdma_first_frame().await {
                 Ok(_) => {}
-                Err(_) => return Err(AisError::SotdmaInitFailed),
+                Err(e) => {
+                    println!("Erreur : {:?}", e);
+                    return Err(AisError::SotdmaInitFailed);
+                }
             }
 
             log("Fin de la première frame.".yellow());
             log("Lancement de la phase continue SOTDMA.".yellow());
 
             loop {
-                let last_msg5_timestamp: i64 = self.state.last_msg5_timestamp();
-                if last_msg5_timestamp == -1 || get_timestamp(None) - last_msg5_timestamp >= 356 {
-                    self.state.set_last_msg5_timestamp(get_timestamp(None));
-                    let _ = self.sotdma_continuous(5).await;
-                } else {
-                    let _ = self.sotdma_continuous(1).await;
+                match self.clone().sotdma_continuous().await {
+                    Ok(_) => {}
+                    Err(_) => {
+                        self.state.increase_t_counter();
+                        self.state.set_ns(self.upcoming_ns());
+                        self.state.set_nts(self.upcoming_nts()?);
+
+                        log("L'AIS a subi une erreur qui a rendu l'émission du message initialement prévu impossible. Il continuera probablement à fonctionner normalement, mais il est préférable de surveiller son bon comportement pour une durée d'une minute révolue.".red());
+                    }
                 }
             }
         } else {
@@ -686,7 +679,7 @@ impl BoatAisRunner {
                             {
                                 Ok(msg) => {
                                     log(format!(
-                                        "Message {} reçu du navire {} : {:?}.",
+                                        "Message {} reçu du navire {} : {:#?}.",
                                         msg.message_type,
                                         msg.boat_info.get_static_data().mmsi,
                                         msg.boat_info.clone()
@@ -706,7 +699,7 @@ impl BoatAisRunner {
                             {
                                 Ok(msg) => {
                                     log(format!(
-                                        "Message {} reçu du navire {} : {:?}.",
+                                        "Message {} reçu du navire {} : {:#?}.",
                                         msg.message_type,
                                         msg.boat_info.get_static_data().mmsi,
                                         msg.boat_info.clone()
@@ -731,7 +724,7 @@ impl BoatAisRunner {
             Ok(_) => {}
             Err(_) => {
                 panic!(
-                    "L'initialisation du SOTDMA a échoué. Veuillez redémarrer le système manuellement."
+                    "Le SOTDMA a subi une erreur irrécupérable. Veuillez redémarrer l'AIS manuellement."
                 )
             }
         }

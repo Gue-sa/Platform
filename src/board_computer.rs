@@ -132,7 +132,7 @@ impl BoardComputer {
 
                         match satcom_message.message_type {
                             SatComMessageType::Offer => {
-                                let _ = self.satcom_tx.send(msg_template.clone()).await;
+                                self.satcom_tx.send(msg_template.clone()).await;
 
                                 if !self.has_voyage() {
                                     let voyage_order: VoyageOrder =
@@ -142,10 +142,10 @@ impl BoardComputer {
 
                                     self.update_voyage_status(VoyageStatus::Accepted);
                                     msg_template.message_type = SatComMessageType::Acceptation;
-                                    let _ = self.satcom_tx.send(msg_template).await;
+                                    self.satcom_tx.send(msg_template).await;
                                 } else {
                                     msg_template.message_type = SatComMessageType::Refusal;
-                                    let _ = self.satcom_tx.send(msg_template).await;
+                                    self.satcom_tx.send(msg_template).await;
                                 }
                             }
                             SatComMessageType::Acknowledgement => {
@@ -154,7 +154,7 @@ impl BoardComputer {
                                 } else if self.matches_status(Some(VoyageStatus::Accepted)) {
                                     self.update_voyage_status(VoyageStatus::InExecution);
                                     msg_template.message_type = SatComMessageType::Executing;
-                                    let _ = self.satcom_tx.send(msg_template).await;
+                                    self.satcom_tx.send(msg_template).await;
                                 }
                             }
                             SatComMessageType::Acceptation => {
@@ -162,17 +162,17 @@ impl BoardComputer {
                                     self.adopt_voyage_order_revision();
                                     self.update_voyage_status(VoyageStatus::InExecution);
                                     msg_template.message_type = SatComMessageType::Executing;
-                                    let _ = self.satcom_tx.send(msg_template).await;
+                                    self.satcom_tx.send(msg_template).await;
                                 }
                             }
                             SatComMessageType::Refusal => {
                                 if self.matches_status(Some(VoyageStatus::UnderRevision)) {
-                                    let _ = self.satcom_tx.send(msg_template.clone()).await;
+                                    self.satcom_tx.send(msg_template.clone()).await;
                                     self.drop_voyage_order_revision();
                                     self.update_voyage_status(VoyageStatus::InExecution);
                                     msg_template.message_type = SatComMessageType::Executing;
                                     msg_template.order_version = self.order_version();
-                                    let _ = self.satcom_tx.send(msg_template).await;
+                                    self.satcom_tx.send(msg_template).await;
                                 }
                             }
                             SatComMessageType::Revision => {
@@ -184,17 +184,17 @@ impl BoardComputer {
                                     self.update_voyage_status(VoyageStatus::UnderRevision);
                                     msg_template.order_version =
                                         satcom_message.order_review.unwrap().version;
-                                    let _ = self.satcom_tx.send(msg_template.clone()).await;
+                                    self.satcom_tx.send(msg_template.clone()).await;
                                     self.adopt_voyage_order_revision();
                                     self.update_voyage_status(VoyageStatus::Accepted);
                                     msg_template.message_type = SatComMessageType::Acceptation;
-                                    let _ = self.satcom_tx.send(msg_template).await;
+                                    self.satcom_tx.send(msg_template).await;
                                 }
                             }
                             SatComMessageType::EndOfVoyage => {
                                 if self.matches_status(Some(VoyageStatus::Completed)) {
                                     self.update_voyage_status(VoyageStatus::Finished);
-                                    let _ = self.satcom_tx.send(msg_template.clone()).await;
+                                    self.satcom_tx.send(msg_template.clone()).await;
                                 }
                             }
                             _ => {}

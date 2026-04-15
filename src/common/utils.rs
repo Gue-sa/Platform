@@ -46,7 +46,7 @@ pub fn log(msg: ColoredString) -> () {
         .open("logs.log")
         .unwrap();
 
-    let _ = writeln!(log_file, "{file_log_msg}");
+    writeln!(log_file, "{file_log_msg}");
 
     println!("{log_msg}");
 }

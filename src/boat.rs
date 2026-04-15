@@ -141,7 +141,7 @@ impl Boat {
     }
 
     pub async fn start(self) -> () {
-        let _ = tokio::spawn(async move {
+        tokio::spawn(async move {
             self.antenna_87_b.start().await;
             self.antenna_88_b.start().await;
             self.gps_antenna.start().await;

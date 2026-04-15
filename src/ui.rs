@@ -79,7 +79,7 @@ impl Ui {
 
                 let ui_weak: Weak<AppWindow> = ui_handle_clone.clone();
 
-                let _ = slint::invoke_from_event_loop(move || {
+                slint::invoke_from_event_loop(move || {
                     if let Some(ui) = ui_weak.upgrade() {
                         let boat_data = ui.global::<BoatData>();
                         let logs: ModelRc<SharedString> = Ui::get_last_logs_entries(300);
@@ -105,6 +105,6 @@ impl Ui {
             }
         });
 
-        let _ = self.ui.run();
+        self.ui.run();
     }
 }

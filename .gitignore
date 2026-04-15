@@ -1,0 +1,8 @@
+/target
+/crates/boat/target
+/crates/server/target
+/crates/harbourmaster/target
+/crates/shared/target
+
+logs.log
+todo

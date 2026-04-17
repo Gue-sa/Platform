@@ -5,6 +5,7 @@ mod harbourmaster_ais;
 mod clients_registry;
 mod harbourmaster_gps;
 mod fms;
+mod database_manager;
 
 
 #[tokio::main]

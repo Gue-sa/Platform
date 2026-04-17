@@ -41,7 +41,7 @@ pub enum VoyageStatus {
     Completed,
     Finished,
     Aborted,
-    Unkown,
+    Unknown,
 }
 
 impl Into<VoyageStatus> for u8 {
@@ -56,7 +56,7 @@ impl Into<VoyageStatus> for u8 {
             6 => VoyageStatus::Completed,
             7 => VoyageStatus::Finished,
             8 => VoyageStatus::Aborted,
-            _ => VoyageStatus::Unkown,
+            _ => VoyageStatus::Unknown,
         }
     }
 }
@@ -73,7 +73,7 @@ impl Into<u8> for VoyageStatus {
             VoyageStatus::Completed => 6,
             VoyageStatus::Finished => 7,
             VoyageStatus::Aborted => 8,
-            VoyageStatus::Unkown => 9,
+            VoyageStatus::Unknown => 9,
         }
     }
 }
@@ -177,6 +177,12 @@ pub enum SatComError {
     SatComMessage(SatComMessageError),
 }
 
+#[derive(Debug, PartialEq)]
+pub enum DatabaseManagerError {
+    InsertionError(diesel::result::Error),
+    QueryError(diesel::result::Error)
+}
+
 pub type ClockResult<T> = Result<T, ClockError>;
 pub type BitPackerResult<T> = Result<T, BitPackerError>;
 pub type AisResult<T> = Result<T, AisError>;
@@ -184,6 +190,7 @@ pub type AisMessageResult<T> = Result<T, AisMessageError>;
 pub type VoyageOrderResult<T> = Result<T, VoyageOrderError>;
 pub type SatComResult<T> = Result<T, SatComError>;
 pub type SatComMessageResult<T> = Result<T, SatComMessageError>;
+pub type DatabaseManagerResult<T> = Result<T, DatabaseManagerError>;
 
 impl From<BitPackerError> for AisMessageError {
     fn from(value: BitPackerError) -> Self {

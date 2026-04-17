@@ -1,11 +1,11 @@
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use shared::{
     boat_info::BoatInfo,
     boats_registry::BoatsInfoRegistry,
     common::types::{SatComMessageType, VoyageStatus},
     satcom_message::SatComMessage,
-    voyage_order::{VoyageOrder, VoyageOrderBody},
+    voyage_order::VoyageOrder,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -38,7 +38,7 @@ impl BoardComputer {
         }
     }
 
-    pub fn order_id(&self) -> u32 {
+    pub fn order_id(&self) -> u16 {
         self.voyage.as_ref().unwrap().order.header.id
     }
 
@@ -85,8 +85,8 @@ impl BoardComputer {
         self.update_voyage(Voyage::from(
             order.clone(),
             (
-                self.boat_info.get_navigation_data().longitude,
-                self.boat_info.get_navigation_data().latitude,
+                self.boat_info.get_navigation_data().longitude as u16, // ATTENTION, CE N'EST PAS CORRECT, MAIS ON PART DU PRINCIPE QUE COMME ON UTILISER UN REPERE 1920x1080, UN u16 SUFFIT !
+                self.boat_info.get_navigation_data().latitude as u16,
             ),
         ));
 
@@ -153,12 +153,15 @@ impl BoardComputer {
                             SatComMessageType::Acknowledgement => {
                                 if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
                                     && satcom_message.order_header
-                                        == self.voyage_order_revision.clone().unwrap().header
+                                        == self.voyage_order_revision.as_ref().unwrap().header
                                 {
+                                    self.voyage_order_revision.as_mut().unwrap().header.version =
+                                        satcom_message.order_header.version;
+
                                     self.update_voyage_status(VoyageStatus::UnderRevision);
                                 } else if self.matches_status(Some(VoyageStatus::Accepted))
                                     && satcom_message.order_header
-                                        == self.voyage_order_revision.clone().unwrap().header
+                                        == self.voyage.as_ref().unwrap().order.header
                                 {
                                     self.update_voyage_status(VoyageStatus::InExecution);
 
@@ -169,7 +172,7 @@ impl BoardComputer {
                             SatComMessageType::Acceptation => {
                                 if self.matches_status(Some(VoyageStatus::UnderRevision))
                                     && satcom_message.order_header
-                                        == self.voyage_order_revision.clone().unwrap().header
+                                        == self.voyage_order_revision.as_ref().unwrap().header
                                 {
                                     self.adopt_voyage_order_revision();
 
@@ -182,7 +185,7 @@ impl BoardComputer {
                             SatComMessageType::Refusal => {
                                 if self.matches_status(Some(VoyageStatus::UnderRevision))
                                     && satcom_message.order_header
-                                        == self.voyage_order_revision.clone().unwrap().header
+                                        == self.voyage_order_revision.as_ref().unwrap().header
                                 {
                                     self.satcom_tx.send(msg_template.clone()).await;
 
@@ -198,8 +201,8 @@ impl BoardComputer {
                             SatComMessageType::Revision => {
                                 if (self.matches_status(Some(VoyageStatus::Accepted))
                                     || self.matches_status(Some(VoyageStatus::InExecution)))
-                                    && satcom_message.order_header
-                                        == self.voyage_order_revision.clone().unwrap().header
+                                    && self.voyage.as_ref().unwrap().order.header.id
+                                        == satcom_message.order_header.id
                                 {
                                     self.voyage_order_revision = Some(VoyageOrder {
                                         header: satcom_message.order_header.clone(),
@@ -222,7 +225,7 @@ impl BoardComputer {
                             SatComMessageType::EndOfVoyage => {
                                 if self.matches_status(Some(VoyageStatus::Completed))
                                     && satcom_message.order_header
-                                        == self.voyage_order_revision.clone().unwrap().header
+                                        == self.voyage.as_ref().unwrap().order.header
                                 {
                                     self.update_voyage_status(VoyageStatus::Finished);
 

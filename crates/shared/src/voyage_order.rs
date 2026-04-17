@@ -2,14 +2,14 @@ use crate::{bitpacker::BitPacker, common::types::VoyageOrderResult};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VoyageOrderHeader {
-    pub id: u32,
+    pub id: u16,
     pub version: u8,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VoyageOrderBody {
     pub destination: String,
-    pub destination_position: (u32, u32),
+    pub destination_position: (u16, u16),
     pub eta_month: u8,
     pub eta_day: u8,
     pub eta_hour: u8,
@@ -27,8 +27,8 @@ pub struct VoyageOrder {
 impl VoyageOrderHeader {
     pub fn from(voyage_order_header_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
         Ok(Self {
-            id: voyage_order_header_bitpacker.extract_int::<u32>(None, Some(31))?,
-            version: voyage_order_header_bitpacker.extract_int::<u8>(Some(32), None)?,
+            id: voyage_order_header_bitpacker.extract_int::<u16>(None, Some(15))?,
+            version: voyage_order_header_bitpacker.extract_int::<u8>(Some(16), None)?,
         })
     }
 
@@ -42,15 +42,15 @@ impl VoyageOrderBody {
         Ok(Self {
             destination: voyage_order_body_bitpacker.extract_str(None, Some(119))?,
             destination_position: (
-                voyage_order_body_bitpacker.extract_int::<u32>(Some(120), Some(151))?,
-                voyage_order_body_bitpacker.extract_int::<u32>(Some(152), Some(183))?,
+                voyage_order_body_bitpacker.extract_int::<u16>(Some(120), Some(135))?,
+                voyage_order_body_bitpacker.extract_int::<u16>(Some(136), Some(151))?,
             ),
-            eta_month: voyage_order_body_bitpacker.extract_int::<u8>(Some(184), Some(191))?,
-            eta_day: voyage_order_body_bitpacker.extract_int::<u8>(Some(192), Some(199))?,
-            eta_hour: voyage_order_body_bitpacker.extract_int::<u8>(Some(200), Some(207))?,
-            eta_minute: voyage_order_body_bitpacker.extract_int::<u8>(Some(208), Some(215))?,
-            cargo_type: voyage_order_body_bitpacker.extract_int::<u8>(Some(216), Some(223))?,
-            speed_profile: voyage_order_body_bitpacker.extract_int::<u8>(Some(224), None)?,
+            eta_month: voyage_order_body_bitpacker.extract_int::<u8>(Some(152), Some(159))?,
+            eta_day: voyage_order_body_bitpacker.extract_int::<u8>(Some(160), Some(167))?,
+            eta_hour: voyage_order_body_bitpacker.extract_int::<u8>(Some(168), Some(175))?,
+            eta_minute: voyage_order_body_bitpacker.extract_int::<u8>(Some(176), Some(183))?,
+            cargo_type: voyage_order_body_bitpacker.extract_int::<u8>(Some(184), Some(191))?,
+            speed_profile: voyage_order_body_bitpacker.extract_int::<u8>(Some(192), None)?,
         })
     }
 
@@ -60,8 +60,8 @@ impl VoyageOrderBody {
             + BitPacker::from_int(self.eta_hour, Some(8))
             + BitPacker::from_int(self.eta_day, Some(8))
             + BitPacker::from_int(self.eta_month, Some(8))
-            + BitPacker::from_int(self.destination_position.1, Some(32))
-            + BitPacker::from_int(self.destination_position.0, Some(32))
+            + BitPacker::from_int(self.destination_position.1, Some(16))
+            + BitPacker::from_int(self.destination_position.0, Some(16))
             + BitPacker::from_str(&self.destination, Some(120))
     }
 }
@@ -69,8 +69,8 @@ impl VoyageOrderBody {
 impl VoyageOrder {
     pub fn from(voyage_order_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
         Ok(Self {
-            header: VoyageOrderHeader::from(voyage_order_bitpacker.slice(None, Some(39))?)?,
-            body: VoyageOrderBody::from(voyage_order_bitpacker.slice(Some(40), None)?)?,
+            header: VoyageOrderHeader::from(voyage_order_bitpacker.slice(None, Some(23))?)?,
+            body: VoyageOrderBody::from(voyage_order_bitpacker.slice(Some(24), None)?)?,
         })
     }
 

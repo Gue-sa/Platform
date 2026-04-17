@@ -6,3 +6,7 @@
 
 logs.log
 todo
+*/.env
+./harbourmaster_database.db
+
+/crates/harbourmaster/.env

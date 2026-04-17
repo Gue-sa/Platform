@@ -10,6 +10,7 @@ path = "src/lib.rs"
 chrono = "0.4.44"
 crc = "3.4.0"
 dashmap = "6.1.0"
+diesel = "2.3.7"
 num-traits = "0.2.19"
 rand = "0.10.1"
 tokio = {version = "1.51.0", features = ["full"]}

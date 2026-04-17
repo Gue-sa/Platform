@@ -33,15 +33,15 @@ impl SatComMessage {
     pub fn parse(msg: BitPacker) -> SatComMessageResult<Self> {
         let mut order_body_review: Option<VoyageOrderBody> = None;
 
-        if msg.bits_len > 111 {
-            order_body_review = Some(VoyageOrderBody::from(msg.slice(Some(112), None)?)?);
+        if msg.bits_len > 104 {
+            order_body_review = Some(VoyageOrderBody::from(msg.slice(Some(104), None)?)?);
         }
 
         Ok(Self {
             source: msg.extract_int::<u32>(None, Some(31))?,
             target: msg.extract_int::<u32>(Some(32), Some(63))?,
-            order_header: VoyageOrderHeader::from(msg.slice(Some(64), Some(103))?)?,
-            message_type: msg.extract_int::<u8>(Some(104), Some(111))?.into(),
+            order_header: VoyageOrderHeader::from(msg.slice(Some(64), Some(95))?)?,
+            message_type: msg.extract_int::<u8>(Some(96), Some(103))?.into(),
             order_body_review,
         })
     }

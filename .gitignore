@@ -7,6 +7,8 @@
 logs.log
 todo
 */.env
-./harbourmaster_database.db
+harbourmaster_database.db
+
+.VSCodeCounter
 
 /crates/harbourmaster/.env

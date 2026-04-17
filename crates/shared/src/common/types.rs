@@ -32,7 +32,7 @@ pub enum CSType {
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum VoyageStatus {
-    Unattributed,
+    Unassigned,
     UnderRevision,
     RevisionSubmitted,
     Accepted,
@@ -47,7 +47,7 @@ pub enum VoyageStatus {
 impl Into<VoyageStatus> for u8 {
     fn into(self) -> VoyageStatus {
         match self {
-            0 => VoyageStatus::Unattributed,
+            0 => VoyageStatus::Unassigned,
             1 => VoyageStatus::UnderRevision,
             2 => VoyageStatus::RevisionSubmitted,
             3 => VoyageStatus::Accepted,
@@ -64,7 +64,7 @@ impl Into<VoyageStatus> for u8 {
 impl Into<u8> for VoyageStatus {
     fn into(self) -> u8 {
         match self {
-            VoyageStatus::Unattributed => 0,
+            VoyageStatus::Unassigned => 0,
             VoyageStatus::UnderRevision => 1,
             VoyageStatus::RevisionSubmitted => 2,
             VoyageStatus::Accepted => 3,
@@ -180,7 +180,9 @@ pub enum SatComError {
 #[derive(Debug, PartialEq)]
 pub enum DatabaseManagerError {
     InsertionError(diesel::result::Error),
-    QueryError(diesel::result::Error)
+    QueryError(diesel::result::Error),
+    UpdateError(diesel::result::Error),
+    DeletionError(diesel::result::Error)
 }
 
 pub type ClockResult<T> = Result<T, ClockError>;

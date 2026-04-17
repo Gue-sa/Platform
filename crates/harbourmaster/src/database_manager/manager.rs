@@ -57,7 +57,7 @@ impl DatabaseManager {
         &mut self,
         order_id: i32,
         version_number: u8,
-        destination: String,
+        destination_id: i32,
         eta_month: u8,
         eta_day: u8,
         eta_hour: u8,
@@ -65,12 +65,6 @@ impl DatabaseManager {
         cargo_type: u8,
         speed_profile: u8,
     ) -> DatabaseManagerResult<()> {
-        let destination_id: i32 = DESTINATIONS::table
-            .filter(DESTINATIONS::name.eq(destination))
-            .select(DESTINATIONS::id)
-            .first::<i32>(&mut self.connection)
-            .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
-
         let new_voyage_order_version: VoyageOrderVersionInsertionModel<'_> =
             VoyageOrderVersionInsertionModel {
                 version_number: &version_number.into(),
@@ -95,7 +89,7 @@ impl DatabaseManager {
 
     pub fn add_voyage_order(
         &mut self,
-        destination: String,
+        destination_id: i32,
         eta_month: u8,
         eta_day: u8,
         eta_hour: u8,
@@ -109,10 +103,16 @@ impl DatabaseManager {
             .get_result::<i32>(&mut self.connection)
             .map_err(|e: diesel::result::Error| DatabaseManagerError::InsertionError(e))?;
 
+        let destination_name: String = DESTINATIONS::table
+            .filter(DESTINATIONS::id.eq(destination_id))
+            .select(DESTINATIONS::name)
+            .first::<String>(&mut self.connection)
+            .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
+
         self.add_voyage_order_version(
             order_id.clone(),
             0,
-            destination.clone(),
+            destination_id,
             eta_month,
             eta_day,
             eta_hour,
@@ -122,7 +122,7 @@ impl DatabaseManager {
         )?;
 
         let destination_info: DestinationQueryResult = DESTINATIONS::table
-            .filter(DESTINATIONS::name.eq(destination.clone()))
+            .filter(DESTINATIONS::name.eq(destination_name.clone()))
             .select(DestinationQueryResult::as_returning())
             .first::<DestinationQueryResult>(&mut self.connection)
             .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
@@ -133,7 +133,7 @@ impl DatabaseManager {
                 version: 0,
             },
             body: VoyageOrderBody {
-                destination: destination,
+                destination: destination_name,
                 destination_position: (
                     destination_info.longitude as u16,
                     destination_info.latitude as u16,
@@ -146,18 +146,6 @@ impl DatabaseManager {
                 speed_profile: speed_profile,
             },
         })
-    }
-
-    pub fn update_destination(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
-    }
-
-    pub fn update_voyage_order(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
-    }
-
-    pub fn delete_destination(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
     }
 
     pub fn get_destinations(
@@ -280,35 +268,126 @@ impl DatabaseManager {
         Ok(voyage_orders)
     }
 
-    pub fn get_voyage_order_versions_count(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
+    pub fn get_voyage_order_versions_count(
+        &mut self,
+        voyage_order_id: u16,
+    ) -> DatabaseManagerResult<usize> {
+        let count: i64 = ORDER_VERSIONS::table
+            .filter(ORDER_VERSIONS::order_id.eq(voyage_order_id as i32)) // On filtre par l'ID de l'ordre
+            .count()
+            .get_result::<i64>(&mut self.connection)
+            .map_err(DatabaseManagerError::QueryError)?;
+
+        Ok(count as usize)
     }
 
-    pub fn get_voyage_orders_count(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
+    pub fn has_version(
+        &mut self,
+        voyage_order_id: u16,
+        version: u8,
+    ) -> DatabaseManagerResult<bool> {
+        let count: i64 = ORDER_VERSIONS::table
+            .filter(
+                ORDER_VERSIONS::order_id
+                    .eq(voyage_order_id as i32)
+                    .and(ORDER_VERSIONS::version_number.eq(version as i32)),
+            ) // On filtre par l'ID de l'ordre
+            .count()
+            .get_result::<i64>(&mut self.connection)
+            .map_err(DatabaseManagerError::QueryError)?;
+
+        Ok(count == 1)
     }
 
-    pub fn has_version(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
+    pub fn is_current_version(
+        &mut self,
+        voyage_order_id: u16,
+        version: u8,
+    ) -> DatabaseManagerResult<bool> {
+        let current_version: i32 = VOYAGE_ORDERS::table
+            .filter(VOYAGE_ORDERS::id.eq(voyage_order_id as i32))
+            .select(VOYAGE_ORDERS::current_version_number)
+            .get_result::<i32>(&mut self.connection)
+            .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
+
+        Ok(current_version == version as i32)
     }
 
-    pub fn is_current_version(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
+    pub fn update_voyage_order_status(
+        &mut self,
+        voyage_order_id: u16,
+        status: VoyageStatus,
+    ) -> DatabaseManagerResult<()> {
+        diesel::update(VOYAGE_ORDERS::table.filter(VOYAGE_ORDERS::id.eq(voyage_order_id as i32)))
+            .set(VOYAGE_ORDERS::status.eq(Into::<u8>::into(status) as i32))
+            .execute(&mut self.connection)
+            .map_err(|e: diesel::result::Error| DatabaseManagerError::UpdateError(e))?;
+
+        Ok(())
     }
 
-    pub fn update_voyage_order_status(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
+    pub fn assign_voyage_order(
+        &mut self,
+        voyage_order_id: u16,
+        mmsi: u32,
+    ) -> DatabaseManagerResult<()> {
+        diesel::update(VOYAGE_ORDERS::table.filter(VOYAGE_ORDERS::id.eq(voyage_order_id as i32)))
+            .set(VOYAGE_ORDERS::executant.eq(mmsi as i32))
+            .execute(&mut self.connection)
+            .map_err(|e: diesel::result::Error| DatabaseManagerError::UpdateError(e))?;
+
+        Ok(())
     }
 
-    pub fn assign_voyage_order(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
+    pub fn update_voyage_order_version(
+        &mut self,
+        voyage_order_id: u16,
+        version_number: u8,
+    ) -> DatabaseManagerResult<()> {
+        if self.has_version(voyage_order_id, version_number)? {
+            diesel::update(
+                VOYAGE_ORDERS::table.filter(VOYAGE_ORDERS::id.eq(voyage_order_id as i32)),
+            )
+            .set(VOYAGE_ORDERS::current_version_number.eq(version_number as i32))
+            .execute(&mut self.connection)
+            .map_err(|e: diesel::result::Error| DatabaseManagerError::UpdateError(e))?;
+
+            Ok(())
+        } else {
+            return Err(DatabaseManagerError::UpdateError(
+                diesel::result::Error::NotFound,
+            ));
+        }
     }
 
-    pub fn get_unassigned_voyage_orders(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
+    pub fn delete_destination(&mut self, destination_id: i32) -> DatabaseManagerResult<()> {
+        diesel::delete(DESTINATIONS::table.filter(DESTINATIONS::id.eq(destination_id)))
+            .execute(&mut self.connection)
+            .map_err(|e: diesel::result::Error| DatabaseManagerError::DeletionError(e))?;
+
+        Ok(())
     }
 
-    pub fn get_assigned_voyage_orders(&mut self) -> DatabaseManagerResult<()> {
-        todo!()
+    pub fn delete_voyage_order_versions(
+        &mut self,
+        voyage_order_id: u16,
+    ) -> DatabaseManagerResult<()> {
+        diesel::delete(
+            ORDER_VERSIONS::table.filter(ORDER_VERSIONS::order_id.eq(voyage_order_id as i32)),
+        )
+        .execute(&mut self.connection)
+        .map_err(|e: diesel::result::Error| DatabaseManagerError::DeletionError(e))?;
+
+        Ok(())
+    }
+
+    pub fn delete_voyage_order(&mut self, voyage_order_id: u16) -> DatabaseManagerResult<()> {
+        self.delete_voyage_order_versions(voyage_order_id)?;
+
+        diesel::delete(VOYAGE_ORDERS::table.filter(VOYAGE_ORDERS::id.eq(voyage_order_id as i32)))
+            .execute(&mut self.connection)
+            .map_err(|e: diesel::result::Error| DatabaseManagerError::DeletionError(e))?;
+
+        Ok(())
     }
 }

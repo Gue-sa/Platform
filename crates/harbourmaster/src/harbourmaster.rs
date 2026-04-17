@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    fms::Fms, harbourmaster_ais::HarbourmasterAisRunner, harbourmaster_gps::HarbourmasterGps,
+    database_manager::manager::DatabaseManager, fms::Fms, harbourmaster_ais::HarbourmasterAisRunner, harbourmaster_gps::HarbourmasterGps
 };
 
 use shared::{
@@ -86,12 +86,13 @@ impl Harbourmaster {
         .await;
 
         let boats_registry: Arc<BoatsInfoRegistry> = Arc::new(BoatsInfoRegistry::init());
+        let database_manager: Arc<DatabaseManager> = Arc::new(DatabaseManager::init().unwrap());
 
         let ais: HarbourmasterAisRunner =
             HarbourmasterAisRunner::init(ais_rx, boats_registry.clone());
         let gps: HarbourmasterGps = HarbourmasterGps::init(gps_rx, c_gps_tx).await;
         let satcom: SatCom = SatCom::new(reader_satcom_rx, sender_satcom_rx, c_satcom_tx, fms_tx);
-        let fms = Fms::new(boats_registry, fms_rx, sender_satcom_tx);
+        let fms = Fms::new(boats_registry, database_manager.clone(), fms_rx, sender_satcom_tx);
 
         Self {
             ais: ais,

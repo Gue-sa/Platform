@@ -1,0 +1,260 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+
+html,
+body {
+    font-family: "Inter", sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: #1e3041;
+    color: #dfe4e8;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+p,
+li,
+ul,
+ol {
+    margin: 0;
+    padding: 0;
+}
+
+article {
+    border: 3px solid #475765;
+    background-color: #17212a;
+    border-radius: 0.5vh;
+    overflow: hidden;
+    overflow-y: auto;
+}
+
+.voyage-orders-article {
+    max-height: 85.85vh;
+}
+
+.article-title {
+    background-color: #303944;
+    height: 3vh;
+    padding-left: 1vw;
+    display: flex;
+    align-items: center;
+    font-weight: bold;
+}
+
+.harbourmaster-interface {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+header {
+    height: 5vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background-color: #072945;
+    border-bottom: 3px solid #475765;
+}
+
+.main-title {
+    width: 100vw;
+    text-align: center;
+}
+
+main {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    height: 95vh;
+}
+
+.screen-section {
+    width: 49vw;
+    height: 95vh;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.left-screen-section {
+    justify-content: space-evenly;
+}
+
+.right-screen-section {
+    justify-content: center;
+}
+
+.map-screen,
+.metrics-screen {
+    height: 42vh;
+}
+
+.voyage-order {
+    margin-bottom: 0.5vh;
+    border-top: 1px solid #475765;
+}
+
+.voyage-order-header {
+    height: 5vh;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 1vw 0 1vw;
+}
+
+.voyage-order-header:hover {
+    cursor: pointer;
+}
+
+.voyage-order-header {
+    overflow-y: auto;
+}
+
+.voyage-order.opened .voyage-order-header {
+    background-color: #0b5169;
+}
+
+.voyage-order.closed .voyage-order-header {
+    background-color: #17212a;
+}
+
+.voyage-order-body {
+    overflow-y: auto;
+    transition: all 1s;
+}
+
+.voyage-order.opened .voyage-order-body {
+    max-height: 100vh;
+    margin: 1vh 0 1vh 0;
+}
+
+.voyage-order.closed .voyage-order-body {
+    max-height: 0;
+    margin: 0;
+}
+
+.voyage-order-version {
+    margin-top: 1vh;
+}
+
+.add-voyage-order-button-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 2vh;
+}
+
+.add-voyage-order-button {
+    padding: 1vh 1vw 1vh 1vw;
+    cursor: pointer;
+    background-color: #303944;
+    border: 3px solid #475765;
+    color: #dfe4e8;
+    font-weight: bold;
+    border-radius: 0.5vh;
+    transition: all 0.25s;
+}
+
+.add-voyage-order-button:hover {
+    background-color: #0b5169;
+}
+
+.current-version ul,
+.voyage-order-version ul {
+    margin: 1vh 0 0 1.5vw;
+}
+
+.current-version ul li,
+.voyage-order-version ul li {
+    margin: 0.25vh 0 0 0;
+}
+
+.dropdown {
+    width: 100%;
+}
+
+.dropdown-lid {
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.dropdown-lid:hover {
+    font-weight: normal;
+}
+
+.dropdown-lid:hover {
+    cursor: pointer;
+}
+
+.dropdown-content {
+    transition: all 1s;
+    overflow-y: auto;
+}
+
+.dropdown.opened .dropdown-content {
+    max-height: 100vh;
+}
+
+.dropdown.closed .dropdown-content {
+    max-height: 0;
+}
+
+.voyage-order-creation-form-container {
+    z-index: 1;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50vw;
+    height: 47.5vh;
+    background-color: rgba(15, 22, 28, 0.9);
+    border-radius: 0.5vh;
+    border: 3px solid #475765;
+    box-shadow: #17212a 0px 0px 15px 1px;
+}
+
+.voyage-order-creation-form {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    align-items: center;
+    font-weight: bold;
+    height: 100%;
+}
+
+.voyage-order-creation-form select {
+    width: 50%;
+    height: 6%;
+    cursor: pointer;
+    background-color: #303944;
+    border: 3px solid #475765;
+    color: #dfe4e8;
+    font-weight: bold;
+    border-radius: 0.5vh;
+}
+
+.voyage-order-creation-form input {
+    width: 33%;
+    margin-top: 5%;
+    height: 10%;
+    padding: 1vh 1vw 1vh 1vw;
+    cursor: pointer;
+    background-color: #303944;
+    border: 3px solid #475765;
+    color: #dfe4e8;
+    font-weight: bold;
+    border-radius: 0.5vh;
+    transition: all 0.25s;
+}
+
+.voyage-order-creation-form input:hover {
+    background-color: #0b5169;
+}

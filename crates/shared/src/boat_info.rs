@@ -2,7 +2,9 @@ use std::sync::{RwLock, RwLockWriteGuard};
 
 use crate::bitpacker::BitPacker;
 
-#[derive(Debug, Clone)]
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
 pub struct StaticData {
     pub mmsi: u32,
     pub imo_number: u32,
@@ -19,7 +21,7 @@ pub struct StaticData {
     pub spare: u8,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct VoyageData {
     pub destination: String,
     pub eta_month: u8,
@@ -31,7 +33,7 @@ pub struct VoyageData {
     pub raim_flag: u8,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NavigationData {
     pub navigational_status: u8,
     pub time_stamp: u8,
@@ -44,7 +46,7 @@ pub struct NavigationData {
     pub true_heading: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct BoatInfo {
     static_data: RwLock<StaticData>,
     voyage_data: RwLock<VoyageData>,
@@ -124,8 +126,8 @@ impl NavigationData {
             navigational_status: navigational_status.unwrap_or(15),
             time_stamp: time_stamp.unwrap_or(63),
             special_maneuvre_indicator: special_maneuvre_indicator.unwrap_or(0),
-            latitude: latitude.unwrap_or(91),
-            longitude: longitude.unwrap_or(181),
+            latitude: latitude.unwrap_or(0),
+            longitude: longitude.unwrap_or(0),
             course_over_ground: course_over_ground.unwrap_or(3601),
             speed_over_ground: speed_over_ground.unwrap_or(1023),
             rate_of_turn: rate_of_turn.unwrap_or(-128),
@@ -179,8 +181,8 @@ impl BoatInfo {
 
     pub fn update_positon(&self, latitude: Option<u32>, longitude: Option<u32>) -> () {
         let mut guard: RwLockWriteGuard<'_, NavigationData> = self.navigation_data.write().unwrap();
-        guard.latitude = latitude.unwrap_or(91);
-        guard.longitude = longitude.unwrap_or(181);
+        guard.latitude = latitude.unwrap_or(0);
+        guard.longitude = longitude.unwrap_or(0);
     }
 
     pub fn update_movement(

@@ -1,12 +1,14 @@
+use serde::Serialize;
+
 use crate::{bitpacker::BitPacker, common::types::VoyageOrderResult};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct VoyageOrderHeader {
     pub id: u16,
     pub version: u8,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct VoyageOrderBody {
     pub destination: String,
     pub destination_position: (u16, u16),
@@ -18,7 +20,7 @@ pub struct VoyageOrderBody {
     pub speed_profile: u8, //0: eco, 1: à temps, 2: aussi vite que possible
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct VoyageOrder {
     pub header: VoyageOrderHeader,
     pub body: VoyageOrderBody,

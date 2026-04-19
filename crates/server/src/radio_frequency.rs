@@ -60,6 +60,7 @@ impl RadioFrequency {
         let client: IpAddr = IpAddr::V4(Ipv4Addr::from_bits(
             msg.extract_int::<u32>(None, Some(31)).unwrap(),
         ));
+
         let data: BitPacker = msg.slice(Some(32), None).unwrap();
 
         self
@@ -79,7 +80,7 @@ impl RadioFrequency {
                 let (size, source) = result.unwrap();
                 let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8));
 
-                println!("{}\n", msg.to_bin_string());
+                println!("{}: {}\n", source, msg.to_bin_string());
 
                 self.clients.register_client(source.ip());
 

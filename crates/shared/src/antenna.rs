@@ -52,7 +52,7 @@ impl Antenna {
 
     pub async fn send(&self, msg: BitPacker) -> () {
         //let server_ip: IpAddr = *list_afinet_netifas().unwrap().iter().find(|(nom, _)| nom == "wlan0").map(|(_, ip)| ip).unwrap();
-        let server_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 1, 1));
+        let server_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));
         self
             .socket
             .send_to(msg.bits(), SocketAddr::new(server_ip, self.em_port))

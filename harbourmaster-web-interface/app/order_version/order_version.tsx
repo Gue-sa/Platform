@@ -1,16 +1,30 @@
 import { DropDownMenu } from "~/dropdown_menu/dropdown_menu";
+import type { DestinationResult, VoyageVersionResult } from "~/types";
 
-export function VoyageOrderVersion() {
+interface VoyageOrderVersionProps {
+    version_data: VoyageVersionResult;
+    destination_data: DestinationResult;
+}
+
+export function VoyageOrderVersion({
+    version_data,
+    destination_data,
+}: VoyageOrderVersionProps) {
     return (
-        <DropDownMenu subClassName="voyage-order-version" title="Version n°5">
+        <DropDownMenu
+            subClassName="voyage-order-version"
+            title={`Version n°${version_data.version_number}`}
+        >
             <ul>
-                <li>Date de création : 25/11/2005, 21h00</li>
-                <li>Statut : Non assigné</li>
-                <li>Exécutant : Aucun</li>
-                <li>Destination : Port de Dakar (x: 99, y: 99)</li>
-                <li>ETA : 25/09/2009, 15h00</li>
-                <li>Type de cargo : Hydrocarbures</li>
-                <li>Profil de vitesse : Eco</li>
+                <li>Date de création : {version_data.creation_date}</li>
+                <li>
+                    Destination : {destination_data.name} (x:{" "}
+                    {destination_data.longitude}, y: {destination_data.latitude}
+                    )
+                </li>
+                <li>ETA : {version_data.eta}</li>
+                <li>Type de cargo : {version_data.cargo_type}</li>
+                <li>Profil de vitesse : {version_data.speed_profile}</li>
             </ul>
         </DropDownMenu>
     );

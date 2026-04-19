@@ -45,8 +45,8 @@ impl HarbourmasterGps {
         tokio::spawn(async move {
             let mut cam: VideoCapture = VideoCapture::new(0, CAP_ANY).unwrap();
 
-            //cam.set(CAP_PROP_FRAME_WIDTH, 1920.);
-            //cam.set(CAP_PROP_FRAME_HEIGHT, 1080.);
+            cam.set(CAP_PROP_FRAME_WIDTH, 1920.);
+            cam.set(CAP_PROP_FRAME_HEIGHT, 1080.);
 
             cam.set(CAP_PROP_BUFFERSIZE, 1.);
 
@@ -157,7 +157,7 @@ impl HarbourmasterGps {
                             if moments.m00 != 0.0 {
                                 // Calcul du centre de masse (barycentre)
                                 center_x = (moments.m10 / moments.m00) as u32;
-                                center_y = (moments.m01 / moments.m00) as u32;
+                                center_y = 1080 - (moments.m01 / moments.m00) as u32;
 
                                 // Si tu as fait un downscaling, multiplie par 2 pour dessiner sur l'image originale
                                 // let final_x = center_x * 2;

@@ -1,5 +1,11 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
 
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 html,
 body {
     font-family: "Inter", sans-serif;
@@ -23,26 +29,52 @@ ol {
     padding: 0;
 }
 
+p,
+li {
+    font-size: 0.8vw;
+}
+
+/* --- ARTICLES & CONTAINERS --- */
+
 article {
     border: 3px solid #475765;
     background-color: #17212a;
     border-radius: 0.5vh;
-    overflow: hidden;
     overflow-y: auto;
-}
-
-.voyage-orders-article {
-    max-height: 85.85vh;
 }
 
 .article-title {
     background-color: #303944;
     height: 3vh;
-    padding-left: 1vw;
+    padding: 0 1vw;
     display: flex;
     align-items: center;
     font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 2;
 }
+
+.map-article {
+    height: fit-content;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    overflow: hidden;
+}
+
+.metrics-article {
+    height: 37.5vh;
+    overflow-y: hidden;
+}
+
+.voyage-orders-article {
+    width: 100%;
+    max-height: 85.85vh;
+}
+
+/* --- LAYOUT PRINCIPAL --- */
 
 .harbourmaster-interface {
     height: 100vh;
@@ -54,27 +86,25 @@ article {
 header {
     height: 5vh;
     display: flex;
-    flex-direction: column;
+    align-items: center;
     justify-content: center;
     background-color: #072945;
     border-bottom: 3px solid #475765;
 }
 
 .main-title {
-    width: 100vw;
+    width: 100%;
     text-align: center;
 }
 
 main {
     display: flex;
-    flex-direction: row;
     justify-content: space-evenly;
     height: 95vh;
 }
 
 .screen-section {
-    width: 49vw;
-    height: 95vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -82,16 +112,92 @@ main {
 
 .left-screen-section {
     justify-content: space-evenly;
+    width: 50vw;
 }
 
 .right-screen-section {
     justify-content: center;
+    align-items: center;
+    width: 45vw;
 }
+
+/* --- ECRAN METRICS --- */
 
 .map-screen,
 .metrics-screen {
     height: 42vh;
 }
+
+.metrics-screen {
+    display: flex;
+    justify-content: space-around;
+    height: calc(100% - 3vh);
+    overflow: hidden;
+}
+
+.metrics-category {
+    padding: 1vh 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-right: 1px solid #475765;
+}
+
+.metrics-category:last-child {
+    border-right: none;
+}
+
+.metrics-category-title {
+    margin-bottom: 1vh;
+    font-weight: bold;
+}
+
+.metrics-category li {
+    margin-bottom: 0.5vh;
+}
+
+.vessels-list-container {
+    width: 17.5%;
+}
+
+.boat-info-container {
+    width: 46%;
+    padding-top: 1.25%;
+}
+
+.boat-info-container ul {
+    width: 100%;
+    margin-left: 3vw;
+}
+
+.boat-info-category-title {
+    margin-bottom: 1vh;
+    text-decoration: underline;
+}
+
+.statistics-container {
+    width: 32.5%;
+}
+
+/* --- ETATS DES BATEAUX --- */
+
+.boat-mmsi {
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.boat-mmsi:hover,
+.boat-mmsi.selected {
+    text-decoration: none;
+}
+
+.boat-mmsi.selected {
+    font-weight: bold;
+}
+
+/* --- ORDRES DE VOYAGE --- */
 
 .voyage-order {
     margin-bottom: 0.5vh;
@@ -100,18 +206,11 @@ main {
 
 .voyage-order-header {
     height: 5vh;
+    padding: 0 1vw;
     display: flex;
-    flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    padding: 0 1vw 0 1vw;
-}
-
-.voyage-order-header:hover {
     cursor: pointer;
-}
-
-.voyage-order-header {
     overflow-y: auto;
 }
 
@@ -124,13 +223,16 @@ main {
 }
 
 .voyage-order-body {
-    overflow-y: auto;
-    transition: all 1s;
+    overflow: hidden;
+    transition:
+        max-height 0.4s ease-out,
+        margin 0.4s ease-out;
 }
 
 .voyage-order.opened .voyage-order-body {
-    max-height: 100vh;
-    margin: 1vh 0 1vh 0;
+    max-height: 200vh;
+    margin: 1vh 0;
+    overflow-y: auto;
 }
 
 .voyage-order.closed .voyage-order-body {
@@ -142,29 +244,6 @@ main {
     margin-top: 1vh;
 }
 
-.add-voyage-order-button-container {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 2vh;
-}
-
-.add-voyage-order-button {
-    padding: 1vh 1vw 1vh 1vw;
-    cursor: pointer;
-    background-color: #303944;
-    border: 3px solid #475765;
-    color: #dfe4e8;
-    font-weight: bold;
-    border-radius: 0.5vh;
-    transition: all 0.25s;
-}
-
-.add-voyage-order-button:hover {
-    background-color: #0b5169;
-}
-
 .current-version ul,
 .voyage-order-version ul {
     margin: 1vh 0 0 1.5vw;
@@ -172,8 +251,34 @@ main {
 
 .current-version ul li,
 .voyage-order-version ul li {
-    margin: 0.25vh 0 0 0;
+    margin-top: 0.25vh;
 }
+
+/* --- BOUTONS --- */
+
+.add-voyage-order-button-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 2vh;
+}
+
+.add-voyage-order-button {
+    padding: 1vh 1vw;
+    cursor: pointer;
+    background-color: #303944;
+    border: 3px solid #475765;
+    color: #dfe4e8;
+    font-weight: bold;
+    border-radius: 0.5vh;
+    transition: background-color 0.25s ease;
+}
+
+.add-voyage-order-button:hover {
+    background-color: #0b5169;
+}
+
+/* --- DROPDOWN --- */
 
 .dropdown {
     width: 100%;
@@ -184,41 +289,41 @@ main {
     text-align: center;
     font-weight: bold;
     text-decoration: underline;
+    cursor: pointer;
 }
 
 .dropdown-lid:hover {
     font-weight: normal;
 }
 
-.dropdown-lid:hover {
-    cursor: pointer;
-}
-
 .dropdown-content {
-    transition: all 1s;
-    overflow-y: auto;
+    overflow: hidden;
+    transition: max-height 0.4s ease-out;
 }
 
 .dropdown.opened .dropdown-content {
     max-height: 100vh;
+    overflow-y: auto;
 }
 
 .dropdown.closed .dropdown-content {
     max-height: 0;
 }
 
+/* --- FORMULAIRE --- */
+
 .voyage-order-creation-form-container {
-    z-index: 1;
+    z-index: 10;
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 50vw;
     height: 47.5vh;
-    background-color: rgba(15, 22, 28, 0.9);
+    background-color: rgba(15, 22, 28, 0.95);
     border-radius: 0.5vh;
     border: 3px solid #475765;
-    box-shadow: #17212a 0px 0px 15px 1px;
+    box-shadow: 0px 0px 15px 1px rgba(23, 33, 42, 0.8);
 }
 
 .voyage-order-creation-form {
@@ -230,29 +335,26 @@ main {
     height: 100%;
 }
 
-.voyage-order-creation-form select {
-    width: 50%;
-    height: 6%;
+.voyage-order-creation-form select,
+.voyage-order-creation-form input {
     cursor: pointer;
     background-color: #303944;
     border: 3px solid #475765;
     color: #dfe4e8;
     font-weight: bold;
     border-radius: 0.5vh;
+    transition: background-color 0.25s ease;
+}
+
+.voyage-order-creation-form select {
+    width: 50%;
+    height: 6%;
 }
 
 .voyage-order-creation-form input {
     width: 33%;
     margin-top: 5%;
-    height: 10%;
-    padding: 1vh 1vw 1vh 1vw;
-    cursor: pointer;
-    background-color: #303944;
-    border: 3px solid #475765;
-    color: #dfe4e8;
-    font-weight: bold;
-    border-radius: 0.5vh;
-    transition: all 0.25s;
+    padding: 1vh 1vw;
 }
 
 .voyage-order-creation-form input:hover {

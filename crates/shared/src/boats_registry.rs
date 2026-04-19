@@ -37,4 +37,12 @@ impl BoatsInfoRegistry {
     pub fn unregister(&mut self, mmsi: u32) -> Option<BoatInfo> {
         self.registry.remove(&mmsi).map(|(_, boat)| boat)
     }
+
+    pub fn length(&self) -> usize {
+        self.registry.len()
+    }
+
+    pub fn export(&self) -> Box<[(u32, BoatInfo)]> {
+        self.registry.iter().map(|r| (r.key().clone(), r.value().clone())).collect()
+    }
 }

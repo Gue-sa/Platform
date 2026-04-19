@@ -127,7 +127,7 @@ impl Harbourmaster {
         self.ais.start().await;
         self.gps.start().await;
         self.satcom.start().await;
-        //self.fms.start().await;
+        self.fms.start().await;
         self.database_api.start().await;
     }
 }

@@ -271,6 +271,33 @@ impl DatabaseManager {
         Ok(count as usize)
     }
 
+    pub fn get_voyage_order_revision_version(
+        &mut self,
+        order_id: i32,
+    ) -> DatabaseManagerResult<Option<VoyageOrderVersionQueryResult>> {
+        let current_version: i32 = VOYAGE_ORDERS::table
+            .filter(VOYAGE_ORDERS::id.eq(order_id))
+            .select(VOYAGE_ORDERS::current_version_number)
+            .first::<i32>(&mut self.connection)
+            .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
+
+        if self.has_version(order_id, current_version + 1)? {
+            let revision_version: VoyageOrderVersionQueryResult = ORDER_VERSIONS::table
+                .filter(
+                    ORDER_VERSIONS::order_id
+                        .eq(order_id)
+                        .and(ORDER_VERSIONS::version_number.eq(current_version + 1)),
+                )
+                .select(VoyageOrderVersionQueryResult::as_returning())
+                .first::<VoyageOrderVersionQueryResult>(&mut self.connection)
+                .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
+
+            Ok(Some(revision_version))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn has_version(
         &mut self,
         voyage_order_id: i32,

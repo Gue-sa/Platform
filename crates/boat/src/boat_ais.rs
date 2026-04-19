@@ -149,7 +149,7 @@ impl BoatAisRunner {
         }
     }
 
-    pub async fn master_clock(&self) {
+    pub async fn boat_ais_master_clock(&self) {
         log("Horloge SOTDMA lancée.".yellow());
 
         loop {
@@ -665,14 +665,14 @@ impl BoatAisRunner {
     }
 
     pub async fn start(self) -> () {
-        let runner_arc: Arc<BoatAisRunner> = Arc::new(self);
-        let c87b_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
-        let c88b_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
-        let sotdma_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
-        let clock_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
+        let runner_arc: Arc<Self> = Arc::new(self);
+        let c87b_runner_arc: Arc<Self> = runner_arc.clone();
+        let c88b_runner_arc: Arc<Self> = runner_arc.clone();
+        let sotdma_runner_arc: Arc<Self> = runner_arc.clone();
+        let clock_runner_arc: Arc<Self> = runner_arc.clone();
 
         tokio::spawn(async move {
-            clock_runner_arc.clone().master_clock().await;
+            clock_runner_arc.clone().boat_ais_master_clock().await;
         });
 
         tokio::spawn(async move {

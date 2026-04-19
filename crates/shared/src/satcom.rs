@@ -26,12 +26,14 @@ impl SatCom {
 
     pub async fn start(mut self) -> () {
         tokio::spawn(async move {
-            tokio::select! {
-                Some(msg) = self.reader_rx.recv() => {
-                    self.board_computer_tx.send(SatComMessage::parse(msg).unwrap()).await;
-                },
-                Some(msg) = self.sender_rx.recv() => {
-                    self.antenna_tx.send(msg.to_bitpacker()).await;
+            loop {
+                tokio::select! {
+                    Some(msg) = self.reader_rx.recv() => {
+                        self.board_computer_tx.send(SatComMessage::parse(msg).unwrap()).await;
+                    },
+                    Some(msg) = self.sender_rx.recv() => {
+                        self.antenna_tx.send(msg.to_bitpacker()).await;
+                    }
                 }
             }
         });

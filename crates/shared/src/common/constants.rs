@@ -63,3 +63,5 @@ pub const MSG5_FIELDS: [&str; 19] = [
     "dte",
     "spare",
 ];
+
+pub const FMS_UPDATE_SECS_INTERVAL: u64 = 10;

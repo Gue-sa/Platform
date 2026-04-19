@@ -156,8 +156,10 @@ impl HarbourmasterGps {
 
                             if moments.m00 != 0.0 {
                                 // Calcul du centre de masse (barycentre)
-                                center_x = (moments.m10 / moments.m00) as u32;
-                                center_y = 1080 - (moments.m01 / moments.m00) as u32;
+                                center_x = ((moments.m10 / moments.m00) as u32).min(1920).max(0);
+                                center_y = ((1080. - (moments.m01 / moments.m00)) as u32)
+                                    .min(1080)
+                                    .max(0);
 
                                 // Si tu as fait un downscaling, multiplie par 2 pour dessiner sur l'image originale
                                 // let final_x = center_x * 2;

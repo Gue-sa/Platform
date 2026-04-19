@@ -42,7 +42,7 @@ impl BoatGps {
                         if let Ok(latitude) = msg.extract_int::<u32>(None, Some(31)) && let Ok(longitude) = msg.extract_int::<u32>(Some(32), None) {
                             self.boat_info.update_positon(Some(latitude), Some(longitude));
 
-                            log(format!("Position mise à jour depuis le GPS : {latitude} | {longitude}").white().italic());
+                            //log(format!("Position mise à jour depuis le GPS : {latitude} | {longitude}").white().italic());
                         }
                     },
                     _ = interval.tick() => {

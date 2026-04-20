@@ -36,7 +36,9 @@ export function Metrics({ boats_info }: MetricsProps) {
                 <p className="metrics-category-title">Informations bateau</p>
                 {selectedBoat != -1 ? (
                     <>
-                        <p className="boat-info-category-title">Données statiques</p>
+                        <p className="boat-info-category-title">
+                            Données statiques
+                        </p>
                         <ul>
                             <li>MMSI : {selectedBoatInfo?.static_data.mmsi}</li>
                             <li>
@@ -141,15 +143,18 @@ export function Metrics({ boats_info }: MetricsProps) {
                                 {
                                     selectedBoatInfo?.navigation_data
                                         .speed_over_ground
-                                }
+                                }{" "}
+                                kt
                             </li>
                             <li>
                                 Taux de virage :{" "}
-                                {selectedBoatInfo?.navigation_data.rate_of_turn}
+                                {selectedBoatInfo?.navigation_data.rate_of_turn}{" "}
+                                °/s
                             </li>
                             <li>
                                 Cap vrai :{" "}
                                 {selectedBoatInfo?.navigation_data.true_heading}
+                                °
                             </li>
                         </ul>
                     </>

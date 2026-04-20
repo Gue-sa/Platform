@@ -210,8 +210,8 @@ impl HarbourmasterGps {
             loop {
                 tokio::select! {
                     Some(pos_arr) = self.pos_rx.recv() => {
-                        self.latitude = pos_arr[0];
-                        self.longitude = pos_arr[1];
+                        self.longitude = pos_arr[0];
+                        self.latitude = pos_arr[1];
                     },
                     Some(msg) = self.rx.recv() => {
                         println!("Requête GPS reçue : {:?}", msg);

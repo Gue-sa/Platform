@@ -58,6 +58,7 @@ impl VoyageOrderBody {
 
     pub fn to_bitpacker(&self) -> BitPacker {
         BitPacker::from_int(self.speed_profile, Some(8))
+            + BitPacker::from_int(self.cargo_type, Some(8))
             + BitPacker::from_int(self.eta_minute, Some(8))
             + BitPacker::from_int(self.eta_hour, Some(8))
             + BitPacker::from_int(self.eta_day, Some(8))

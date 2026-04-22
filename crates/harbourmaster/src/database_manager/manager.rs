@@ -383,6 +383,18 @@ impl DatabaseManager {
         Ok(())
     }
 
+    pub fn delete_voyage_order_version(
+        &mut self,
+        voyage_order_id: i32,
+        version_number: i32,
+    ) -> DatabaseManagerResult<()> {
+        diesel::delete(ORDER_VERSIONS::table.filter(ORDER_VERSIONS::order_id.eq(voyage_order_id).and(ORDER_VERSIONS::version_number.eq(version_number))))
+            .execute(&mut self.connection)
+            .map_err(|e: diesel::result::Error| DatabaseManagerError::DeletionError(e))?;
+
+        Ok(())
+    }
+
     pub fn delete_voyage_order_versions(
         &mut self,
         voyage_order_id: i32,

@@ -3,13 +3,18 @@ use std::sync::Arc;
 use shared::{
     boat_info::BoatInfo,
     boats_registry::BoatsInfoRegistry,
-    common::types::{SatComMessageType, VoyageStatus},
+    common::{
+        constants::HARBOURMASTER_MMSI,
+        types::{SatComMessageType, VoyageStatus},
+    },
     satcom_message::SatComMessage,
     voyage_order::VoyageOrder,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::voyage::Voyage;
+use colored::*;
+
+use crate::{common::utils::log, voyage::Voyage};
 
 pub struct BoardComputer {
     pub boat_info: Arc<BoatInfo>,
@@ -121,10 +126,12 @@ impl BoardComputer {
             loop {
                 match self.rx.recv().await {
                     Some(satcom_message) => {
-                        if satcom_message.target == self.boat_info.get_static_data().mmsi {
+                        if satcom_message.target == self.boat_info.get_static_data().mmsi
+                            && satcom_message.source == HARBOURMASTER_MMSI
+                        {
                             let mut msg_template: SatComMessage = SatComMessage::new(
                                 self.boat_info.get_static_data().mmsi,
-                                satcom_message.source,
+                                HARBOURMASTER_MMSI,
                                 satcom_message.order_header.clone(),
                                 SatComMessageType::Acknowledgement,
                                 None,
@@ -134,10 +141,16 @@ impl BoardComputer {
                                 SatComMessageType::Offer => {
                                     self.satcom_tx.send(msg_template.clone()).await;
 
+                                    log(format!(
+                                        "Offre d'ordre de voyage reçue (ID {}). Accusé de réception envoyé.",
+                                        satcom_message.clone().order_header.id
+                                    )
+                                    .cyan());
+
                                     if !self.has_voyage() {
                                         let voyage_order: VoyageOrder = VoyageOrder {
-                                            header: satcom_message.order_header,
-                                            body: satcom_message.order_body_review.unwrap(),
+                                            header: satcom_message.clone().order_header,
+                                            body: satcom_message.clone().order_body_review.unwrap(),
                                         };
 
                                         self.adopt_voyage_order(voyage_order);
@@ -147,10 +160,22 @@ impl BoardComputer {
                                         msg_template.message_type =
                                             SatComMessageType::RevisionAcceptation;
                                         self.satcom_tx.send(msg_template).await;
+
+                                        log(format!(
+                                            "Ordre de voyage {} accepté.",
+                                            satcom_message.clone().order_header.id
+                                        )
+                                        .cyan());
                                     } else {
                                         msg_template.message_type =
                                             SatComMessageType::RevisionRefusal;
                                         self.satcom_tx.send(msg_template).await;
+
+                                        log(format!(
+                                            "Ordre de voyage {} refusé (navire déjà en activité).",
+                                            satcom_message.clone().order_header.id
+                                        )
+                                        .cyan());
                                     }
                                 }
                                 SatComMessageType::Acknowledgement => {
@@ -165,6 +190,12 @@ impl BoardComputer {
                                             .version = satcom_message.order_header.version;
 
                                         self.update_voyage_status(VoyageStatus::UnderRevision);
+
+                                        log(format!(
+                                            "Demande de révision de l'ordre {} reçu par la capitainerie. Attente d'une réponse.",
+                                            satcom_message.clone().order_header.id
+                                        )
+                                        .cyan());
                                     } else if self
                                         .matches_status(Some(VoyageStatus::RevisionAccepted))
                                         && satcom_message.order_header
@@ -175,6 +206,18 @@ impl BoardComputer {
                                         msg_template.message_type =
                                             SatComMessageType::ExecutingLastAgreedRevision;
                                         self.satcom_tx.send(msg_template).await;
+
+                                        log(format!(
+                                            "Exécution en cours de l'ordre {}.",
+                                            satcom_message.clone().order_header.id
+                                        )
+                                        .cyan());
+                                    } else if self
+                                        .matches_status(Some(VoyageStatus::RevisionRefused))
+                                        && satcom_message.order_header
+                                            == self.voyage.as_ref().unwrap().order.header
+                                    {
+                                        self.voyage = None;
                                     }
                                 }
                                 SatComMessageType::RevisionAcceptation => {
@@ -189,6 +232,12 @@ impl BoardComputer {
                                         msg_template.message_type =
                                             SatComMessageType::ExecutingLastAgreedRevision;
                                         self.satcom_tx.send(msg_template).await;
+
+                                        log(format!(
+                                            "Révision de l'ordre de voyage {} acceptée. Nouvelle version : n°{}. Exécution en cours.",
+                                            satcom_message.clone().order_header.id, satcom_message.clone().order_header.version
+                                        )
+                                        .cyan());
                                     }
                                 }
                                 SatComMessageType::RevisionRefusal => {
@@ -206,6 +255,12 @@ impl BoardComputer {
                                             SatComMessageType::ExecutingLastAgreedRevision;
                                         msg_template.order_header.version = self.order_version();
                                         self.satcom_tx.send(msg_template).await;
+
+                                        log(format!(
+                                            "Révision de l'ordre de voyage {} refusée. Retour à la version n°{}. Exécution en cours.",
+                                            satcom_message.clone().order_header.id, satcom_message.clone().order_header.version
+                                        )
+                                        .cyan());
                                     }
                                 }
                                 SatComMessageType::RevisionRequest => {
@@ -222,7 +277,13 @@ impl BoardComputer {
 
                                         self.update_voyage_status(VoyageStatus::UnderRevision);
 
-                                        msg_template.order_header = satcom_message.order_header;
+                                        log(format!(
+                                            "Demande de révision de l'ordre de voyage {} reçue. Traitement de la demande.",
+                                            satcom_message.clone().order_header.id
+                                        )
+                                        .cyan());
+
+                                        msg_template.order_header = satcom_message.clone().order_header;
                                         self.satcom_tx.send(msg_template.clone()).await;
 
                                         self.adopt_voyage_order_revision();
@@ -232,6 +293,12 @@ impl BoardComputer {
                                         msg_template.message_type =
                                             SatComMessageType::RevisionAcceptation;
                                         self.satcom_tx.send(msg_template).await;
+
+                                        log(format!(
+                                            "Révision de l'ordre de voyage {} acceptée. Nouvelle version : n°{}. Exécution en cours.",
+                                            satcom_message.clone().order_header.id, satcom_message.clone().order_header.version
+                                        )
+                                        .cyan());
                                     }
                                 }
                                 SatComMessageType::EndOfVoyage => {
@@ -242,6 +309,12 @@ impl BoardComputer {
                                         self.update_voyage_status(VoyageStatus::Finished);
 
                                         self.satcom_tx.send(msg_template.clone()).await;
+
+                                        log(format!(
+                                            "Ordre de voyage {} achevé. Attente d'un nouvel ordre.",
+                                            satcom_message.clone().order_header.id
+                                        )
+                                        .cyan());
                                     }
                                 }
                                 _ => {}

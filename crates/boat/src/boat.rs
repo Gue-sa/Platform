@@ -141,15 +141,17 @@ impl Boat {
     }
 
     pub async fn start(self) -> () {
-        self.antenna_87_b.start().await;
-        self.antenna_88_b.start().await;
-        self.gps_antenna.start().await;
-        self.satcom_antenna.start().await;
-        self.gps.start().await;
-        self.ais.start().await;
-        self.satcom.start().await;
-        self.board_computer.start().await;
-
+        tokio::spawn(async move {
+            self.antenna_87_b.start().await;
+            self.antenna_88_b.start().await;
+            self.gps_antenna.start().await;
+            self.satcom_antenna.start().await;
+            self.gps.start().await;
+            self.satcom.start().await;
+            self.board_computer.start().await;
+            self.ais.start().await;
+        });
+        
         self.ui.start();
     }
 }

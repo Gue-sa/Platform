@@ -124,7 +124,7 @@ impl BitPacker {
             bits_len: bits_len,
         };
 
-        for (i, c) in value.chars().enumerate() {
+        for (i, c) in value.to_ascii_uppercase().chars().enumerate() {
             let ord: u8 = ord6(c);
             bitpacker.write_bits::<u8>(ord, Some(i * 6));
         }

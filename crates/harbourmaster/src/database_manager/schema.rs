@@ -33,5 +33,6 @@ diesel::table! {
 }
 
 diesel::joinable!(ORDER_VERSIONS -> DESTINATIONS (destination_id));
+diesel::joinable!(ORDER_VERSIONS -> VOYAGE_ORDERS (order_id));
 
 diesel::allow_tables_to_appear_in_same_query!(DESTINATIONS, ORDER_VERSIONS, VOYAGE_ORDERS,);

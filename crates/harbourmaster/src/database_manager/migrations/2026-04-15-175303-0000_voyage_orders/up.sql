@@ -2,7 +2,6 @@ CREATE TABLE VOYAGE_ORDERS (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     creation_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status INTEGER NOT NULL DEFAULT 0,
-    executant INTEGER,
-    current_version_number INTEGER NOT NULL DEFAULT 0,
-    CONSTRAINT fk_version FOREIGN KEY (current_version_number) REFERENCES ORDER_VERSIONS(verion_number)
+    executant INTEGER DEFAULT NULL,
+    current_version_number INTEGER NOT NULL DEFAULT 0
 );

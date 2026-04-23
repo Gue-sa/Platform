@@ -1,7 +1,7 @@
 use crate::{
     bitpacker::BitPacker,
     common::types::{SatComMessageResult, SatComMessageType},
-    voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
+    voyage_order::{VoyageOrderBody, VoyageOrderHeader},
 };
 
 #[derive(Debug, Clone)]

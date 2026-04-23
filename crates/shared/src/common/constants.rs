@@ -64,4 +64,4 @@ pub const MSG5_FIELDS: [&str; 19] = [
     "spare",
 ];
 
-pub const FMS_UPDATE_SECS_INTERVAL: u64 = 30;
+pub const FMS_UPDATE_SECS_INTERVAL: u64 = 1;

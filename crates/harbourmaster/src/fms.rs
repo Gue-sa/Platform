@@ -2,13 +2,10 @@ use std::{sync::Arc, time::Duration};
 
 use chrono::{Datelike, Timelike};
 use shared::{
-    boats_registry::BoatsInfoRegistry,
-    common::{
+    boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, common::{
         constants::{FMS_UPDATE_SECS_INTERVAL, HARBOURMASTER_MMSI},
         types::{SatComMessageType, VoyageStatus},
-    },
-    satcom_message::SatComMessage,
-    voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
+    }, satcom_message::SatComMessage, voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader}
 };
 use tokio::sync::{
     Notify,
@@ -56,6 +53,7 @@ impl Fms {
         let database_manager_sender_clone: Arc<std::sync::Mutex<DatabaseManager>> =
             self.database_manager.clone();
         let boats_registry_clone: Arc<BoatsInfoRegistry> = self.boats_registry.clone();
+        let runner_boats_registry_clone: Arc<BoatsInfoRegistry> = self.boats_registry.clone();
 
         let clock_pulse_clone: Arc<Notify> = self.clock_pulse.clone();
         let runner_arc: Arc<Self> = Arc::new(self);
@@ -115,8 +113,8 @@ impl Fms {
             loop {
                 match runner_arc.rx.lock().await.recv().await {
                     Some(satcom_message) => {
+                        println!("{:#?}", satcom_message);
                         if satcom_message.target == HARBOURMASTER_MMSI {
-                            println!("{:#?}", satcom_message);
                             let mut msg_template: SatComMessage = SatComMessage::new(
                                 HARBOURMASTER_MMSI,
                                 satcom_message.source,
@@ -175,18 +173,9 @@ impl Fms {
                                         v.version_number as u8;
                                 }
 
-                                println!("{:?}", concerned_voyage_order.0.executant.is_none());
-                                println!("{:?}", concerned_voyage_order_version_number == concerned_voyage_order_version_number);
-                                println!("{:?}", concerned_voyage_order_status == VoyageStatus::UnderRevision);
-
                                 match satcom_message.message_type {
                                     SatComMessageType::Acknowledgement => {
-                                        if concerned_voyage_order_status == VoyageStatus::Unassigned
-                                            || (concerned_voyage_order_status
-                                                == VoyageStatus::RevisionSubmitted
-                                                && Some(satcom_message.source as i32)
-                                                    == concerned_voyage_order.0.executant && satcom_message_order_header.version == concerned_voyage_order_revision_version_number)
-                                        {
+                                        if concerned_voyage_order_status == VoyageStatus::Unassigned {
                                             database_manager_listener_clone
                                                 .lock()
                                                 .unwrap()
@@ -195,8 +184,27 @@ impl Fms {
                                                     VoyageStatus::UnderRevision,
                                                 );
 
-                                                println!("Offre pour l'ordre de voyage {} reçue par le bateau {}. Attente d'une réponse pour la révision initiale.", satcom_message.order_header.id, satcom_message.source);
-                                        }
+                                            let concerned_boat_info: BoatInfo = runner_boats_registry_clone.get(satcom_message.source).unwrap();
+
+                                            concerned_boat_info.update_voyage_data(Some(concerned_voyage_order.2.name.clone()), Some(concerned_voyage_order.1.eta.month() as u8), Some(concerned_voyage_order.1.eta.day() as u8), Some(concerned_voyage_order.1.eta.hour() as u8), Some(concerned_voyage_order.1.eta.minute() as u8));
+
+                                            runner_boats_registry_clone.update(concerned_boat_info);
+
+                                            println!("Offre pour l'ordre de voyage {} reçue par le bateau {}. Attente d'une réponse pour la révision initiale.", satcom_message.order_header.id, satcom_message.source);
+                                        } else if (concerned_voyage_order_status
+                                            == VoyageStatus::RevisionSubmitted
+                                            && Some(satcom_message.source as i32)
+                                                == concerned_voyage_order.0.executant && satcom_message_order_header.version == concerned_voyage_order_revision_version_number) {
+                                                    database_manager_listener_clone
+                                                        .lock()
+                                                        .unwrap()
+                                                        .update_voyage_order_status(
+                                                            satcom_message_order_header.id as i32,
+                                                            VoyageStatus::UnderRevision,
+                                                        );
+
+                                                    println!("Offre pour l'ordre de voyage {} reçue par le bateau {}. Attente d'une réponse pour la révision initiale.", satcom_message.order_header.id, satcom_message.source);
+                                                }
                                     }
                                     SatComMessageType::RevisionAcceptation => {
                                         if concerned_voyage_order_status

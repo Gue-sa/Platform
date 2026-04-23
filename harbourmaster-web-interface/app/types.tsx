@@ -2,7 +2,7 @@ export interface VoyageOrderResult {
     id: number;
     creation_date: string;
     status: number;
-    executant: number;
+    executant: number | null;
     current_version_number: number;
 }
 
@@ -74,6 +74,8 @@ export type VoyageResult = [
     VoyageVersionResult,
     DestinationResult,
 ][];
+
+export type DestinationsResult = DestinationResult[];
 
 export type VersionResult = [VoyageVersionResult, DestinationResult][];
 

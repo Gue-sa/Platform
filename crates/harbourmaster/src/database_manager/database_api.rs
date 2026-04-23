@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use axum::{
     Json, Router,
     extract::{Query, State},
-    routing::get,
+    routing::{get, post},
 };
 use serde::Deserialize;
 use shared::{boat_info::BoatInfo, boats_registry::BoatsInfoRegistry};
@@ -15,10 +15,17 @@ use crate::database_manager::{
     models::{DestinationQueryResult, VoyageOrderQueryResult, VoyageOrderVersionQueryResult},
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct GetVoyageOrderVersionsFilterParams {
     order_id: Option<i32>,
     version_number: Option<i32>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CreateVoyageOrderPayload {
+    pub destination_id: i32,
+    pub ship_type: u8,
+    pub speed_profile: u8,
 }
 
 pub struct DatabaseApiSharedState {
@@ -51,8 +58,9 @@ impl DatabaseApi {
                 get(Self::get_voyage_order_versions),
             )
             .route("/get_boats_list", get(Self::get_boats_list))
-            //.route("/get_boat_info", get(Self::get_boat_info))
+            .route("/get_destinations", get(Self::get_destinations))
             //.route("/get_statistics", get(Self::get_statistics))
+            .route("/add_voyage_order", post(Self::create_voyage_order))
             .with_state(self.state.clone())
             .layer(CorsLayer::permissive());
 
@@ -72,7 +80,8 @@ impl DatabaseApi {
             )],
         >,
     > {
-        let mut manager: std::sync::MutexGuard<'_, DatabaseManager> = shared_state.database_manager.lock().unwrap();
+        let mut manager: std::sync::MutexGuard<'_, DatabaseManager> =
+            shared_state.database_manager.lock().unwrap();
 
         let results: Box<
             [(
@@ -89,7 +98,8 @@ impl DatabaseApi {
         Query(params): Query<GetVoyageOrderVersionsFilterParams>,
         State(shared_state): State<Arc<DatabaseApiSharedState>>,
     ) -> Json<Box<[(VoyageOrderVersionQueryResult, DestinationQueryResult)]>> {
-        let mut manager: std::sync::MutexGuard<'_, DatabaseManager> = shared_state.database_manager.lock().unwrap();
+        let mut manager: std::sync::MutexGuard<'_, DatabaseManager> =
+            shared_state.database_manager.lock().unwrap();
 
         let results: Box<[(VoyageOrderVersionQueryResult, DestinationQueryResult)]> = manager
             .get_voyage_order_versions(params.order_id, params.version_number)
@@ -98,7 +108,39 @@ impl DatabaseApi {
         Json(results)
     }
 
-    async fn get_boats_list(State(shared_state): State<Arc<DatabaseApiSharedState>>) -> Json<Box<[(u32, BoatInfo)]>> {
+    async fn get_boats_list(
+        State(shared_state): State<Arc<DatabaseApiSharedState>>,
+    ) -> Json<Box<[(u32, BoatInfo)]>> {
         Json(shared_state.boats_registry.export())
+    }
+
+    async fn get_destinations(
+        State(shared_state): State<Arc<DatabaseApiSharedState>>,
+    ) -> Json<Box<[DestinationQueryResult]>> {
+        let mut manager: std::sync::MutexGuard<'_, DatabaseManager> =
+            shared_state.database_manager.lock().unwrap();
+
+        let results: Box<[DestinationQueryResult]> =
+            manager.get_destinations(None, None, None, None).unwrap();
+
+        Json(results)
+    }
+
+    async fn create_voyage_order(
+        State(shared_state): State<Arc<DatabaseApiSharedState>>,
+        Json(payload): Json<CreateVoyageOrderPayload>,
+    ) -> () {
+        let mut manager: std::sync::MutexGuard<'_, DatabaseManager> =
+            shared_state.database_manager.lock().unwrap();
+
+        manager.add_voyage_order(
+            payload.destination_id.into(),
+            1,
+            1,
+            0,
+            0,
+            payload.ship_type.into(),
+            payload.speed_profile.into(),
+        );
     }
 }

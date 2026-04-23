@@ -65,15 +65,17 @@ impl DatabaseManager {
         cargo_type: i32,
         speed_profile: i32,
     ) -> DatabaseManagerResult<()> {
+        let mut eta: NaiveDateTime = NaiveDateTime::new(
+            NaiveDate::from_ymd_opt(0, eta_month as u32, eta_day as u32).unwrap(),
+            NaiveTime::from_hms_opt(eta_hour as u32, eta_minute as u32, 0).unwrap(),
+        );
+
         let new_voyage_order_version: VoyageOrderVersionInsertionModel<'_> =
             VoyageOrderVersionInsertionModel {
                 version_number: &version_number,
                 order_id: &order_id,
                 destination_id: &destination_id,
-                eta: &NaiveDateTime::new(
-                    NaiveDate::from_ymd_opt(0, eta_month as u32, eta_day as u32).unwrap(),
-                    NaiveTime::from_hms_opt(eta_hour as u32, eta_minute as u32, 0).unwrap(),
-                ),
+                eta: &eta,
                 cargo_type: &cargo_type,
                 speed_profile: &speed_profile,
             };
@@ -388,9 +390,15 @@ impl DatabaseManager {
         voyage_order_id: i32,
         version_number: i32,
     ) -> DatabaseManagerResult<()> {
-        diesel::delete(ORDER_VERSIONS::table.filter(ORDER_VERSIONS::order_id.eq(voyage_order_id).and(ORDER_VERSIONS::version_number.eq(version_number))))
-            .execute(&mut self.connection)
-            .map_err(|e: diesel::result::Error| DatabaseManagerError::DeletionError(e))?;
+        diesel::delete(
+            ORDER_VERSIONS::table.filter(
+                ORDER_VERSIONS::order_id
+                    .eq(voyage_order_id)
+                    .and(ORDER_VERSIONS::version_number.eq(version_number)),
+            ),
+        )
+        .execute(&mut self.connection)
+        .map_err(|e: diesel::result::Error| DatabaseManagerError::DeletionError(e))?;
 
         Ok(())
     }

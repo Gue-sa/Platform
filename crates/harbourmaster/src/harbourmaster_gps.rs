@@ -43,10 +43,13 @@ impl HarbourmasterGps {
 
     pub fn detect(&self, pos_tx: Sender<[u32; 2]>) -> () {
         tokio::spawn(async move {
-            let mut cam: VideoCapture = VideoCapture::new(0, CAP_ANY).unwrap();
+            let mut cam = VideoCapture::new(0, CAP_ANY).unwrap();
 
-            cam.set(CAP_PROP_FRAME_WIDTH, 1920.);
-            cam.set(CAP_PROP_FRAME_HEIGHT, 1080.);
+            let fourcc = videoio::VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
+            cam.set(videoio::CAP_PROP_FOURCC, fourcc as f64).unwrap();
+
+            cam.set(videoio::CAP_PROP_FRAME_WIDTH, 1920.).unwrap();
+            cam.set(videoio::CAP_PROP_FRAME_HEIGHT, 1080.).unwrap();
 
             cam.set(CAP_PROP_BUFFERSIZE, 1.);
 
@@ -166,8 +169,6 @@ impl HarbourmasterGps {
                             }
 
                             pos_tx.send([center_x, center_y]).await;
-
-                            println!("Rectangle rouge détecté en [{}, {}]", center_x, center_y);
 
                             // Dessin des résultats
                             imgproc::rectangle(

@@ -18,6 +18,7 @@ slint = "1.15.1"
 tokio = {version = "1.51.0", features = ["full"]}
 toml = "1.1.2"
 shared = { path = "../shared" }
+serialport = "4.9.0"
 
 [build-dependencies]
 slint-build = "1.15.1"

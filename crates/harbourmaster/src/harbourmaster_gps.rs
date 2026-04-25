@@ -6,11 +6,10 @@ use tokio::sync::{
 
 use opencv::{
     core::{self, Scalar},
-    highgui, imgproc,
+    highgui, imgproc::{self, INTER_CUBIC},
     prelude::*,
     videoio::{
-        self, CAP_ANY, CAP_PROP_BUFFERSIZE, CAP_PROP_EXPOSURE, CAP_PROP_FRAME_HEIGHT,
-        CAP_PROP_FRAME_WIDTH, CAP_V4L2, VideoCapture,
+        self, CAP_ANY, CAP_PROP_BUFFERSIZE, CAP_PROP_EXPOSURE, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, CAP_V4L, CAP_V4L2, VideoCapture
     },
 };
 
@@ -43,7 +42,7 @@ impl HarbourmasterGps {
 
     pub fn detect(&self, pos_tx: Sender<[u32; 2]>) -> () {
         tokio::spawn(async move {
-            let mut cam = VideoCapture::new(0, CAP_ANY).unwrap();
+            let mut cam = VideoCapture::new(4, CAP_V4L2).unwrap();
 
             let fourcc = videoio::VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
             cam.set(videoio::CAP_PROP_FOURCC, fourcc as f64).unwrap();
@@ -53,8 +52,8 @@ impl HarbourmasterGps {
 
             cam.set(CAP_PROP_BUFFERSIZE, 1.);
 
-            cam.set(videoio::CAP_PROP_AUTO_EXPOSURE, 1.);
-            cam.set(CAP_PROP_EXPOSURE, -3.).unwrap();
+            //cam.set(videoio::CAP_PROP_AUTO_EXPOSURE, 1.);
+            //cam.set(CAP_PROP_EXPOSURE, -3.).unwrap();
 
             let mut frame: Mat = Mat::default();
             let mut flipped_frame: Mat = Mat::default();
@@ -85,9 +84,8 @@ impl HarbourmasterGps {
                 if frame.empty() {
                     break;
                 }
-                core::flip(&frame, &mut flipped_frame, 1).unwrap();
 
-                //imgproc::gaussian_blur(&flipped_frame, &mut blurred, core::Size::new(3, 3), 0., 0., core::BORDER_DEFAULT, core::AlgorithmHint::ALGO_HINT_DEFAULT).unwrap();
+                core::flip(&frame, &mut flipped_frame, 1).unwrap();
 
                 imgproc::cvt_color(
                     &flipped_frame,

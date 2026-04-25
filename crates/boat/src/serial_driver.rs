@@ -17,7 +17,7 @@ impl SerialDriver {
     }
 
     pub async fn start(mut self) -> () {
-        let ports = available_ports().unwrap();
+        let ports: Vec<serialport::SerialPortInfo> = available_ports().unwrap();
 
         let port_name = ports
             .into_iter()
@@ -38,14 +38,26 @@ impl SerialDriver {
         tokio::spawn(async move {
             loop {
                 port.write_all(b"1\n").unwrap();
-                println!("Allumage.");
+                println!("Avancer.");
+
+                thread::sleep(Duration::from_secs(5));
+
+                port.write_all(b"-1\n").unwrap();
+                println!("Reculer.");
+
+                thread::sleep(Duration::from_secs(5));
+
+                /*
+                port.write_all(b"01\n").unwrap();
+                println!("Droite.");
 
                 thread::sleep(Duration::from_secs(1));
-
-                port.write_all(b"0\n").unwrap();
-                println!("Extinction.");
+                
+                port.write_all(b"00\n").unwrap();
+                println!("Gauche.");
 
                 thread::sleep(Duration::from_secs(1));
+                */
             }
         });
 
@@ -61,7 +73,7 @@ impl SerialDriver {
         //self.tx.send(format!("SPEED:{}", speed)).await.unwrap();
     }
 
-    pub async fn set_haeding(&mut self, heading: u16) {
+    pub async fn set_heading(&mut self, heading: u16) {
         //self.tx.send(format!("HEADING:{}", heading)).await.unwrap();
     }
 

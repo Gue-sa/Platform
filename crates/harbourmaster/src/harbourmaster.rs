@@ -4,22 +4,8 @@ use crate::{
     harbourmaster_ais::HarbourmasterAisRunner,
     harbourmaster_gps::HarbourmasterGps,
 };
-use shared::{
-    antenna::Antenna,
-    bitpacker::BitPacker,
-    boats_registry::BoatsInfoRegistry,
-    common::{
-        constants::{
-            C87B_EM_PORT, C87B_REC_PORT, C88B_EM_PORT, C88B_REC_PORT, GPS_EM_PORT, GPS_REC_PORT,
-            SATCOM_EM_PORT, SATCOM_REC_PORT,
-        },
-        types::{AisPacket, Channel},
-    },
-    satcom::SatCom,
-    satcom_message::SatComMessage,
-};
+use shared::{antenna::Antenna, radio_builder::build_radio, satcom::SatCom};
 use std::sync::{Arc, Mutex};
-use tokio::sync::{Semaphore, mpsc::channel};
 
 pub struct Harbourmaster {
     ais: HarbourmasterAisRunner,
@@ -35,73 +21,29 @@ pub struct Harbourmaster {
 
 impl Harbourmaster {
     pub async fn init() -> Self {
-        let (ais_tx, ais_rx) = channel::<AisPacket>(Semaphore::MAX_PERMITS);
-        let (gps_tx, gps_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (sender_satcom_tx, sender_satcom_rx) = channel::<SatComMessage>(Semaphore::MAX_PERMITS);
-        let (reader_satcom_tx, reader_satcom_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (fms_tx, fms_rx) = channel::<SatComMessage>(Semaphore::MAX_PERMITS);
+        let (
+            ais_rx,
+            gps_rx,
+            fms_rx,
+            _,
+            _,
+            c_gps_tx,
+            sender_satcom_tx,
+            ant1,
+            ant2,
+            ant3,
+            ant4,
+            satcom,
+            boats_reg,
+        ) = build_radio().await;
 
-        let (_, c87b_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (_, c88b_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (c_gps_tx, c_gps_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (c_satcom_tx, c_satcom_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-
-        let ant1: Antenna = Antenna::init(
-            Some(ais_tx.clone()),
-            None,
-            None,
-            c87b_rx,
-            C87B_REC_PORT,
-            C87B_EM_PORT,
-            Channel::C87B,
-        )
-        .await;
-        let ant2: Antenna = Antenna::init(
-            Some(ais_tx),
-            None,
-            None,
-            c88b_rx,
-            C88B_REC_PORT,
-            C88B_EM_PORT,
-            Channel::C88B,
-        )
-        .await;
-        let ant3: Antenna = Antenna::init(
-            None,
-            Some(gps_tx),
-            None,
-            c_gps_rx,
-            GPS_REC_PORT,
-            GPS_EM_PORT,
-            Channel::GPS,
-        )
-        .await;
-        let ant4: Antenna = Antenna::init(
-            None,
-            None,
-            Some(reader_satcom_tx),
-            c_satcom_rx,
-            SATCOM_REC_PORT,
-            SATCOM_EM_PORT,
-            Channel::SATCOM,
-        )
-        .await;
-
-        let boats_reg: Arc<BoatsInfoRegistry> = Arc::new(BoatsInfoRegistry::new());
         let db_manager: Arc<Mutex<DatabaseManager>> =
             Arc::new(Mutex::new(DatabaseManager::init().unwrap()));
+        let db_api: DatabaseApi = DatabaseApi::init(db_manager.clone(), boats_reg.clone());
 
         let ais: HarbourmasterAisRunner = HarbourmasterAisRunner::init(ais_rx, boats_reg.clone());
         let gps: HarbourmasterGps = HarbourmasterGps::init(gps_rx, c_gps_tx).await;
-        let satcom: SatCom = SatCom::new(reader_satcom_rx, sender_satcom_rx, c_satcom_tx, fms_tx);
-        let fms = Fms::new(
-            boats_reg.clone(),
-            db_manager.clone(),
-            fms_rx,
-            sender_satcom_tx,
-        );
-
-        let db_api: DatabaseApi = DatabaseApi::init(db_manager, boats_reg);
+        let fms: Fms = Fms::new(boats_reg, db_manager, fms_rx, sender_satcom_tx);
 
         Self {
             ais: ais,

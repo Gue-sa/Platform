@@ -2,23 +2,8 @@ use crate::{
     board_computer::BoardComputer, boat_ais::BoatAisRunner, boat_gps::BoatGps,
     systemstate::SystemState, ui::Ui, voyage::Voyage,
 };
-use shared::{
-    antenna::Antenna,
-    bitpacker::BitPacker,
-    boat_info::BoatInfo,
-    boats_registry::BoatsInfoRegistry,
-    common::{
-        constants::{
-            C87B_EM_PORT, C87B_REC_PORT, C88B_EM_PORT, C88B_REC_PORT, GPS_EM_PORT, GPS_REC_PORT,
-            SATCOM_EM_PORT, SATCOM_REC_PORT,
-        },
-        types::{AisPacket, Channel},
-    },
-    satcom::SatCom,
-    satcom_message::SatComMessage,
-};
+use shared::{antenna::Antenna, boat_info::BoatInfo, radio_builder::build_radio, satcom::SatCom};
 use std::sync::Arc;
-use tokio::sync::{Semaphore, mpsc::channel};
 
 pub struct Boat {
     ais: BoatAisRunner,
@@ -35,70 +20,34 @@ pub struct Boat {
 
 impl Boat {
     pub async fn init() -> Self {
-        let (ais_tx, ais_rx) = channel::<AisPacket>(Semaphore::MAX_PERMITS);
-        let (gps_tx, gps_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (sender_satcom_tx, sender_satcom_rx) = channel::<SatComMessage>(Semaphore::MAX_PERMITS);
-        let (reader_satcom_tx, reader_satcom_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (board_computer_tx, board_computer_rx) =
-            channel::<SatComMessage>(Semaphore::MAX_PERMITS);
-
-        let (c87b_tx, c87b_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (c88b_tx, c88b_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (c_gps_tx, c_gps_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (c_satcom_tx, c_satcom_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-
-        let ant1: Antenna = Antenna::init(
-            Some(ais_tx.clone()),
-            None,
-            None,
-            c87b_rx,
-            C87B_REC_PORT,
-            C87B_EM_PORT,
-            Channel::C87B,
-        )
-        .await;
-        let ant2: Antenna = Antenna::init(
-            Some(ais_tx),
-            None,
-            None,
-            c88b_rx,
-            C88B_REC_PORT,
-            C88B_EM_PORT,
-            Channel::C88B,
-        )
-        .await;
-        let ant3: Antenna = Antenna::init(
-            None,
-            Some(gps_tx),
-            None,
-            c_gps_rx,
-            GPS_REC_PORT,
-            GPS_EM_PORT,
-            Channel::GPS,
-        )
-        .await;
-        let ant4: Antenna = Antenna::init(
-            None,
-            None,
-            Some(reader_satcom_tx),
-            c_satcom_rx,
-            SATCOM_REC_PORT,
-            SATCOM_EM_PORT,
-            Channel::SATCOM,
-        )
-        .await;
+        let (
+            ais_rx,
+            gps_rx,
+            board_computer_rx,
+            c87b_tx,
+            c88b_tx,
+            c_gps_tx,
+            sender_satcom_tx,
+            ant1,
+            ant2,
+            ant3,
+            ant4,
+            satcom,
+            boats_reg,
+        ) = build_radio().await;
 
         let boat_info: Arc<BoatInfo> = Arc::new(BoatInfo::new(None, None, None));
-        let boats_registry: Arc<BoatsInfoRegistry> = Arc::new(BoatsInfoRegistry::new());
-
         let system_state: Arc<SystemState> = Arc::new(SystemState::new());
+        let voyage: Option<Voyage> = None;
+
+        let ui: Ui = Ui::init(boat_info.clone());
 
         let ais: BoatAisRunner = BoatAisRunner::init(
             ais_rx,
             c87b_tx,
             c88b_tx,
             Arc::clone(&boat_info),
-            boats_registry.clone(),
+            boats_reg.clone(),
             system_state.clone(),
         );
         let gps: BoatGps = BoatGps::init(
@@ -107,22 +56,13 @@ impl Boat {
             c_gps_tx,
             system_state.clone(),
         );
-        let satcom: SatCom = SatCom::new(
-            reader_satcom_rx,
-            sender_satcom_rx,
-            c_satcom_tx,
-            board_computer_tx,
-        );
-        let voyage: Option<Voyage> = None;
         let board_computer = BoardComputer::new(
             boat_info.clone(),
-            boats_registry,
+            boats_reg,
             voyage,
             board_computer_rx,
             sender_satcom_tx,
         );
-
-        let ui: Ui = Ui::init(boat_info.clone());
 
         Self {
             system_state: system_state,

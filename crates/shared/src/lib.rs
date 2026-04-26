@@ -4,6 +4,7 @@ pub mod bitpacker;
 pub mod boat_info;
 pub mod boats_registry;
 pub mod common;
+pub mod radio_builder;
 pub mod satcom;
 pub mod satcom_message;
 pub mod slot;

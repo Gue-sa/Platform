@@ -2,7 +2,7 @@ use crate::{clients_registry::ClientsRegistry, common::constants::HARBOURMASTER_
 use dashmap::DashSet;
 use shared::{
     bitpacker::BitPacker,
-    common::{constants::GPS_EM_PORT, types::Channel},
+    common::{constants::GPS_FROM_SERVER_PORT, types::Channel},
 };
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::net::UdpSocket;
@@ -45,7 +45,7 @@ impl RadioFrequency {
         self.socket
             .send_to(
                 msg.bits(),
-                SocketAddr::new(HARBOURMASTER_IPADDR, GPS_EM_PORT),
+                SocketAddr::new(HARBOURMASTER_IPADDR, GPS_FROM_SERVER_PORT),
             )
             .await;
         self.pending_gps_clients
@@ -62,7 +62,7 @@ impl RadioFrequency {
         let data: BitPacker = msg.slice(Some(32), None).unwrap();
 
         self.socket
-            .send_to(data.bits(), SocketAddr::new(client, GPS_EM_PORT))
+            .send_to(data.bits(), SocketAddr::new(client, GPS_FROM_SERVER_PORT))
             .await;
         self.pending_gps_clients.remove(&client);
     }

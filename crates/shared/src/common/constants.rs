@@ -12,17 +12,17 @@ pub const NO_CS_MSGS: [u8; 19] = [
 
 pub const IMPLEMENTED_MSGS: [u8; 4] = [1, 2, 3, 5];
 
-pub const C87B_REC_PORT: u16 = 4444;
-pub const C87B_EM_PORT: u16 = 5555;
+pub const C87B_TO_SERVER_PORT: u16 = 4444;
+pub const C87B_FROM_SERVER_PORT: u16 = 5555;
 
-pub const C88B_REC_PORT: u16 = 6666;
-pub const C88B_EM_PORT: u16 = 7777;
+pub const C88B_TO_SERVER_PORT: u16 = 6666;
+pub const C88B_FROM_SERVER_PORT: u16 = 7777;
 
-pub const GPS_REC_PORT: u16 = 8888;
-pub const GPS_EM_PORT: u16 = 9999;
+pub const GPS_TO_SERVER_PORT: u16 = 8888;
+pub const GPS_FROM_SERVER_PORT: u16 = 9999;
 
-pub const SATCOM_REC_PORT: u16 = 8989;
-pub const SATCOM_EM_PORT: u16 = 9898;
+pub const SATCOM_TO_SERVER_PORT: u16 = 8989;
+pub const SATCOM_FROM_SERVER_PORT: u16 = 9898;
 
 pub const HARBOURMASTER_MMSI: u32 = 0b111111111111111111111111111111;
 

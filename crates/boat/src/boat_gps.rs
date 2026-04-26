@@ -32,24 +32,28 @@ impl BoatGps {
         }
     }
 
+    async fn run_gps(&mut self) -> () {
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+
+        loop {
+            tokio::select! {
+                Some(msg) = self.rx.recv() => {
+                    if let Ok(latitude) = msg.extract_int::<u32>(None, Some(31)) && let Ok(longitude) = msg.extract_int::<u32>(Some(32), None) {
+                        self.boat_info.update_positon(Some(latitude), Some(longitude));
+
+                        //log(format!("Position mise à jour depuis le GPS : {latitude} | {longitude}").white().italic());
+                    }
+                },
+                _ = interval.tick() => {
+                    self.antenna_tx.send(BitPacker::from_int(Ipv4Addr::to_bits(BOAT_IPV4), Some(32))).await;
+                }
+            };
+        }
+    }
+
     pub async fn start(mut self) -> () {
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
-
-            loop {
-                tokio::select! {
-                    Some(msg) = self.rx.recv() => {
-                        if let Ok(latitude) = msg.extract_int::<u32>(None, Some(31)) && let Ok(longitude) = msg.extract_int::<u32>(Some(32), None) {
-                            self.boat_info.update_positon(Some(latitude), Some(longitude));
-
-                            //log(format!("Position mise à jour depuis le GPS : {latitude} | {longitude}").white().italic());
-                        }
-                    },
-                    _ = interval.tick() => {
-                        self.antenna_tx.send(BitPacker::from_int(Ipv4Addr::to_bits(BOAT_IPV4), Some(32))).await;
-                    }
-                };
-            }
+            self.run_gps().await;
         });
     }
 }

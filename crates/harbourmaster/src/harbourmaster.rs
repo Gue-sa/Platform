@@ -24,15 +24,15 @@ use shared::{
 use tokio::sync::{Semaphore, mpsc::channel};
 
 pub struct Harbourmaster {
-    pub ais: HarbourmasterAisRunner,
-    pub gps: HarbourmasterGps,
-    pub satcom: SatCom,
-    pub fms: Fms,
-    pub antenna_87_b: Antenna,
-    pub antenna_88_b: Antenna,
-    pub gps_antenna: Antenna,
-    pub satcom_antenna: Antenna,
-    pub database_api: DatabaseApi,
+    ais: HarbourmasterAisRunner,
+    gps: HarbourmasterGps,
+    satcom: SatCom,
+    fms: Fms,
+    antenna_87_b: Antenna,
+    antenna_88_b: Antenna,
+    gps_antenna: Antenna,
+    satcom_antenna: Antenna,
+    database_api: DatabaseApi,
 }
 
 impl Harbourmaster {
@@ -125,7 +125,7 @@ impl Harbourmaster {
         self.gps_antenna.start().await;
         self.satcom_antenna.start().await;
         self.ais.start().await;
-        self.gps.start().await;
+        //self.gps.start().await;
         self.satcom.start().await;
         self.fms.start().await;
         self.database_api.start().await;

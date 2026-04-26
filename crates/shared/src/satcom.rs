@@ -5,8 +5,8 @@ use crate::{bitpacker::BitPacker, satcom_message::SatComMessage};
 pub struct SatCom {
     reader_rx: Receiver<BitPacker>,
     sender_rx: Receiver<SatComMessage>,
-    pub antenna_tx: Sender<BitPacker>,
-    pub board_computer_tx: Sender<SatComMessage>,
+    antenna_tx: Sender<BitPacker>,
+    board_computer_tx: Sender<SatComMessage>,
 }
 
 impl SatCom {

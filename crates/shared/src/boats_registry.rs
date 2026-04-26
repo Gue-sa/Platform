@@ -14,7 +14,7 @@ impl BoatsInfoRegistry {
     }
 
     pub fn register(&self, info: BoatInfo) -> () {
-        self.registry.insert(info.get_static_data().mmsi, info);
+        self.registry.insert(*info.get_static_data().mmsi(), info);
     }
 
     pub fn is_registered(&self, mmsi: &u32) -> bool {
@@ -28,7 +28,7 @@ impl BoatsInfoRegistry {
     }
 
     pub fn update(&self, new_boat_info: BoatInfo) -> () {
-        let mmsi: u32 = new_boat_info.get_static_data().mmsi;
+        let mmsi: u32 = *new_boat_info.get_static_data().mmsi();
         if self.is_registered(&mmsi) {
             self.registry.insert(mmsi, new_boat_info);
         }

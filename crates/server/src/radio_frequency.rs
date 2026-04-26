@@ -11,12 +11,12 @@ use tokio::net::UdpSocket;
 use crate::{clients_registry::ClientsRegistry, common::constants::HARBOURMASTER_IP};
 
 pub struct RadioFrequency {
-    pub channel: Channel,
-    pub socket: UdpSocket,
-    pub clients: ClientsRegistry,
-    pub em_port: u16,
-    pub rec_port: u16,
-    pub pending_gps_clients: DashSet<IpAddr>,
+    channel: Channel,
+    socket: UdpSocket,
+    clients: ClientsRegistry,
+    em_port: u16,
+    rec_port: u16,
+    pending_gps_clients: DashSet<IpAddr>,
 }
 
 impl RadioFrequency {
@@ -36,7 +36,7 @@ impl RadioFrequency {
         }
     }
 
-    pub async fn relay(&self, buf: &[u8]) {
+    async fn relay(&self, buf: &[u8]) {
         for client_ip in self.clients.get() {
             self
                 .socket
@@ -45,7 +45,7 @@ impl RadioFrequency {
         }
     }
 
-    pub async fn handle_gps_request(&self, msg: BitPacker) -> () {
+    async fn handle_gps_request(&self, msg: BitPacker) -> () {
         self
             .socket
             .send_to(msg.bits(), SocketAddr::new(HARBOURMASTER_IP, GPS_EM_PORT))
@@ -56,7 +56,7 @@ impl RadioFrequency {
             )));
     }
 
-    pub async fn handle_gps_response(&self, msg: BitPacker) -> () {
+    async fn handle_gps_response(&self, msg: BitPacker) -> () {
         let client: IpAddr = IpAddr::V4(Ipv4Addr::from_bits(
             msg.extract_int::<u32>(None, Some(31)).unwrap(),
         ));

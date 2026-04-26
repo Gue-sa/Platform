@@ -2,36 +2,48 @@ use serde::Serialize;
 
 use crate::{bitpacker::BitPacker, common::types::VoyageOrderResult};
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+use getset::{Getters, Setters};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Getters, Setters)]
 pub struct VoyageOrderHeader {
-    pub id: u16,
-    pub version: u8,
+    #[getset(get = "pub")]
+    id: u16,
+    #[getset(get = "pub", set = "pub")]
+    version: u8,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Getters, Setters)]
+#[getset(get = "pub")]
 pub struct VoyageOrderBody {
-    pub destination: String,
-    pub destination_position: (u16, u16),
-    pub eta_month: u8,
-    pub eta_day: u8,
-    pub eta_hour: u8,
-    pub eta_minute: u8,
-    pub cargo_type: u8,
-    pub speed_profile: u8, //0: eco, 1: à temps, 2: aussi vite que possible
+    destination: String,
+    destination_position: (u16, u16),
+    eta_month: u8,
+    eta_day: u8,
+    eta_hour: u8,
+    eta_minute: u8,
+    cargo_type: u8,
+    speed_profile: u8, //0: eco, 1: à temps, 2: aussi vite que possible
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct VoyageOrder {
-    pub header: VoyageOrderHeader,
-    pub body: VoyageOrderBody,
+    header: VoyageOrderHeader,
+    body: VoyageOrderBody,
 }
 
 impl VoyageOrderHeader {
-    pub fn from(voyage_order_header_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
+    pub fn from_bitpacker(voyage_order_header_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
         Ok(Self {
             id: voyage_order_header_bitpacker.extract_int::<u16>(None, Some(15))?,
             version: voyage_order_header_bitpacker.extract_int::<u8>(Some(16), None)?,
         })
+    }
+
+    pub fn from(id: u16, version: u8) -> Self {
+        Self {
+            id: id,
+            version: version,
+        }
     }
 
     pub fn to_bitpacker(&self) -> BitPacker {
@@ -40,7 +52,7 @@ impl VoyageOrderHeader {
 }
 
 impl VoyageOrderBody {
-    pub fn from(voyage_order_body_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
+    pub fn from_bitpacker(voyage_order_body_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
         Ok(Self {
             destination: voyage_order_body_bitpacker.extract_str(None, Some(119))?,
             destination_position: (
@@ -54,6 +66,28 @@ impl VoyageOrderBody {
             cargo_type: voyage_order_body_bitpacker.extract_int::<u8>(Some(184), Some(191))?,
             speed_profile: voyage_order_body_bitpacker.extract_int::<u8>(Some(192), None)?,
         })
+    }
+
+    pub fn from(
+        destination: String,
+        destination_position: (u16, u16),
+        eta_month: u8,
+        eta_day: u8,
+        eta_hour: u8,
+        eta_minute: u8,
+        cargo_type: u8,
+        speed_profile: u8,
+    ) -> Self {
+        Self {
+            destination: destination,
+            destination_position: destination_position,
+            eta_month: eta_month,
+            eta_day: eta_day,
+            eta_hour: eta_hour,
+            eta_minute: eta_minute,
+            cargo_type: cargo_type,
+            speed_profile: speed_profile,
+        }
     }
 
     pub fn to_bitpacker(&self) -> BitPacker {
@@ -70,11 +104,28 @@ impl VoyageOrderBody {
 }
 
 impl VoyageOrder {
-    pub fn from(voyage_order_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
+    pub fn from_bitpacker(voyage_order_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
         Ok(Self {
-            header: VoyageOrderHeader::from(voyage_order_bitpacker.slice(None, Some(23))?)?,
-            body: VoyageOrderBody::from(voyage_order_bitpacker.slice(Some(24), None)?)?,
+            header: VoyageOrderHeader::from_bitpacker(
+                voyage_order_bitpacker.slice(None, Some(23))?,
+            )?,
+            body: VoyageOrderBody::from_bitpacker(voyage_order_bitpacker.slice(Some(24), None)?)?,
         })
+    }
+
+    pub fn from(header: VoyageOrderHeader, body: VoyageOrderBody) -> Self {
+        Self {
+            header: header,
+            body: body,
+        }
+    }
+
+    pub fn header(&self) -> VoyageOrderHeader {
+        self.header.clone()
+    }
+
+    pub fn body(&self) -> VoyageOrderBody {
+        self.body.clone()
     }
 
     pub fn to_bitpacker(&self) -> BitPacker {
@@ -83,5 +134,9 @@ impl VoyageOrder {
 
     pub fn is_revision_of(&self, order2: &VoyageOrder) -> bool {
         self.header.id == order2.header.id && self.header.version > order2.header.version
+    }
+
+    pub fn set_version(&mut self, version: u8) -> () {
+        self.header.set_version(version);
     }
 }

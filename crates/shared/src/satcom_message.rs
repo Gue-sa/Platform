@@ -1,16 +1,23 @@
 use crate::{
     bitpacker::BitPacker,
     common::types::{SatComMessageResult, SatComMessageType},
-    voyage_order::{VoyageOrderBody, VoyageOrderHeader},
+    voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
 
-#[derive(Debug, Clone)]
+use getset::{CloneGetters, Getters, Setters};
+
+#[derive(Debug, Clone, Getters, Setters, CloneGetters)]
 pub struct SatComMessage {
-    pub source: u32,
-    pub target: u32,
-    pub order_header: VoyageOrderHeader,
-    pub message_type: SatComMessageType,
-    pub order_body_review: Option<VoyageOrderBody>,
+    #[getset(get = "pub")]
+    source: u32,
+    #[getset(get = "pub")]
+    target: u32,
+    #[getset(get_clone = "pub")]
+    order_header: VoyageOrderHeader,
+    #[getset(get = "pub")]
+    message_type: SatComMessageType,
+    #[getset(get_clone = "pub")]
+    order_body_review: Option<VoyageOrderBody>,
 }
 
 impl SatComMessage {
@@ -30,17 +37,30 @@ impl SatComMessage {
         }
     }
 
+    pub fn order(&self) -> Option<VoyageOrder> {
+        if self.order_body_review().is_some() {
+            Some(VoyageOrder::from(
+                self.order_header(),
+                self.order_body_review().unwrap(),
+            ))
+        } else {
+            None
+        }
+    }
+
     pub fn parse(msg: BitPacker) -> SatComMessageResult<Self> {
         let mut order_body_review: Option<VoyageOrderBody> = None;
 
-        if msg.bits_len > 112 {
-            order_body_review = Some(VoyageOrderBody::from(msg.slice(Some(112), None)?)?);
+        if *msg.bits_len() > 112 {
+            order_body_review = Some(VoyageOrderBody::from_bitpacker(
+                msg.slice(Some(112), None)?,
+            )?);
         }
 
         Ok(Self {
             source: msg.extract_int::<u32>(None, Some(31))?,
             target: msg.extract_int::<u32>(Some(32), Some(63))?,
-            order_header: VoyageOrderHeader::from(msg.slice(Some(64), Some(103))?)?,
+            order_header: VoyageOrderHeader::from_bitpacker(msg.slice(Some(64), Some(103))?)?,
             message_type: msg.extract_int::<u8>(Some(104), Some(111))?.into(),
             order_body_review,
         })

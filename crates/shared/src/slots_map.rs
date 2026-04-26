@@ -4,6 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use getset::MutGetters;
 use tokio::time::{Duration, Instant, interval_at};
 
 use rand::seq::IndexedRandom;
@@ -17,8 +18,10 @@ use crate::{
     slot::Slot,
 };
 
+#[derive(Debug, Clone, MutGetters)]
 pub struct SlotsMap {
-    pub slots: Arc<RwLock<[Slot; 2 * SLOTS_PER_MINUTE as usize]>>,
+    #[getset(get_mut = "pub")]
+    slots: Arc<RwLock<[Slot; 2 * SLOTS_PER_MINUTE as usize]>>,
     mmsi: u32,
 }
 
@@ -34,14 +37,16 @@ impl SlotsMap {
         tokio::spawn(async move {
             loop {
                 for slot in slots_cleanup_clone.write().unwrap().iter_mut() {
-                    match slot.frames_since_last_use {
+                    match *slot.frames_since_last_use() {
                         -2 => {
                             if !slot.is_free() {
                                 slot.release();
                             }
                         }
                         3 => slot.release(),
-                        _ => slot.frames_since_last_use += 1,
+                        _ => {
+                            slot.set_frames_since_last_use(*slot.frames_since_last_use() + 1);
+                        }
                     }
                 }
 
@@ -73,15 +78,15 @@ impl SlotsMap {
     }
 
     pub fn slot_owner(&self, si: u16) -> Option<u32> {
-        self.slots.read().unwrap()[si as usize].owner
+        *self.slots.read().unwrap()[si as usize].owner()
     }
 
     pub fn slot_timeout(&self, si: u16) -> Option<u8> {
-        self.slots.read().unwrap()[si as usize].timeout
+        *self.slots.read().unwrap()[si as usize].timeout()
     }
 
     pub fn slot_channel(&self, si: u16) -> Channel {
-        self.slots.read().unwrap()[si as usize].channel
+        *self.slots.read().unwrap()[si as usize].channel()
     }
 
     pub fn is_slot_free(&self, si: u16) -> bool {
@@ -89,11 +94,15 @@ impl SlotsMap {
     }
 
     pub fn is_slot_expired(&self, si: u16) -> bool {
-        self.slots.read().unwrap()[si as usize].frames_since_last_use > 2
+        *self.slots.read().unwrap()[si as usize].frames_since_last_use() > 2
     }
 
     pub fn is_slot_current(&self, si: u16) -> bool {
         datetime_to_slots_idx(None).contains(&si)
+    }
+
+    pub fn set_slot_timeout(&self, si: u16, timeout: Option<u8>) {
+        self.slots.write().unwrap()[si as usize].set_timeout(timeout);
     }
 
     pub fn book_slot(&self, si: u16, mmsi: u32, timeout: Option<u8>, assigned: Option<bool>) -> () {

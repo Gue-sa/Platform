@@ -23,18 +23,18 @@ pub struct GetVoyageOrderVersionsFilterParams {
 
 #[derive(Deserialize, Debug)]
 pub struct CreateVoyageOrderPayload {
-    pub destination_id: i32,
-    pub ship_type: u8,
-    pub speed_profile: u8,
+    destination_id: i32,
+    ship_type: u8,
+    speed_profile: u8,
 }
 
 pub struct DatabaseApiSharedState {
-    pub database_manager: Arc<Mutex<DatabaseManager>>,
-    pub boats_registry: Arc<BoatsInfoRegistry>,
+    database_manager: Arc<Mutex<DatabaseManager>>,
+    boats_registry: Arc<BoatsInfoRegistry>,
 }
 
 pub struct DatabaseApi {
-    pub state: Arc<DatabaseApiSharedState>,
+    state: Arc<DatabaseApiSharedState>,
 }
 
 impl DatabaseApi {

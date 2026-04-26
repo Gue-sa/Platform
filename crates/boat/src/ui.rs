@@ -62,20 +62,20 @@ impl Ui {
                 let voyage_data: VoyageData = boat_info_clone.get_voyage_data();
                 let nav_data: NavigationData = boat_info_clone.get_navigation_data();
 
-                let name: String = static_data.name;
-                let mmsi: u32 = static_data.mmsi;
-                let imo: u32 = static_data.imo_number;
-                let boat_type: u8 = static_data.type_of_ship_and_cargo_type;
-                let longitude: u32 = nav_data.longitude;
-                let latitude: u32 = nav_data.latitude;
-                let heading: u16 = nav_data.true_heading;
-                let speed: u16 = nav_data.speed_over_ground;
-                let turn_rate: i8 = nav_data.rate_of_turn;
-                let destination: String = voyage_data.destination;
-                let eta_month: u8 = voyage_data.eta_month;
-                let eta_day: u8 = voyage_data.eta_day;
-                let eta_hour: u8 = voyage_data.eta_hour;
-                let eta_minute: u8 = voyage_data.eta_minute;
+                let name: String = static_data.name().to_string();
+                let mmsi: u32 = *static_data.mmsi();
+                let imo: u32 = *static_data.imo_number();
+                let boat_type: u8 = *static_data.type_of_ship_and_cargo_type();
+                let longitude: u32 = *nav_data.longitude();
+                let latitude: u32 = *nav_data.latitude();
+                let heading: u16 = *nav_data.true_heading();
+                let speed: u16 = *nav_data.speed_over_ground();
+                let turn_rate: i8 = *nav_data.rate_of_turn();
+                let destination: String = voyage_data.destination().to_string();
+                let eta_month: u8 = *voyage_data.eta_month();
+                let eta_day: u8 = *voyage_data.eta_day();
+                let eta_hour: u8 = *voyage_data.eta_hour();
+                let eta_minute: u8 = *voyage_data.eta_minute();
 
                 let ui_weak: Weak<AppWindow> = ui_handle_clone.clone();
 

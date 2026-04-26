@@ -7,10 +7,13 @@ use crate::common::{
     utils::{char6, ord6},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+use getset::Getters;
+
+#[derive(Debug, Clone, PartialEq, Getters)]
+#[getset(get = "pub")]
 pub struct BitPacker {
     bits: Vec<u8>,
-    pub bits_len: usize,
+    bits_len: usize,
 }
 
 impl Index<usize> for BitPacker {
@@ -94,10 +97,6 @@ impl BitPacker {
         }
 
         Ok(())
-    }
-
-    pub fn bits(&self) -> &[u8] {
-        &self.bits
     }
 
     pub fn from_int<T: PrimInt>(value: T, bits_len: Option<usize>) -> Self {

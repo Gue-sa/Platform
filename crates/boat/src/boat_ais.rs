@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use shared::{
-    ais_message::{CommunicationState, Message},
+    ais_message::{AisMessage, CommunicationState},
     bitpacker::BitPacker,
     boat_info::BoatInfo,
     boats_registry::BoatsInfoRegistry,
@@ -68,7 +68,7 @@ impl BoatAisState {
         boats_registry: Arc<BoatsInfoRegistry>,
         system_state: Arc<SystemState>,
     ) -> Self {
-        let mmsi: u32 = boat_info.get_static_data().mmsi;
+        let mmsi: u32 = *boat_info.get_static_data().mmsi();
 
         Self {
             c_87_b_tx: c_87_b_tx,
@@ -98,11 +98,11 @@ impl BoatAisState {
         &self.slots_map
     }
 
-    pub fn increase_t_counter(&self) -> () {
+    fn increase_t_counter(&self) -> () {
         self.sotdma_t_counter.fetch_add(1, Relaxed);
     }
 
-    pub fn decrease_t_counter(&self) -> () {
+    fn decrease_t_counter(&self) -> () {
         self.sotdma_t_counter.fetch_sub(1, Relaxed);
     }
 
@@ -149,7 +149,7 @@ impl BoatAisRunner {
         }
     }
 
-    pub async fn boat_ais_master_clock(&self) {
+    async fn run_boat_ais_master_clock(&self) {
         log("Horloge SOTDMA lancée.".yellow());
 
         loop {
@@ -172,17 +172,17 @@ impl BoatAisRunner {
         }
     }
 
-    pub fn handle_transmission(&self, msg: BitPacker, channel: Channel) -> AisResult<Message> {
+    fn handle_transmission(&self, msg: BitPacker, channel: Channel) -> AisResult<AisMessage> {
         let t_s: u16 = SlotsMap::current_slot_number(channel);
-        let msg: Message = Message::from_bits(msg)?;
-        let boat_mmsi: u32 = msg.boat_info.get_static_data().mmsi;
-        let self_mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
+        let msg: AisMessage = AisMessage::from_bits(msg)?;
+        let boat_mmsi: u32 = *msg.boat_info().get_static_data().mmsi();
+        let self_mmsi: u32 = *self.state.boat_info().get_static_data().mmsi();
 
-        if boat_mmsi != self_mmsi && IMPLEMENTED_MSGS.binary_search(&msg.message_type).is_ok() {
+        if boat_mmsi != self_mmsi && IMPLEMENTED_MSGS.binary_search(msg.message_type()).is_ok() {
             if self.state.boats_registry.is_registered(&boat_mmsi) {
-                self.state.boats_registry.update(msg.boat_info.clone());
+                self.state.boats_registry.update(msg.boat_info());
             } else {
-                self.state.boats_registry.register(msg.boat_info.clone());
+                self.state.boats_registry.register(msg.boat_info());
             }
 
             let slots_map: &SlotsMap = self.state.slots_map();
@@ -196,43 +196,30 @@ impl BoatAisRunner {
                     slots_map.mark_slot_as_used(t_s);
                 }
 
-                if [1, 2].binary_search(&msg.message_type).is_ok() {
-                    let cs_timeout: u8 = msg
-                        .communication_state
-                        .clone()
-                        .unwrap()
-                        .slot_timeout
-                        .unwrap();
+                if [1, 2].binary_search(msg.message_type()).is_ok() {
+                    let cs_timeout: u8 = msg.communication_state().unwrap().slot_timeout().unwrap();
 
                     if t_s_owner.is_none() && cs_timeout > 0 {
                         slots_map.book_slot(t_s, boat_mmsi, Some(cs_timeout), None);
                     } else if t_s_timeout.is_none() || cs_timeout > 0 {
-                        slots_map.slots.write().unwrap()[t_s as usize].timeout = Some(cs_timeout);
+                        slots_map.set_slot_timeout(t_s, Some(cs_timeout));
                     } else if t_s_timeout == Some(0) || cs_timeout == 0 {
                         slots_map.release_slot(t_s);
                     }
 
                     if cs_timeout == 0 {
-                        let cs_offset: u16 = msg
-                            .communication_state
-                            .clone()
-                            .unwrap()
-                            .slot_offset
-                            .unwrap();
+                        let cs_offset: u16 =
+                            msg.communication_state().unwrap().slot_offset().unwrap();
                         let rsv_s: u16 = SlotsMap::offseted_slot(t_s, cs_offset);
 
                         slots_map.book_slot(rsv_s, boat_mmsi, Some(cs_timeout), None);
                         slots_map.release_slot(t_s);
                     }
-                } else if msg.message_type == 3 {
+                } else if *msg.message_type() == 3 {
                     let cs_keep_flag: bool =
-                        msg.communication_state.clone().unwrap().keep_flag.unwrap();
-                    let cs_slot_increment: u16 = msg
-                        .communication_state
-                        .clone()
-                        .unwrap()
-                        .slot_increment
-                        .unwrap();
+                        msg.communication_state().unwrap().keep_flag().unwrap();
+                    let cs_slot_increment: u16 =
+                        msg.communication_state().unwrap().slot_increment().unwrap();
 
                     if cs_keep_flag == false {
                         slots_map.release_slot(t_s);
@@ -253,7 +240,7 @@ impl BoatAisRunner {
         Ok(msg)
     }
 
-    pub async fn wait_for_slot(&self, slot_idx: u16) -> ClockResult<()> {
+    async fn wait_for_slot(&self, slot_idx: u16) -> ClockResult<()> {
         let mut last_slots_distance: u16 = SlotsMap::slot_offset(None, slot_idx);
 
         let channel: Channel = if slot_idx < SLOTS_PER_MINUTE {
@@ -284,19 +271,19 @@ impl BoatAisRunner {
         Ok(())
     }
 
-    pub async fn wait_for_nts(&self) -> ClockResult<()> {
+    async fn wait_for_nts(&self) -> ClockResult<()> {
         let nts: u16 = self.state.nts();
         self.wait_for_slot(nts).await
     }
 
-    pub fn upcoming_ns(&self) -> u16 {
+    fn upcoming_ns(&self) -> u16 {
         let nss: u16 = self.state.nss();
         let t_counter: u64 = self.state.t_counter();
         let ni: u16 = self.state.ni();
         ((nss as u64 + t_counter * ni as u64) % SLOTS_PER_MINUTE as u64) as u16
     }
 
-    pub fn upcoming_nts(&self) -> AisResult<u16> {
+    fn upcoming_nts(&self) -> AisResult<u16> {
         let upcoming_ns: u16 = self.upcoming_ns();
         let si: u16 = self.state.si();
         let start_si: u16 = (upcoming_ns + SLOTS_PER_MINUTE - si.div_euclid(2)) % SLOTS_PER_MINUTE;
@@ -314,7 +301,7 @@ impl BoatAisRunner {
         Ok(*available_ss.choose(&mut rand::rng()).unwrap())
     }
 
-    pub fn book_new_nts(&self, ns: u16, keep_nts_channel: bool) -> AisResult<u16> {
+    fn book_new_nts(&self, ns: u16, keep_nts_channel: bool) -> AisResult<u16> {
         let nts: u16 = self.state.nts();
         let si: u16 = self.state.si();
 
@@ -351,7 +338,7 @@ impl BoatAisRunner {
 
         let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max) as u8;
 
-        let mmsi: u32 = self.state.boat_info().get_static_data().mmsi;
+        let mmsi: u32 = *self.state.boat_info().get_static_data().mmsi();
         self.state
             .slots_map()
             .book_slot(next_nts, mmsi, Some(timeout), Some(false));
@@ -359,13 +346,13 @@ impl BoatAisRunner {
         Ok(next_nts)
     }
 
-    pub async fn send(
+    async fn send(
         &self,
         msg_type: u8,
         keep_flag: Option<bool>,
         offset: Option<u16>,
         slots_nbr: Option<u8>,
-        slot: u16
+        slot: u16,
     ) -> () {
         let ant_tx: &Sender<BitPacker> = if self.state.nts() < SLOTS_PER_MINUTE {
             &self.state.c_87_b_tx
@@ -395,20 +382,19 @@ impl BoatAisRunner {
             None
         };
 
-        let msg: Message =
-            Message::from_info(self.state.boat_info().as_ref().clone(), msg_type, com_state);
+        let msg: AisMessage =
+            AisMessage::from_info(self.state.boat_info().as_ref().clone(), msg_type, com_state);
 
         ant_tx.send(msg.build()).await;
 
         log(format!(
             "Message {} envoyé avec succès sur le slot {}.",
-            msg_type,
-            slot
+            msg_type, slot
         )
         .green());
     }
 
-    pub fn ratdma_slot_selection(&self, chn: Channel, lme_rtpri: u8) -> Result<u16, &'static str> {
+    fn ratdma_slot_selection(&self, chn: Channel, lme_rtpri: u8) -> Result<u16, &'static str> {
         let start_s: u16 = SlotsMap::current_slot_number(chn);
 
         let lme_rtes: u16 = SlotsMap::offseted_slot(start_s, 150);
@@ -450,18 +436,24 @@ impl BoatAisRunner {
         }
     }
 
-    pub async fn itdma(
+    async fn itdma(
         &self,
         t_s: u16,
         msg_type: u8,
         lme_itinc: u16,
         lme_itsl: u8,
-        lme_itkp: bool
+        lme_itkp: bool,
     ) -> AisResult<()> {
         if ITDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
             self.wait_for_slot(t_s).await?;
-            self.send(msg_type, Some(lme_itkp), Some(lme_itinc), Some(lme_itsl), t_s)
-                .await;
+            self.send(
+                msg_type,
+                Some(lme_itkp),
+                Some(lme_itinc),
+                Some(lme_itsl),
+                t_s,
+            )
+            .await;
             self.state.slots_map().use_slot(t_s);
         } else if NO_CS_MSGS.binary_search(&msg_type).is_ok() {
             self.wait_for_slot(t_s).await?;
@@ -474,7 +466,7 @@ impl BoatAisRunner {
         Ok(())
     }
 
-    pub async fn sotdma_net_entry(&self) -> AisResult<()> {
+    async fn sotdma_net_entry(&self) -> AisResult<()> {
         let initial_nss_and_ns: u16 = self.ratdma_slot_selection(Channel::C87B, 1).unwrap();
         self.state.set_ns(initial_nss_and_ns);
         self.state.set_nss(initial_nss_and_ns);
@@ -487,7 +479,7 @@ impl BoatAisRunner {
         Ok(())
     }
 
-    pub async fn sotdma_first_frame(&self) -> AisResult<()> {
+    async fn sotdma_first_frame(&self) -> AisResult<()> {
         let mut virtual_offset: Option<u16> = None;
         let ref_nts: u16 = self.state.nts();
         let si: u16 = self.state.si();
@@ -524,7 +516,7 @@ impl BoatAisRunner {
         Ok(())
     }
 
-    pub async fn sotdma_continuous(self: Arc<Self>) -> AisResult<()> {
+    async fn sotdma_continuous(self: Arc<Self>) -> AisResult<()> {
         // Ici, on arrive avec les NS / NTS du message qu'on va envoyer juste après et qu'on doit encore construire
         let nts: u16 = self.state.nts().clone();
         let ns: u16 = self.state.ns().clone();
@@ -612,11 +604,11 @@ impl BoatAisRunner {
         Ok(())
     }
 
-    pub fn sotdma_change_rr(&self) -> () {
+    fn sotdma_change_rr(&self) -> () {
         todo!()
     }
 
-    pub async fn sotdma(self: Arc<Self>) -> AisResult<()> {
+    async fn sotdma(self: Arc<Self>) -> AisResult<()> {
         log("Initialisation du SOTDMA...".yellow());
 
         tokio::time::sleep(Duration::from_secs(0)).await;
@@ -664,74 +656,88 @@ impl BoatAisRunner {
         Ok(())
     }
 
-    pub async fn start(self) -> () {
-        let runner_arc: Arc<Self> = Arc::new(self);
-        let c87b_runner_arc: Arc<Self> = runner_arc.clone();
-        let c88b_runner_arc: Arc<Self> = runner_arc.clone();
-        let sotdma_runner_arc: Arc<Self> = runner_arc.clone();
-        let clock_runner_arc: Arc<Self> = runner_arc.clone();
+    async fn run_listeners(&self) -> () {
+        loop {
+            let packet_opt = {
+                let mut rx = self.ais_rx.lock().await;
+                rx.recv().await
+            };
 
-        tokio::spawn(async move {
-            clock_runner_arc.clone().boat_ais_master_clock().await;
-        });
-
-        tokio::spawn(async move {
-            loop {
-                if let Some(packet) = runner_arc.ais_rx.lock().await.recv().await {
-                    match packet.channel {
-                        Channel::C87B => {
-                            match c87b_runner_arc.handle_transmission(packet.message, Channel::C87B)
-                            {
-                                Ok(msg) => {
-                                    log(format!(
-                                        "Message {} reçu du navire {} : {:#?}.",
-                                        msg.message_type,
-                                        msg.boat_info.get_static_data().mmsi,
-                                        msg.boat_info.clone()
-                                    )
-                                    .blue());
-                                }
-                                Err(e) => match e {
-                                    AisError::SelfEmittedMessage => {}
-                                    _ => {
-                                        log("Message corrompu reçu et ignoré.".red());
-                                    }
-                                },
+            if let Some(packet) = packet_opt {
+                match packet.channel {
+                    Channel::C87B => {
+                        match self.handle_transmission(packet.message, Channel::C87B) {
+                            Ok(msg) => {
+                                log(format!(
+                                    "Message {} reçu du navire {} : {:#?}.",
+                                    msg.message_type(),
+                                    *msg.boat_info().get_static_data().mmsi(),
+                                    msg.boat_info()
+                                )
+                                .blue());
                             }
-                        }
-                        Channel::C88B => {
-                            match c88b_runner_arc.handle_transmission(packet.message, Channel::C88B)
-                            {
-                                Ok(msg) => {
-                                    log(format!(
-                                        "Message {} reçu du navire {} : {:#?}.",
-                                        msg.message_type,
-                                        msg.boat_info.get_static_data().mmsi,
-                                        msg.boat_info.clone()
-                                    )
-                                    .blue());
+                            Err(e) => match e {
+                                AisError::SelfEmittedMessage => {}
+                                _ => {
+                                    log("Message corrompu reçu et ignoré.".red());
                                 }
-                                Err(e) => match e {
-                                    AisError::SelfEmittedMessage => {}
-                                    _ => {
-                                        log("Message corrompu reçu et ignoré.".red());
-                                    }
-                                },
-                            }
+                            },
                         }
-                        _ => todo!(),
                     }
+                    Channel::C88B => {
+                        match self.handle_transmission(packet.message, Channel::C88B) {
+                            Ok(msg) => {
+                                log(format!(
+                                    "Message {} reçu du navire {} : {:#?}.",
+                                    *msg.message_type(),
+                                    *msg.boat_info().get_static_data().mmsi(),
+                                    msg.boat_info()
+                                )
+                                .blue());
+                            }
+                            Err(e) => match e {
+                                AisError::SelfEmittedMessage => {}
+                                _ => {
+                                    log("Message corrompu reçu et ignoré.".red());
+                                }
+                            },
+                        }
+                    }
+                    _ => todo!(),
                 }
             }
-        });
+        }
+    }
 
-        match sotdma_runner_arc.sotdma().await {
-            Ok(_) => {}
-            Err(_) => {
-                panic!(
-                    "Le SOTDMA a subi une erreur irrécupérable. Veuillez redémarrer l'AIS manuellement."
-                )
+    async fn run_sotdma(self: Arc<Self>) {
+        loop {
+            match self.clone().sotdma().await {
+                Ok(_) => {}
+                Err(_) => {
+                    panic!(
+                        "Le SOTDMA a subi une erreur irrécupérable. Veuillez redémarrer l'AIS manuellement."
+                    )
+                }
             }
         }
+    }
+
+    pub async fn start(self) -> () {
+        let runner_arc = Arc::new(self);
+        let listeners_runner_arc = runner_arc.clone();
+        let sotdma_runner_arc = runner_arc.clone();
+        let clock_runner_arc = runner_arc.clone();
+
+        tokio::spawn(async move {
+            clock_runner_arc.clone().run_boat_ais_master_clock().await;
+        });
+
+        tokio::spawn(async move {
+            listeners_runner_arc.run_listeners().await;
+        });
+
+        tokio::spawn(async move {
+            sotdma_runner_arc.run_sotdma().await;
+        });
     }
 }

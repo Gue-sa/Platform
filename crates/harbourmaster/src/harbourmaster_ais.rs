@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use shared::{
-    ais_message::Message,
+    ais_message::AisMessage,
     bitpacker::BitPacker,
     boats_registry::BoatsInfoRegistry,
     common::{
@@ -41,7 +41,7 @@ impl HarbourmasterAisState {
         }
     }
 
-    pub fn slots_map(&self) -> &SlotsMap {
+    fn slots_map(&self) -> &SlotsMap {
         &self.slots_map
     }
 
@@ -57,18 +57,18 @@ impl HarbourmasterAisRunner {
         }
     }
 
-    pub fn handle_transmission(&self, msg: BitPacker, channel: Channel) -> AisResult<Message> {
+    fn handle_transmission(&self, msg: BitPacker, channel: Channel) -> AisResult<AisMessage> {
         let t_s: u16 = SlotsMap::current_slot_number(channel);
-        let msg: Message = Message::from_bits(msg)?;
-        let boat_mmsi: u32 = msg.boat_info.get_static_data().mmsi;
+        let msg: AisMessage = AisMessage::from_bits(msg)?;
+        let boat_mmsi: u32 = *msg.boat_info().get_static_data().mmsi();
 
         if boat_mmsi != HARBOURMASTER_MMSI
-            && IMPLEMENTED_MSGS.binary_search(&msg.message_type).is_ok()
+            && IMPLEMENTED_MSGS.binary_search(msg.message_type()).is_ok()
         {
             if self.state.boats_registry.is_registered(&boat_mmsi) {
-                self.state.boats_registry.update(msg.boat_info.clone());
+                self.state.boats_registry.update(msg.boat_info());
             } else {
-                self.state.boats_registry.register(msg.boat_info.clone());
+                self.state.boats_registry.register(msg.boat_info());
             }
 
             let slots_map: &SlotsMap = self.state.slots_map();
@@ -82,43 +82,30 @@ impl HarbourmasterAisRunner {
                     slots_map.mark_slot_as_used(t_s);
                 }
 
-                if [1, 2].binary_search(&msg.message_type).is_ok() {
-                    let cs_timeout: u8 = msg
-                        .communication_state
-                        .clone()
-                        .unwrap()
-                        .slot_timeout
-                        .unwrap();
+                if [1, 2].binary_search(msg.message_type()).is_ok() {
+                    let cs_timeout: u8 = msg.communication_state().unwrap().slot_timeout().unwrap();
 
                     if t_s_owner.is_none() && cs_timeout > 0 {
                         slots_map.book_slot(t_s, boat_mmsi, Some(cs_timeout), None);
                     } else if t_s_timeout.is_none() || cs_timeout > 0 {
-                        slots_map.slots.write().unwrap()[t_s as usize].timeout = Some(cs_timeout);
+                        slots_map.set_slot_timeout(t_s, Some(cs_timeout));
                     } else if t_s_timeout == Some(0) || cs_timeout == 0 {
                         slots_map.release_slot(t_s);
                     }
 
                     if cs_timeout == 0 {
-                        let cs_offset: u16 = msg
-                            .communication_state
-                            .clone()
-                            .unwrap()
-                            .slot_offset
-                            .unwrap();
+                        let cs_offset: u16 =
+                            msg.communication_state().unwrap().slot_offset().unwrap();
                         let rsv_s: u16 = SlotsMap::offseted_slot(t_s, cs_offset);
 
                         slots_map.book_slot(rsv_s, boat_mmsi, Some(cs_timeout), None);
                         slots_map.release_slot(t_s);
                     }
-                } else if msg.message_type == 3 {
+                } else if *msg.message_type() == 3 {
                     let cs_keep_flag: bool =
-                        msg.communication_state.clone().unwrap().keep_flag.unwrap();
-                    let cs_slot_increment: u16 = msg
-                        .communication_state
-                        .clone()
-                        .unwrap()
-                        .slot_increment
-                        .unwrap();
+                        msg.communication_state().unwrap().keep_flag().unwrap();
+                    let cs_slot_increment: u16 =
+                        msg.communication_state().unwrap().slot_increment().unwrap();
 
                     if cs_keep_flag == false {
                         slots_map.release_slot(t_s);
@@ -139,65 +126,70 @@ impl HarbourmasterAisRunner {
         Ok(msg)
     }
 
-    pub async fn start(self) -> () {
-        let runner_arc: Arc<HarbourmasterAisRunner> = Arc::new(self);
-        let c87b_runner_arc: Arc<HarbourmasterAisRunner> = runner_arc.clone();
-        let c88b_runner_arc: Arc<HarbourmasterAisRunner> = runner_arc.clone();
+    async fn run_listeners(&self) -> () {
+        loop {
+            let packet_opt = {
+                let mut rx = self.ais_rx.lock().await;
+                rx.recv().await
+            };
 
-        tokio::spawn(async move {
-            loop {
-                if let Some(packet) = runner_arc.ais_rx.lock().await.recv().await {
-                    match packet.channel {
-                        Channel::C87B => {
-                            match c87b_runner_arc.handle_transmission(packet.message, Channel::C87B)
-                            {
-                                Ok(msg) => {
-                                    println!(
-                                        "{}",
-                                        format!(
-                                            "Message {} reçu du navire {} : {:#?}.",
-                                            msg.message_type,
-                                            msg.boat_info.get_static_data().mmsi,
-                                            msg.boat_info.clone()
-                                        )
-                                        .blue()
-                                    );
-                                }
-                                Err(e) => match e {
-                                    AisError::SelfEmittedMessage => {}
-                                    _ => {
-                                        println!("{}", "Message corrompu reçu et ignoré.".red());
-                                    }
-                                },
+            if let Some(packet) = packet_opt {
+                match packet.channel {
+                    Channel::C87B => {
+                        match self.handle_transmission(packet.message, Channel::C87B) {
+                            Ok(msg) => {
+                                println!(
+                                    "{}",
+                                    format!(
+                                        "Message {} reçu du navire {} : {:#?}.",
+                                        msg.message_type(),
+                                        *msg.boat_info().get_static_data().mmsi(),
+                                        msg.boat_info()
+                                    )
+                                    .blue()
+                                );
                             }
-                        }
-                        Channel::C88B => {
-                            match c88b_runner_arc.handle_transmission(packet.message, Channel::C88B)
-                            {
-                                Ok(msg) => {
-                                    println!(
-                                        "{}",
-                                        format!(
-                                            "Message {} reçu du navire {} : {:#?}.",
-                                            msg.message_type,
-                                            msg.boat_info.get_static_data().mmsi,
-                                            msg.boat_info.clone()
-                                        )
-                                        .blue()
-                                    );
+                            Err(e) => match e {
+                                AisError::SelfEmittedMessage => {}
+                                _ => {
+                                    println!("{}", "Message corrompu reçu et ignoré.".red());
                                 }
-                                Err(e) => match e {
-                                    AisError::SelfEmittedMessage => {}
-                                    _ => {
-                                        println!("{}", "Message corrompu reçu et ignoré.".red());
-                                    }
-                                },
-                            }
+                            },
                         }
-                        _ => todo!(),
                     }
+                    Channel::C88B => {
+                        match self.handle_transmission(packet.message, Channel::C88B) {
+                            Ok(msg) => {
+                                println!(
+                                    "{}",
+                                    format!(
+                                        "Message {} reçu du navire {} : {:#?}.",
+                                        *msg.message_type(),
+                                        *msg.boat_info().get_static_data().mmsi(),
+                                        msg.boat_info()
+                                    )
+                                    .blue()
+                                );
+                            }
+                            Err(e) => match e {
+                                AisError::SelfEmittedMessage => {}
+                                _ => {
+                                    println!("{}", "Message corrompu reçu et ignoré.".red());
+                                }
+                            },
+                        }
+                    }
+                    _ => todo!(),
                 }
             }
+        }
+    }
+
+    pub async fn start(self) -> () {
+        let listeners_runner_arc: Arc<HarbourmasterAisRunner> = Arc::new(self);
+
+        tokio::spawn(async move {
+            listeners_runner_arc.run_listeners().await;
         });
     }
 }

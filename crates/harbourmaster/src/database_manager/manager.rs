@@ -129,25 +129,19 @@ impl DatabaseManager {
             .first::<DestinationQueryResult>(&mut self.connection)
             .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
 
-        Ok(VoyageOrder {
-            header: VoyageOrderHeader {
-                id: order_id as u16,
-                version: 0,
-            },
-            body: VoyageOrderBody {
-                destination: destination_name,
-                destination_position: (
-                    destination_info.longitude as u16,
-                    destination_info.latitude as u16,
-                ),
-                eta_month: eta_month as u8,
-                eta_day: eta_day as u8,
-                eta_hour: eta_hour as u8,
-                eta_minute: eta_minute as u8,
-                cargo_type: cargo_type as u8,
-                speed_profile: speed_profile as u8,
-            },
-        })
+        let header: VoyageOrderHeader = VoyageOrderHeader::from(order_id as u16, 0);
+        let body: VoyageOrderBody = VoyageOrderBody::from(
+            destination_name,
+            (destination_info.longitude as u16, destination_info.latitude as u16),
+            eta_month as u8,
+            eta_day as u8,
+            eta_hour as u8,
+            eta_minute as u8,
+            cargo_type as u8,
+            speed_profile as u8,
+        );
+
+        Ok(VoyageOrder::from(header, body))
     }
 
     pub fn get_destinations(

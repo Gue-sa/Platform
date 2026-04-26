@@ -1,24 +1,29 @@
+use getset::{CloneGetters, Getters, Setters};
 use shared::{common::types::VoyageStatus, voyage_order::VoyageOrder};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Getters)]
 pub struct VoyageSegment {
-    pub navigational_status: u8,
-    pub start_point: (u16, u16),
-    pub end_point: (u16, u16),
-    pub distance: u16,
-    //pub target_speed: u16,
-    pub heading: u16,
-    //pub minutes_duration: u16
+    navigational_status: u8,
+    start_point: (u16, u16),
+    end_point: (u16, u16),
+    distance: u16,
+    //target_speed: u16,
+    heading: u16,
+    //minutes_duration: u16
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Getters, CloneGetters, Setters)]
 pub struct Voyage {
-    pub order: VoyageOrder,
-    pub status: VoyageStatus,
-    pub segments: Vec<VoyageSegment>,
-    pub current_segment: usize,
-    //pub distance: u16,
-    //pub minutes_duration: u16
+    #[getset(get = "pub", set = "pub")]
+    order: VoyageOrder,
+    #[getset(get = "pub", set = "pub")]
+    status: VoyageStatus,
+    #[getset(get_clone = "pub")]
+    segments: Vec<VoyageSegment>,
+    #[getset(get = "pub")]
+    current_segment: usize,
+    //distance: u16,
+    //minutes_duration: u16
 }
 
 impl VoyageSegment {
@@ -49,7 +54,7 @@ impl VoyageSegment {
 impl Voyage {
     pub fn from(voyage_order: VoyageOrder, current_position: (u16, u16)) -> Self {
         let segment: VoyageSegment =
-            VoyageSegment::new(0, current_position, voyage_order.body.destination_position, 0);
+            VoyageSegment::new(0, current_position, *voyage_order.body().destination_position(), 0);
 
         Self {
             order: voyage_order,
@@ -57,18 +62,6 @@ impl Voyage {
             segments: vec![segment],
             current_segment: 0,
         }
-    }
-
-    pub fn set_order(&mut self, order: VoyageOrder) -> () {
-        self.order = order;
-    }
-
-    pub fn set_status(&mut self, status: VoyageStatus) -> () {
-        self.status = status;
-    }
-
-    pub fn current_segment(&self) -> &VoyageSegment {
-        &self.segments[self.current_segment]
     }
 
     pub fn next_segment(&mut self) -> &VoyageSegment {

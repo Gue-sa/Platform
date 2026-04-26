@@ -11,34 +11,47 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug)]
+use getset::{CloneGetters, Getters, Setters};
+
+#[derive(Clone, Debug, PartialEq, Getters, Setters)]
+#[getset(get = "pub")]
 pub struct CommunicationState {
-    pub cstype: CSType,
-    pub sync_state: u8,
-    pub slot_timeout: Option<u8>,
-    pub slot_offset: Option<u16>,
-    pub utc_hour: Option<u8>,
-    pub utc_minute: Option<u8>,
-    pub slot_number: Option<u16>,
-    pub received_stations: Option<u16>,
-    pub slot_increment: Option<u16>,
-    pub number_of_slots: Option<u8>,
-    pub keep_flag: Option<bool>,
+    cstype: CSType,
+    sync_state: u8,
+    slot_timeout: Option<u8>,
+    slot_offset: Option<u16>,
+    utc_hour: Option<u8>,
+    utc_minute: Option<u8>,
+    slot_number: Option<u16>,
+    received_stations: Option<u16>,
+    slot_increment: Option<u16>,
+    number_of_slots: Option<u8>,
+    keep_flag: Option<bool>,
 }
 
-#[derive(Debug)]
-pub struct Message {
-    pub message_type: u8,
-    pub boat_info: BoatInfo,
+#[derive(Debug, Getters, Setters, CloneGetters)]
+pub struct AisMessage {
+    #[getset(get = "pub")]
+    message_type: u8,
+    #[getset(get_clone = "pub")]
+    boat_info: BoatInfo,
 
-    pub ramp_up_bits: BitPacker,
-    pub sync_sequence: BitPacker,
-    pub start_flag: BitPacker,
-    pub data: BitPacker,
-    pub communication_state: Option<CommunicationState>,
-    pub crc: BitPacker,
-    pub end_flag: BitPacker,
-    pub buffer: BitPacker,
+    #[getset(get = "pub")]
+    ramp_up_bits: BitPacker,
+    #[getset(get = "pub")]
+    sync_sequence: BitPacker,
+    #[getset(get = "pub")]
+    start_flag: BitPacker,
+    #[getset(get = "pub")]
+    data: BitPacker,
+    #[getset(get_clone = "pub")]
+    communication_state: Option<CommunicationState>,
+    #[getset(get = "pub")]
+    crc: BitPacker,
+    #[getset(get = "pub")]
+    end_flag: BitPacker,
+    #[getset(get = "pub")]
+    buffer: BitPacker,
 }
 
 const X25: Crc<u16> = Crc::<u16>::new(&CRC_16_IBM_SDLC);
@@ -134,7 +147,7 @@ impl CommunicationState {
         Ok(cs)
     }
 
-    pub fn build_sub_message(&self) -> BitPacker {
+    fn build_sub_message(&self) -> BitPacker {
         if self.slot_timeout.unwrap() == 3
             || self.slot_timeout.unwrap() == 5
             || self.slot_timeout.unwrap() == 7
@@ -171,8 +184,8 @@ impl CommunicationState {
     }
 }
 
-impl Message {
-    pub fn compute_crc(bytes: &[u8]) -> Result<u16, &'static str> {
+impl AisMessage {
+    fn compute_crc(bytes: &[u8]) -> Result<u16, &'static str> {
         Ok(X25.checksum(bytes))
     }
 
@@ -198,27 +211,29 @@ impl Message {
                 let communication_state: CommunicationState =
                     CommunicationState::parse(payload.slice(Some(149), Some(167))?, msg_type)?;
                 let msg_crc: u16 = msg.extract_int::<u16>(Some(208), Some(223))?;
-                let computed_crc: u16 = Message::compute_crc(payload.bits()).unwrap();
+                let computed_crc: u16 = AisMessage::compute_crc(payload.bits()).unwrap();
 
                 if msg_crc == computed_crc {
-                    static_data.mmsi = data.extract_int::<u32>(None, Some(29))?;
-                    static_data.position_accuracy = data.extract_int::<u8>(Some(52), Some(52))?;
+                    static_data.set_mmsi(data.extract_int::<u32>(None, Some(29))?);
+                    static_data.set_position_accuracy(data.extract_int::<u8>(Some(52), Some(52))?);
 
-                    voyage_data.raim_flag = data.extract_int::<u8>(Some(140), Some(140))?;
+                    voyage_data.set_raim_flag(data.extract_int::<u8>(Some(140), Some(140))?);
 
-                    navigation_data.navigational_status =
-                        data.extract_int::<u8>(Some(30), Some(33))?;
-                    navigation_data.time_stamp = data.extract_int::<u8>(Some(129), Some(134))?;
-                    navigation_data.special_maneuvre_indicator =
-                        data.extract_int::<u8>(Some(135), Some(136))?;
-                    navigation_data.latitude = data.extract_int::<u32>(Some(53), Some(80))?;
-                    navigation_data.longitude = data.extract_int::<u32>(Some(81), Some(107))?;
-                    navigation_data.course_over_ground =
-                        data.extract_int::<u16>(Some(108), Some(119))?;
-                    navigation_data.speed_over_ground =
-                        data.extract_int::<u16>(Some(42), Some(51))?;
-                    navigation_data.rate_of_turn = data.extract_int::<i8>(Some(34), Some(41))?;
-                    navigation_data.true_heading = data.extract_int::<u16>(Some(120), Some(128))?;
+                    navigation_data
+                        .set_navigational_status(data.extract_int::<u8>(Some(30), Some(33))?);
+                    navigation_data.set_time_stamp(data.extract_int::<u8>(Some(129), Some(134))?);
+                    navigation_data.set_special_maneuvre_indicator(
+                        data.extract_int::<u8>(Some(135), Some(136))?,
+                    );
+                    navigation_data.set_latitude(data.extract_int::<u32>(Some(53), Some(80))?);
+                    navigation_data.set_longitude(data.extract_int::<u32>(Some(81), Some(107))?);
+                    navigation_data
+                        .set_course_over_ground(data.extract_int::<u16>(Some(108), Some(119))?);
+                    navigation_data
+                        .set_speed_over_ground(data.extract_int::<u16>(Some(42), Some(51))?);
+                    navigation_data.set_rate_of_turn(data.extract_int::<i8>(Some(34), Some(41))?);
+                    navigation_data
+                        .set_true_heading(data.extract_int::<u16>(Some(120), Some(128))?);
 
                     let boat_info: BoatInfo =
                         BoatInfo::init(Some(static_data), Some(voyage_data), Some(navigation_data));
@@ -238,31 +253,33 @@ impl Message {
                 let payload: BitPacker = msg.slice(Some(40), Some(463))?;
                 let data: BitPacker = payload.slice(Some(8), None)?;
                 let msg_crc: u16 = msg.slice(Some(464), Some(479))?.extract_int(None, None)?;
-                let computed_crc: u16 = Message::compute_crc(payload.bits()).unwrap();
+                let computed_crc: u16 = AisMessage::compute_crc(&payload.bits()).unwrap();
 
                 if msg_crc == computed_crc {
-                    static_data.mmsi = data.extract_int::<u32>(None, Some(29))?;
-                    static_data.imo_number = data.extract_int::<u32>(Some(32), Some(61))?;
-                    static_data.call_sign = data.extract_str(Some(62), Some(103))?;
-                    static_data.name = data.extract_str(Some(104), Some(223))?;
-                    static_data.type_of_ship_and_cargo_type =
-                        data.extract_int::<u8>(Some(224), Some(231))?;
-                    static_data.ais_version = data.extract_int::<u8>(Some(30), Some(31))?;
-                    static_data.type_of_epf_device =
-                        data.extract_int::<u8>(Some(262), Some(265))?;
-                    static_data.a = data.extract_int::<u16>(Some(232), Some(240))?;
-                    static_data.b = data.extract_int::<u16>(Some(241), Some(249))?;
-                    static_data.c = data.extract_int::<u8>(Some(250), Some(255))?;
-                    static_data.d = data.extract_int::<u8>(Some(256), Some(261))?;
+                    static_data.set_mmsi(data.extract_int::<u32>(None, Some(29))?);
+                    static_data.set_imo_number(data.extract_int::<u32>(Some(32), Some(61))?);
+                    static_data.set_call_sign(data.extract_str(Some(62), Some(103))?);
+                    static_data.set_name(data.extract_str(Some(104), Some(223))?);
+                    static_data.set_type_of_ship_and_cargo_type(
+                        data.extract_int::<u8>(Some(224), Some(231))?,
+                    );
+                    static_data.set_ais_version(data.extract_int::<u8>(Some(30), Some(31))?);
+                    static_data
+                        .set_type_of_epf_device(data.extract_int::<u8>(Some(262), Some(265))?);
+                    static_data.set_a(data.extract_int::<u16>(Some(232), Some(240))?);
+                    static_data.set_b(data.extract_int::<u16>(Some(241), Some(249))?);
+                    static_data.set_c(data.extract_int::<u8>(Some(250), Some(255))?);
+                    static_data.set_d(data.extract_int::<u8>(Some(256), Some(261))?);
 
-                    voyage_data.destination = data.extract_str(Some(294), Some(413))?;
-                    voyage_data.eta_month = data.extract_int::<u8>(Some(282), Some(285))?;
-                    voyage_data.eta_day = data.extract_int::<u8>(Some(277), Some(281))?;
-                    voyage_data.eta_hour = data.extract_int::<u8>(Some(272), Some(276))?;
-                    voyage_data.eta_minute = data.extract_int::<u8>(Some(266), Some(271))?;
-                    voyage_data.maximum_present_static_draught =
-                        data.extract_int::<u8>(Some(286), Some(293))?;
-                    voyage_data.dte = data.extract_int::<u8>(Some(414), Some(414))?;
+                    voyage_data.set_destination(data.extract_str(Some(294), Some(413))?);
+                    voyage_data.set_eta_month(data.extract_int::<u8>(Some(282), Some(285))?);
+                    voyage_data.set_eta_day(data.extract_int::<u8>(Some(277), Some(281))?);
+                    voyage_data.set_eta_hour(data.extract_int::<u8>(Some(272), Some(276))?);
+                    voyage_data.set_eta_minute(data.extract_int::<u8>(Some(266), Some(271))?);
+                    voyage_data.set_maximum_present_static_draught(
+                        data.extract_int::<u8>(Some(286), Some(293))?,
+                    );
+                    voyage_data.set_dte(data.extract_int::<u8>(Some(414), Some(414))?);
 
                     let boat_info: BoatInfo =
                         BoatInfo::init(Some(static_data), Some(voyage_data), None);
@@ -277,7 +294,7 @@ impl Message {
     }
 
     pub fn from_bits(msg: BitPacker) -> AisMessageResult<Self> {
-        let (message_type, data, communication_state, crc, boat_info) = Message::parse(msg)?;
+        let (message_type, data, communication_state, crc, boat_info) = AisMessage::parse(msg)?;
 
         Ok(Self {
             message_type: message_type,
@@ -299,9 +316,9 @@ impl Message {
         message_type: u8,
         communication_state: Option<CommunicationState>,
     ) -> Self {
-        let data: BitPacker = Message::build_data_bytes(&boat_info, message_type);
-        let crc: u16 = Message::compute_crc(
-            Message::build_payload(message_type, data.clone(), communication_state.clone()).bits(),
+        let data: BitPacker = AisMessage::build_data_bytes(&boat_info, message_type);
+        let crc: u16 = AisMessage::compute_crc(
+            AisMessage::build_payload(message_type, data.clone(), communication_state.clone()).bits(),
         )
         .unwrap();
 
@@ -320,7 +337,7 @@ impl Message {
         }
     }
 
-    pub fn build_data_bytes(boat_info: &BoatInfo, msg_type: u8) -> BitPacker {
+    fn build_data_bytes(boat_info: &BoatInfo, msg_type: u8) -> BitPacker {
         let mut data_vec: BitPacker = BitPacker::from_int(0, Some(0));
 
         match msg_type {
@@ -340,7 +357,7 @@ impl Message {
         data_vec
     }
 
-    pub fn build_payload(
+    fn build_payload(
         msg_type: u8,
         data: BitPacker,
         communication_state: Option<CommunicationState>,
@@ -357,13 +374,13 @@ impl Message {
     }
 
     pub fn build(&self) -> BitPacker {
-        let payload: BitPacker = Message::build_payload(
+        let payload: BitPacker = AisMessage::build_payload(
             self.message_type,
-            Message::build_data_bytes(&self.boat_info, self.message_type),
+            AisMessage::build_data_bytes(&self.boat_info, self.message_type),
             self.communication_state.clone(),
         );
         let crc: BitPacker =
-            BitPacker::from_int::<u16>(Message::compute_crc(payload.bits()).unwrap(), Some(16));
+            BitPacker::from_int::<u16>(AisMessage::compute_crc(payload.bits()).unwrap(), Some(16));
         let msg: BitPacker = self.buffer.clone()
             + self.end_flag.clone()
             + crc

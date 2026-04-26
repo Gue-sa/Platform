@@ -11,12 +11,12 @@ use crate::{
 };
 
 pub struct Antenna {
-    pub channel: Channel,
-    pub socket: UdpSocket,
+    channel: Channel,
+    socket: UdpSocket,
     ant_rx: Receiver<BitPacker>,
-    pub ais_tx: Option<Sender<AisPacket>>,
-    pub gps_tx: Option<Sender<BitPacker>>,
-    pub satcom_tx: Option<Sender<BitPacker>>,
+    ais_tx: Option<Sender<AisPacket>>,
+    gps_tx: Option<Sender<BitPacker>>,
+    satcom_tx: Option<Sender<BitPacker>>,
     rec_port: u16,
     em_port: u16,
 }

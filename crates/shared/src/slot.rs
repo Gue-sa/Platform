@@ -1,13 +1,21 @@
 use crate::common::{constants::SLOTS_PER_MINUTE, types::Channel};
 
-#[derive(Debug)]
+use getset::{Getters, Setters};
+
+#[derive(Debug, Getters, Setters)]
 pub struct Slot {
-    pub number: u16,
-    pub channel: Channel,
-    pub assigned: bool,
-    pub owner: Option<u32>,
-    pub timeout: Option<u8>,
-    pub frames_since_last_use: i8,
+    #[getset(get = "pub")]
+    number: u16,
+    #[getset(get = "pub")]
+    channel: Channel,
+    #[getset(get = "pub", set = "pub")]
+    assigned: bool,
+    #[getset(get = "pub", set = "pub")]
+    owner: Option<u32>,
+    #[getset(get = "pub", set = "pub")]
+    timeout: Option<u8>,
+    #[getset(get = "pub", set = "pub")]
+    frames_since_last_use: i8,
 }
 
 impl Slot {

@@ -18,13 +18,13 @@ async fn main() {
         env::set_var("RUST_BACKTRACE", "1");
     }
     
-    //let boat: Boat = Boat::init().await;
+    let boat: Boat = Boat::init().await;
 
-    //boat.start().await;
+    boat.start().await;
 
-    let serialdriver = SerialDriver::init(/*boat.serial_rx, boat.serial_tx*/);
+    //let serialdriver = SerialDriver::init(/*boat.serial_rx, boat.serial_tx*/);
 
-    serialdriver.start().await;
+    //serialdriver.start().await;
 
     thread::park();
 }

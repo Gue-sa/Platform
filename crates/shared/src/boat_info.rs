@@ -4,46 +4,51 @@ use crate::bitpacker::BitPacker;
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize)]
+use getset::{Getters, Setters};
+
+#[derive(Debug, Clone, Serialize, Getters, Setters, PartialEq)]
+#[getset(get = "pub", set = "pub")]
 pub struct StaticData {
-    pub mmsi: u32,
-    pub imo_number: u32,
-    pub call_sign: String,
-    pub name: String,
-    pub type_of_ship_and_cargo_type: u8,
-    pub position_accuracy: u8,
-    pub ais_version: u8,
-    pub type_of_epf_device: u8,
-    pub a: u16,
-    pub b: u16,
-    pub c: u8,
-    pub d: u8,
-    pub spare: u8,
+    mmsi: u32,
+    imo_number: u32,
+    call_sign: String,
+    name: String,
+    type_of_ship_and_cargo_type: u8,
+    position_accuracy: u8,
+    ais_version: u8,
+    type_of_epf_device: u8,
+    a: u16,
+    b: u16,
+    c: u8,
+    d: u8,
+    spare: u8,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Getters, Setters, PartialEq)]
+#[getset(get = "pub", set = "pub")]
 pub struct VoyageData {
-    pub destination: String,
-    pub eta_month: u8,
-    pub eta_day: u8,
-    pub eta_hour: u8,
-    pub eta_minute: u8,
-    pub maximum_present_static_draught: u8,
-    pub dte: u8,
-    pub raim_flag: u8,
+    destination: String,
+    eta_month: u8,
+    eta_day: u8,
+    eta_hour: u8,
+    eta_minute: u8,
+    maximum_present_static_draught: u8,
+    dte: u8,
+    raim_flag: u8,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Getters, Setters, PartialEq)]
+#[getset(get = "pub", set = "pub")]
 pub struct NavigationData {
-    pub navigational_status: u8,
-    pub time_stamp: u8,
-    pub special_maneuvre_indicator: u8,
-    pub latitude: u32,
-    pub longitude: u32,
-    pub course_over_ground: u16,
-    pub speed_over_ground: u16,
-    pub rate_of_turn: i8,
-    pub true_heading: u16,
+    navigational_status: u8,
+    time_stamp: u8,
+    special_maneuvre_indicator: u8,
+    latitude: u32,
+    longitude: u32,
+    course_over_ground: u16,
+    speed_over_ground: u16,
+    rate_of_turn: i8,
+    true_heading: u16,
 }
 
 #[derive(Debug, Serialize)]

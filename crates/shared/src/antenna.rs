@@ -1,11 +1,12 @@
 use crate::{
     bitpacker::BitPacker,
-    common::types::{AisPacket, Channel},
+    common::{constants::SERVER_IPADDR, types::{AisPacket, Channel}},
 };
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::{
     net::UdpSocket,
     sync::mpsc::{Receiver, Sender},
+    task::JoinHandle,
 };
 
 pub struct Antenna {
@@ -50,45 +51,48 @@ impl Antenna {
 
     pub async fn emit(&self, msg: BitPacker) -> () {
         //let server_ip: IpAddr = *list_afinet_netifas().unwrap().iter().find(|(nom, _)| nom == "wlan0").map(|(_, ip)| ip).unwrap();
-        let serv_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));
         self.socket
-            .send_to(msg.bits(), SocketAddr::new(serv_ip, self.em_port))
+            .send_to(msg.bits(), SocketAddr::new(SERVER_IPADDR, self.em_port))
             .await
             .unwrap();
     }
 
-    pub async fn start(mut self) -> () {
+    async fn run_listener(&mut self) -> () {
+        let mut buf: [u8; 512] = [0; 512];
+
+        loop {
+            tokio::select! {
+                result = self.socket.recv_from(&mut buf) => {
+                    let (size, _source) = result.unwrap();
+                    let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8));
+
+                    if msg.bits() != BitPacker::from_str("hello", None).bits() {
+                        match self.channel {
+                            Channel::C87B | Channel::C88B => {
+                                self.ais_tx.clone().unwrap().send(AisPacket::from(msg, self.channel)).await;
+                            },
+                            Channel::GPS => {
+                                self.gps_tx.clone().unwrap().send(msg).await;
+                            },
+                            Channel::SATCOM => {
+                                self.satcom_tx.clone().unwrap().send(msg).await;
+                            },
+                            Channel::Any => todo!()
+                        }
+                    }
+                },
+                Some(msg) = self.ant_rx.recv() => {
+                    self.emit(msg).await;
+                }
+            }
+        }
+    }
+
+    pub async fn start(mut self) -> JoinHandle<()> {
         self.emit(BitPacker::from_str("hello", None)).await;
 
         tokio::spawn(async move {
-            let mut buf: [u8; 512] = [0; 512];
-
-            loop {
-                tokio::select! {
-                    result = self.socket.recv_from(&mut buf) => {
-                        let (size, source) = result.unwrap();
-                        let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8));
-
-                        if msg.bits() != BitPacker::from_str("hello", None).bits() {
-                            match self.channel {
-                                Channel::C87B | Channel::C88B => {
-                                    self.ais_tx.clone().unwrap().send(AisPacket::from(msg, self.channel)).await;
-                                },
-                                Channel::GPS => {
-                                    self.gps_tx.clone().unwrap().send(msg).await;
-                                },
-                                Channel::SATCOM => {
-                                    self.satcom_tx.clone().unwrap().send(msg).await;
-                                },
-                                Channel::Any => todo!()
-                            }
-                        }
-                    },
-                    Some(msg) = self.ant_rx.recv() => {
-                        self.emit(msg).await;
-                    }
-                }
-            }
-        });
+            self.run_listener().await;
+        })
     }
 }

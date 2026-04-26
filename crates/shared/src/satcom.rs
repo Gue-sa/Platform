@@ -1,5 +1,5 @@
 use crate::{bitpacker::BitPacker, satcom_message::SatComMessage};
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::{sync::mpsc::{Receiver, Sender}, task::JoinHandle};
 
 pub struct SatCom {
     reader_rx: Receiver<BitPacker>,
@@ -9,7 +9,7 @@ pub struct SatCom {
 }
 
 impl SatCom {
-    pub fn new(
+    pub fn init(
         reader_rx: Receiver<BitPacker>,
         sender_rx: Receiver<SatComMessage>,
         antenna_tx: Sender<BitPacker>,
@@ -38,9 +38,9 @@ impl SatCom {
         }
     }
 
-    pub async fn start(mut self) -> () {
+    pub fn start(mut self) -> JoinHandle<()> {
         tokio::spawn(async move {
             self.satcom_runner().await;
-        });
+        })
     }
 }

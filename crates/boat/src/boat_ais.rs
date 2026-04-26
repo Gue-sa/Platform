@@ -25,6 +25,7 @@ use std::{
 };
 use tokio::{
     sync::{Mutex, Notify, mpsc::*},
+    task::JoinHandle,
     time::{Duration, sleep},
 };
 
@@ -70,6 +71,11 @@ impl BoatAisState {
     ) -> Self {
         let mmsi: u32 = *boat_info.get_static_data().mmsi();
 
+        let sotdma_ri: u32 = 10;
+        let sotdma_rr: f64 = 60. / sotdma_ri as f64;
+        let sotdma_ni: u16 = (SLOTS_PER_MINUTE as f64 / sotdma_rr).round() as u16;
+        let sotdma_si: u16 = (0.2 * sotdma_ni as f64).round() as u16;
+
         Self {
             c_87_b_tx: c_87_b_tx,
             c_88_b_tx: c_88_b_tx,
@@ -83,10 +89,10 @@ impl BoatAisState {
             sotdma_nss: AtomicU16::new(u16::MAX),
             sotdma_ns: AtomicU16::new(u16::MAX),
             sotdma_nts: AtomicU16::new(u16::MAX),
-            sotdma_ri: AtomicU32::from(10),
-            sotdma_rr: 6.,
-            sotdma_ni: AtomicU16::from(375),
-            sotdma_si: AtomicU16::from(75),
+            sotdma_ri: AtomicU32::from(sotdma_ri),
+            sotdma_rr: sotdma_rr,
+            sotdma_ni: AtomicU16::from(sotdma_ni),
+            sotdma_si: AtomicU16::from(sotdma_si),
             sotdma_tmo_min: AtomicU8::from(3),
             sotdma_tmo_max: AtomicU8::from(7),
             sotdma_t_counter: AtomicU64::from(1),
@@ -710,31 +716,37 @@ impl BoatAisRunner {
         }
     }
 
-    pub async fn start(self) -> () {
+    pub fn start(
+        self,
+    ) -> (
+        JoinHandle<()>,
+        JoinHandle<()>,
+        JoinHandle<()>,
+        JoinHandle<()>,
+    ) {
         let runner_arc: Arc<BoatAisRunner> = Arc::new(self);
         let slots_map_cleanup_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
         let listeners_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
         let sotdma_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
         let clock_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
 
-        tokio::spawn(async move {
-            slots_map_cleanup_runner_arc
-                .state
-                .slots_map()
-                .run_cleanup_task()
-                .await;
-        });
-
-        tokio::spawn(async move {
-            clock_runner_arc.clone().run_boat_ais_master_clock().await;
-        });
-
-        tokio::spawn(async move {
-            listeners_runner_arc.run_listeners().await;
-        });
-
-        tokio::spawn(async move {
-            sotdma_runner_arc.run_sotdma().await;
-        });
+        (
+            tokio::spawn(async move {
+                slots_map_cleanup_runner_arc
+                    .state
+                    .slots_map()
+                    .run_cleanup_task()
+                    .await;
+            }),
+            tokio::spawn(async move {
+                clock_runner_arc.clone().run_boat_ais_master_clock().await;
+            }),
+            tokio::spawn(async move {
+                listeners_runner_arc.run_listeners().await;
+            }),
+            tokio::spawn(async move {
+                sotdma_runner_arc.run_sotdma().await;
+            }),
+        )
     }
 }

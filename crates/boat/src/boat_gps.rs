@@ -3,6 +3,7 @@ use shared::{bitpacker::BitPacker, boat_info::BoatInfo};
 use std::{net::Ipv4Addr, sync::Arc, u32};
 use tokio::{
     sync::mpsc::{Receiver, Sender},
+    task::JoinHandle,
     time::{Duration, Interval, interval},
 };
 
@@ -47,9 +48,9 @@ impl BoatGps {
         }
     }
 
-    pub async fn start(mut self) -> () {
+    pub fn start(mut self) -> JoinHandle<()> {
         tokio::spawn(async move {
             self.run_gps().await;
-        });
+        })
     }
 }

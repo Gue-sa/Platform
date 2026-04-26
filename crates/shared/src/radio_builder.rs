@@ -87,7 +87,7 @@ pub async fn build_radio() -> (
     )
     .await;
 
-    let satcom: SatCom = SatCom::new(reader_satcom_rx, sender_satcom_rx, c_satcom_tx, computer_tx);
+    let satcom: SatCom = SatCom::init(reader_satcom_rx, sender_satcom_rx, c_satcom_tx, computer_tx);
 
     let boats_reg: Arc<BoatsInfoRegistry> = Arc::new(BoatsInfoRegistry::new());
 

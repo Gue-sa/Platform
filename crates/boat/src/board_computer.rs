@@ -11,7 +11,7 @@ use shared::{
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
 use std::sync::Arc;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::{sync::mpsc::{Receiver, Sender}, task::JoinHandle};
 
 pub struct BoardComputer {
     boat_info: Arc<BoatInfo>,
@@ -23,7 +23,7 @@ pub struct BoardComputer {
 }
 
 impl BoardComputer {
-    pub fn new(
+    pub fn init(
         boat_info: Arc<BoatInfo>,
         boats_registry: Arc<BoatsInfoRegistry>,
         voyage: Option<Voyage>,
@@ -278,7 +278,7 @@ impl BoardComputer {
         .await;
     }
 
-    pub async fn start(mut self) -> () {
+    pub fn start(mut self) -> JoinHandle<()> {
         // ATTENTION : tout ce qui touche à la révision d'ordres de voyage en cours de route est très hasardeux, pour ne pas dire 0% fonctionnel.
         tokio::spawn(async move {
             let self_mmsi: u32 = *self.boat_info.get_static_data().mmsi();
@@ -345,6 +345,6 @@ impl BoardComputer {
                     _ => {}
                 }
             }
-        });
+        })
     }
 }

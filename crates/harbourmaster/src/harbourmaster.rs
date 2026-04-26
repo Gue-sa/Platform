@@ -6,6 +6,7 @@ use crate::{
 };
 use shared::{antenna::Antenna, radio_builder::build_radio, satcom::SatCom};
 use std::sync::{Arc, Mutex};
+use tokio::task::JoinHandle;
 
 pub struct Harbourmaster {
     ais: HarbourmasterAisRunner,
@@ -43,7 +44,7 @@ impl Harbourmaster {
 
         let ais: HarbourmasterAisRunner = HarbourmasterAisRunner::init(ais_rx, boats_reg.clone());
         let gps: HarbourmasterGps = HarbourmasterGps::init(gps_rx, c_gps_tx).await;
-        let fms: Fms = Fms::new(boats_reg, db_manager, fms_rx, sender_satcom_tx);
+        let fms: Fms = Fms::init(boats_reg, db_manager, fms_rx, sender_satcom_tx);
 
         Self {
             ais: ais,
@@ -59,14 +60,16 @@ impl Harbourmaster {
     }
 
     pub async fn start(self) -> () {
-        self.c87b_antenna.start().await;
-        self.c88b_antenna.start().await;
-        self.gps_antenna.start().await;
-        self.satcom_antenna.start().await;
-        self.ais.start().await;
-        //self.gps.start().await;
-        self.satcom.start().await;
-        self.fms.start().await;
+        let _c87b_antenna_handle: JoinHandle<()> = self.c87b_antenna.start().await;
+        let _c88b_antenna_handle: JoinHandle<()> = self.c88b_antenna.start().await;
+        let _gps_antenna_handle: JoinHandle<()> = self.gps_antenna.start().await;
+        let _satcom_antenna_handle: JoinHandle<()> = self.satcom_antenna.start().await;
+        
+        let _ais_handle: (JoinHandle<()>, JoinHandle<()>) = self.ais.start();
+        //let _gps_handle: (JoinHandle<()>, JoinHandle<()>) = self.gps.start();
+        let _satcom_handle: JoinHandle<()> = self.satcom.start();
+        let _fms_handle: (JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) = self.fms.start();
+
         self.database_api.start().await;
     }
 }

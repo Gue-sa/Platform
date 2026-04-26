@@ -14,7 +14,10 @@ use std::sync::{
     Arc,
     atomic::{AtomicU8, AtomicU16},
 };
-use tokio::sync::{Mutex, mpsc::*};
+use tokio::{
+    sync::{Mutex, mpsc::*},
+    task::JoinHandle,
+};
 
 pub struct HarbourmasterAisState {
     boats_registry: Arc<BoatsInfoRegistry>,
@@ -180,21 +183,22 @@ impl HarbourmasterAisRunner {
         }
     }
 
-    pub async fn start(self) -> () {
+    pub fn start(self) -> (JoinHandle<()>, JoinHandle<()>) {
         let listeners_runner_arc: Arc<HarbourmasterAisRunner> = Arc::new(self);
         let slots_map_cleanup_runner_arc: Arc<HarbourmasterAisRunner> =
             listeners_runner_arc.clone();
 
-        tokio::spawn(async move {
-            slots_map_cleanup_runner_arc
-                .state
-                .slots_map()
-                .run_cleanup_task()
-                .await;
-        });
-
-        tokio::spawn(async move {
-            listeners_runner_arc.run_listeners().await;
-        });
+        (
+            tokio::spawn(async move {
+                slots_map_cleanup_runner_arc
+                    .state
+                    .slots_map()
+                    .run_cleanup_task()
+                    .await;
+            }),
+            tokio::spawn(async move {
+                listeners_runner_arc.run_listeners().await;
+            }),
+        )
     }
 }

@@ -11,9 +11,12 @@ use shared::{
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
 use std::{sync::Arc, time::Duration};
-use tokio::sync::{
-    Notify,
-    mpsc::{Receiver, Sender},
+use tokio::{
+    sync::{
+        Notify,
+        mpsc::{Receiver, Sender},
+    },
+    task::JoinHandle,
 };
 
 pub struct Fms {
@@ -25,7 +28,7 @@ pub struct Fms {
 }
 
 impl Fms {
-    pub fn new(
+    pub fn init(
         boats_reg: Arc<BoatsInfoRegistry>,
         db_manager: Arc<std::sync::Mutex<DatabaseManager>>,
         rx: Receiver<SatComMessage>,
@@ -433,21 +436,21 @@ impl Fms {
         }
     }
 
-    pub async fn start(self) -> () {
+    pub fn start(self) -> (JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) {
         let runner_arc: Arc<Self> = Arc::new(self);
         let order_dispatcher_runer_arc: Arc<Self> = runner_arc.clone();
         let clock_runner_arc: Arc<Self> = runner_arc.clone();
 
-        tokio::spawn(async move {
-            clock_runner_arc.run_fms_master_clock().await;
-        });
-
-        tokio::spawn(async move {
-            order_dispatcher_runer_arc.run_order_dispatcher().await;
-        });
-
-        tokio::spawn(async move {
-            runner_arc.run_message_listener().await;
-        });
+        (
+            tokio::spawn(async move {
+                clock_runner_arc.run_fms_master_clock().await;
+            }),
+            tokio::spawn(async move {
+                order_dispatcher_runer_arc.run_order_dispatcher().await;
+            }),
+            tokio::spawn(async move {
+                runner_arc.run_message_listener().await;
+            }),
+        )
     }
 }

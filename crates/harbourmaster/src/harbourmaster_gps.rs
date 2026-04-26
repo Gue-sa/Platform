@@ -18,9 +18,12 @@ use std::sync::{
     Arc,
     atomic::{AtomicU32, Ordering},
 };
-use tokio::sync::{
-    Mutex, MutexGuard, Semaphore,
-    mpsc::{Receiver, Sender, channel},
+use tokio::{
+    sync::{
+        Mutex, MutexGuard, Semaphore,
+        mpsc::{Receiver, Sender, channel},
+    },
+    task::JoinHandle,
 };
 
 pub struct HarbourmasterGps {
@@ -233,16 +236,17 @@ impl HarbourmasterGps {
         }
     }
 
-    pub async fn start(self) -> () {
+    pub fn start(self) -> (JoinHandle<()>, JoinHandle<()>) {
         let listener_arc: Arc<HarbourmasterGps> = Arc::new(self);
         let detect_and_send_arc: Arc<HarbourmasterGps> = listener_arc.clone();
 
-        tokio::spawn(async move {
-            detect_and_send_arc.run_detect_and_send().await;
-        });
-
-        tokio::spawn(async move {
-            listener_arc.run_listener().await;
-        });
+        (
+            tokio::spawn(async move {
+                detect_and_send_arc.run_detect_and_send().await;
+            }),
+            tokio::spawn(async move {
+                listener_arc.run_listener().await;
+            }),
+        )
     }
 }

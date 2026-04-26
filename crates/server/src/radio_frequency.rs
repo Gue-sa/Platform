@@ -1,11 +1,14 @@
-use crate::{clients_registry::ClientsRegistry, common::constants::HARBOURMASTER_IPADDR};
+use crate::clients_registry::ClientsRegistry;
 use dashmap::DashSet;
 use shared::{
     bitpacker::BitPacker,
-    common::{constants::GPS_FROM_SERVER_PORT, types::Channel},
+    common::{
+        constants::{GPS_FROM_SERVER_PORT, HARBOURMASTER_IPADDR},
+        types::Channel,
+    },
 };
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use tokio::net::UdpSocket;
+use tokio::{net::UdpSocket, task::JoinHandle};
 
 pub struct RadioFrequency {
     channel: Channel,
@@ -67,7 +70,7 @@ impl RadioFrequency {
         self.pending_gps_clients.remove(&client);
     }
 
-    pub fn start(self) {
+    pub fn start(self) -> JoinHandle<()> {
         tokio::spawn(async move {
             let mut buf: [u8; 512] = [0; 512];
 
@@ -93,6 +96,6 @@ impl RadioFrequency {
                     }
                 }
             }
-        });
+        })
     }
 }

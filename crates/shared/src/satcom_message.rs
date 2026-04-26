@@ -25,21 +25,21 @@ impl SatComMessage {
         source: u32,
         target: u32,
         order_header: VoyageOrderHeader,
-        message_type: SatComMessageType,
+        msg_type: SatComMessageType,
         order_body_review: Option<VoyageOrderBody>,
     ) -> Self {
         Self {
             source: source,
             target: target,
             order_header: order_header,
-            message_type: message_type,
+            message_type: msg_type,
             order_body_review,
         }
     }
 
     pub fn order(&self) -> Option<VoyageOrder> {
         if self.order_body_review().is_some() {
-            Some(VoyageOrder::from(
+            Some(VoyageOrder::from_components(
                 self.order_header(),
                 self.order_body_review().unwrap(),
             ))

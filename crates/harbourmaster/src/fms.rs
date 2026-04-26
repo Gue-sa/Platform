@@ -28,14 +28,14 @@ pub struct Fms {
 
 impl Fms {
     pub fn new(
-        boats_registry: Arc<BoatsInfoRegistry>,
-        database_manager: Arc<std::sync::Mutex<DatabaseManager>>,
+        boats_reg: Arc<BoatsInfoRegistry>,
+        db_manager: Arc<std::sync::Mutex<DatabaseManager>>,
         rx: Receiver<SatComMessage>,
         satcom_tx: Sender<SatComMessage>,
     ) -> Self {
         Self {
-            boats_registry: boats_registry,
-            database_manager: database_manager,
+            boats_registry: boats_reg,
+            database_manager: db_manager,
             rx: tokio::sync::Mutex::new(rx),
             satcom_tx: satcom_tx,
             clock_pulse: Arc::new(Notify::new()),
@@ -49,11 +49,11 @@ impl Fms {
         }
     }
 
-    async fn respond(&self, satcom_message: &SatComMessage, msg_type: SatComMessageType) -> () {
+    async fn respond(&self, satcom_msg: &SatComMessage, msg_type: SatComMessageType) -> () {
         let msg: SatComMessage = SatComMessage::new(
             HARBOURMASTER_MMSI,
-            *satcom_message.source(),
-            satcom_message.order_header(),
+            *satcom_msg.source(),
+            satcom_msg.order_header(),
             msg_type,
             None,
         );
@@ -63,23 +63,23 @@ impl Fms {
 
     fn update_associated_order_status(
         &self,
-        satcom_message: &SatComMessage,
+        satcom_msg: &SatComMessage,
         new_status: VoyageStatus,
     ) -> () {
         self.database_manager
             .lock()
             .unwrap()
-            .update_voyage_order_status(*satcom_message.order_header().id() as i32, new_status);
+            .update_voyage_order_status(*satcom_msg.order_header().id() as i32, new_status);
     }
 
     async fn update_associated_order_status_and_respond(
         &self,
-        satcom_message: &SatComMessage,
+        satcom_msg: &SatComMessage,
         new_status: VoyageStatus,
-        response_msg_type: SatComMessageType,
+        res_msg_type: SatComMessageType,
     ) -> () {
-        self.update_associated_order_status(satcom_message, new_status);
-        self.respond(satcom_message, response_msg_type).await;
+        self.update_associated_order_status(satcom_msg, new_status);
+        self.respond(satcom_msg, res_msg_type).await;
     }
 
     async fn run_order_dispatcher(&self) -> () {
@@ -93,22 +93,24 @@ impl Fms {
                 .get_voyage_orders(None, Some(VoyageStatus::Unassigned), None)
                 .unwrap()
                 .iter()
-                .map(|(o, v, d)| {
-                    let order_header =
-                        VoyageOrderHeader::from(o.id as u16, o.current_version_number as u8);
-
-                    let order_body = VoyageOrderBody::from(
-                        d.name.to_string(),
-                        (d.longitude as u16, d.latitude as u16),
-                        v.eta.month() as u8,
-                        v.eta.day() as u8,
-                        v.eta.hour() as u8,
-                        v.eta.minute() as u8,
-                        v.cargo_type as u8,
-                        v.speed_profile as u8,
+                .map(|(order, ver, dest)| {
+                    let order_header = VoyageOrderHeader::from_data(
+                        order.id as u16,
+                        order.current_version_number as u8,
                     );
 
-                    VoyageOrder::from(order_header, order_body)
+                    let order_body = VoyageOrderBody::from_data(
+                        dest.name.to_string(),
+                        (dest.longitude as u16, dest.latitude as u16),
+                        ver.eta.month() as u8,
+                        ver.eta.day() as u8,
+                        ver.eta.hour() as u8,
+                        ver.eta.minute() as u8,
+                        ver.cargo_type as u8,
+                        ver.speed_profile as u8,
+                    );
+
+                    VoyageOrder::from_components(order_header, order_body)
                 })
                 .collect();
 
@@ -140,19 +142,18 @@ impl Fms {
         }
     }
 
-    async fn handle_offer_acknowledgement(
+    async fn handle_offer_ack(
         &self,
-        satcom_message: &SatComMessage,
+        satcom_msg: &SatComMessage,
         concerned_voyage_order: &(
             crate::database_manager::models::VoyageOrderQueryResult,
             crate::database_manager::models::VoyageOrderVersionQueryResult,
             crate::database_manager::models::DestinationQueryResult,
         ),
     ) -> () {
-        self.update_associated_order_status(&satcom_message, VoyageStatus::UnderRevision);
+        self.update_associated_order_status(&satcom_msg, VoyageStatus::UnderRevision);
 
-        let concerned_boat_info: BoatInfo =
-            self.boats_registry.get(*satcom_message.source()).unwrap();
+        let concerned_boat_info: BoatInfo = self.boats_registry.get(*satcom_msg.source()).unwrap();
 
         concerned_boat_info.update_voyage_data(
             Some(concerned_voyage_order.2.name.clone()),
@@ -166,32 +167,32 @@ impl Fms {
 
         println!(
             "Offre pour l'ordre de voyage {} reçue par le bateau {}. Attente d'une réponse pour la révision initiale.",
-            *satcom_message.order_header().id(),
-            *satcom_message.source()
+            *satcom_msg.order_header().id(),
+            *satcom_msg.source()
         );
     }
 
-    async fn handle_revision_request_acknowledgement(&self, satcom_message: &SatComMessage) -> () {
-        self.update_associated_order_status(&satcom_message, VoyageStatus::UnderRevision);
+    async fn handle_rev_req_ack(&self, satcom_msg: &SatComMessage) -> () {
+        self.update_associated_order_status(&satcom_msg, VoyageStatus::UnderRevision);
 
         println!(
             "Révision de l'ordre de voyage {} demandée par le bateau {}. Attente d'une réponse pour la révision.",
-            *satcom_message.order_header().id(),
-            *satcom_message.source()
+            *satcom_msg.order_header().id(),
+            *satcom_msg.source()
         );
     }
 
-    async fn handle_revision_acceptation(&self, satcom_message: &SatComMessage) -> () {
+    async fn handle_rev_acceptation(&self, satcom_msg: &SatComMessage) -> () {
         self.database_manager
             .lock()
             .unwrap()
             .update_voyage_order_version(
-                *satcom_message.order_header().id() as i32,
-                *satcom_message.order_header().version() as i32,
+                *satcom_msg.order_header().id() as i32,
+                *satcom_msg.order_header().version() as i32,
             );
 
         self.update_associated_order_status_and_respond(
-            &satcom_message,
+            &satcom_msg,
             VoyageStatus::RevisionAccepted,
             SatComMessageType::Acknowledgement,
         )
@@ -199,20 +200,20 @@ impl Fms {
 
         println!(
             "Révision de l'ordre {} acceptée par le bateau {}. Nouvelle version : {}. Accusé de réception envoyé.",
-            *satcom_message.order_header().id(),
-            *satcom_message.source(),
-            *satcom_message.order_header().version()
+            *satcom_msg.order_header().id(),
+            *satcom_msg.source(),
+            *satcom_msg.order_header().version()
         );
     }
 
-    async fn handle_initial_revision_acceptation(&self, satcom_message: &SatComMessage) -> () {
+    async fn handle_initial_rev_acceptation(&self, satcom_msg: &SatComMessage) -> () {
         self.database_manager.lock().unwrap().assign_voyage_order(
-            *satcom_message.order_header().id() as i32,
-            *satcom_message.source() as i32,
+            *satcom_msg.order_header().id() as i32,
+            *satcom_msg.source() as i32,
         );
 
         self.update_associated_order_status_and_respond(
-            &satcom_message,
+            &satcom_msg,
             VoyageStatus::RevisionAccepted,
             SatComMessageType::Acknowledgement,
         )
@@ -220,12 +221,12 @@ impl Fms {
 
         println!(
             "Révision initiale de l'ordre {} acceptée par le bateau {}. Accusé de réception envoyé. Assignation officielle au bateau.",
-            *satcom_message.order_header().id(),
-            *satcom_message.source()
+            *satcom_msg.order_header().id(),
+            *satcom_msg.source()
         );
     }
 
-    async fn handle_revision_refusal(&self, satcom_message: &SatComMessage) -> () {
+    async fn handle_rev_refusal(&self, satcom_message: &SatComMessage) -> () {
         self.database_manager
             .lock()
             .unwrap()
@@ -248,9 +249,9 @@ impl Fms {
         );
     }
 
-    async fn handle_initial_revision_refusal(&self, satcom_message: &SatComMessage) -> () {
+    async fn handle_initial_rev_refusal(&self, satcom_msg: &SatComMessage) -> () {
         self.update_associated_order_status_and_respond(
-            &satcom_message,
+            &satcom_msg,
             VoyageStatus::Unassigned,
             SatComMessageType::Acknowledgement,
         )
@@ -258,18 +259,18 @@ impl Fms {
 
         println!(
             "Révision initiale de l'ordre {} refusée par le bateau {}. Accusé de réception envoyé. Ordre à nouveau non-assigné.",
-            *satcom_message.order_header().id(),
-            *satcom_message.source()
+            *satcom_msg.order_header().id(),
+            *satcom_msg.source()
         );
     }
 
-    async fn handle_revision_request(&self, satcom_message: &SatComMessage) -> () {
+    async fn handle_rev_request(&self, satcom_msg: &SatComMessage) -> () {
         todo!()
     }
 
-    async fn handle_last_agreed_revision_execution(&self, satcom_message: &SatComMessage) -> () {
+    async fn handle_last_agreed_rev_execution(&self, satcom_msg: &SatComMessage) -> () {
         self.update_associated_order_status_and_respond(
-            &satcom_message,
+            &satcom_msg,
             VoyageStatus::InExecution,
             SatComMessageType::Acknowledgement,
         )
@@ -277,14 +278,14 @@ impl Fms {
 
         println!(
             "Ordre {} en cours d'exécution par le bateau {}. Accusé de réception envoyé.",
-            *satcom_message.order_header().id(),
-            *satcom_message.source()
+            *satcom_msg.order_header().id(),
+            *satcom_msg.source()
         );
     }
 
-    async fn handle_notice_of_readiness(&self, satcom_message: &SatComMessage) -> () {
+    async fn handle_notice_of_readiness(&self, satcom_msg: &SatComMessage) -> () {
         self.update_associated_order_status_and_respond(
-            &satcom_message,
+            &satcom_msg,
             VoyageStatus::Completed,
             SatComMessageType::EndOfVoyage,
         )
@@ -292,14 +293,14 @@ impl Fms {
 
         println!(
             "Ordre {} achevé par le bateau {}. Notification de fin de voyage envoyée.",
-            *satcom_message.order_header().id(),
-            *satcom_message.source()
+            *satcom_msg.order_header().id(),
+            *satcom_msg.source()
         );
     }
 
-    async fn handle_aborting(&self, satcom_message: &SatComMessage) -> () {
+    async fn handle_aborting(&self, satcom_msg: &SatComMessage) -> () {
         self.update_associated_order_status_and_respond(
-            &satcom_message,
+            &satcom_msg,
             VoyageStatus::Finished,
             SatComMessageType::Acknowledgement,
         )
@@ -307,23 +308,23 @@ impl Fms {
 
         println!(
             "Exécution de l'ordre {} définitivement abandonnée par le bateau {}. Accusé de réception envoyé. Terminaison de l'ordre.",
-            *satcom_message.order_header().id(),
-            *satcom_message.source()
+            *satcom_msg.order_header().id(),
+            *satcom_msg.source()
         );
     }
 
     async fn run_message_listener(&self) -> () {
         loop {
-            let satcom_message = match self.rx.lock().await.recv().await {
+            let satcom_msg = match self.rx.lock().await.recv().await {
                 Some(m) => m,
                 None => break,
             };
 
-            if *satcom_message.target() != HARBOURMASTER_MMSI {
+            if *satcom_msg.target() != HARBOURMASTER_MMSI {
                 continue;
             }
 
-            let concerned_voyage_order_query_result: Box<
+            let db_order_query_result: Box<
                 [(
                     crate::database_manager::models::VoyageOrderQueryResult,
                     crate::database_manager::models::VoyageOrderVersionQueryResult,
@@ -333,117 +334,100 @@ impl Fms {
                 .database_manager
                 .lock()
                 .unwrap()
-                .get_voyage_orders(Some(*satcom_message.order_header().id() as i32), None, None)
+                .get_voyage_orders(Some(*satcom_msg.order_header().id() as i32), None, None)
                 .unwrap_or(Box::new([]));
 
-            if concerned_voyage_order_query_result.len() != 1 {
+            if db_order_query_result.len() != 1 {
                 continue;
             }
 
-            let concerned_voyage_order: &(
+            let db_order: &(
                 crate::database_manager::models::VoyageOrderQueryResult,
                 crate::database_manager::models::VoyageOrderVersionQueryResult,
                 crate::database_manager::models::DestinationQueryResult,
-            ) = &concerned_voyage_order_query_result[0];
+            ) = &db_order_query_result[0];
 
-            let concerned_voyage_order_status: VoyageStatus =
-                (concerned_voyage_order.0.status as u8).into();
-            let concerned_voyage_order_version_number: u8 =
-                concerned_voyage_order.0.current_version_number as u8;
+            let db_order_status: VoyageStatus = (db_order.0.status as u8).into();
+            let db_order_ver_nbr: u8 = db_order.0.current_version_number as u8;
 
-            let concerned_voyage_order_revision: Option<
+            let db_order_rev: Option<
                 crate::database_manager::models::VoyageOrderVersionQueryResult,
             > = self
                 .database_manager
                 .lock()
                 .unwrap()
-                .get_voyage_order_revision_version(*satcom_message.order_header().id() as i32)
+                .get_voyage_order_rev_ver(*satcom_msg.order_header().id() as i32)
                 .unwrap();
 
-            let mut concerned_voyage_order_revision_version_number: u8 =
-                concerned_voyage_order_version_number + 1;
+            let mut db_order_rev_ver_nbr: u8 = db_order_ver_nbr + 1;
 
-            if let Some(v) = concerned_voyage_order_revision {
-                concerned_voyage_order_revision_version_number = v.version_number as u8;
+            if let Some(v) = db_order_rev {
+                db_order_rev_ver_nbr = v.version_number as u8;
             }
 
-            let msg_version: u8 = *satcom_message.order_header().version();
+            let msg_ver: u8 = *satcom_msg.order_header().version();
 
-            let corresponds_to_current_version: bool = msg_version
-                == concerned_voyage_order_version_number
-                && Some(*satcom_message.source() as i32) == concerned_voyage_order.0.executant;
-            let corresponds_to_revision_version: bool = msg_version
-                == concerned_voyage_order_revision_version_number
-                && Some(*satcom_message.source() as i32) == concerned_voyage_order.0.executant;
+            let refers_current_ver: bool = msg_ver == db_order_ver_nbr
+                && Some(*satcom_msg.source() as i32) == db_order.0.executant;
+            let refers_rev_ver: bool = msg_ver == db_order_rev_ver_nbr
+                && Some(*satcom_msg.source() as i32) == db_order.0.executant;
 
-            match satcom_message.message_type() {
+            match satcom_msg.message_type() {
                 SatComMessageType::Acknowledgement => {
-                    if concerned_voyage_order_status == VoyageStatus::Unassigned {
-                        self.handle_offer_acknowledgement(&satcom_message, concerned_voyage_order)
-                            .await;
-                    } else if concerned_voyage_order_status == VoyageStatus::RevisionSubmitted
-                        && corresponds_to_revision_version
-                    {
-                        self.handle_revision_request_acknowledgement(&satcom_message)
-                            .await;
+                    if db_order_status == VoyageStatus::Unassigned {
+                        self.handle_offer_ack(&satcom_msg, db_order).await;
+                    } else if db_order_status == VoyageStatus::RevisionSubmitted && refers_rev_ver {
+                        self.handle_rev_req_ack(&satcom_msg).await;
                     }
                 }
                 SatComMessageType::RevisionAcceptation => {
-                    if concerned_voyage_order_status == VoyageStatus::UnderRevision
-                        && corresponds_to_current_version
+                    if db_order_status == VoyageStatus::UnderRevision && refers_current_ver {
+                        self.handle_rev_acceptation(&satcom_msg).await;
+                    } else if db_order_status == VoyageStatus::UnderRevision
+                        && db_order_ver_nbr == msg_ver
+                        && db_order.0.executant.is_none()
                     {
-                        self.handle_revision_acceptation(&satcom_message).await;
-                    } else if concerned_voyage_order_status == VoyageStatus::UnderRevision
-                        && concerned_voyage_order_version_number == msg_version
-                        && concerned_voyage_order.0.executant.is_none()
-                    {
-                        self.handle_initial_revision_acceptation(&satcom_message)
-                            .await;
+                        self.handle_initial_rev_acceptation(&satcom_msg).await;
                     }
                 }
                 SatComMessageType::RevisionRefusal => {
-                    if concerned_voyage_order_status == VoyageStatus::UnderRevision
-                        && corresponds_to_revision_version
+                    if db_order_status == VoyageStatus::UnderRevision && refers_rev_ver {
+                        self.handle_rev_refusal(&satcom_msg).await;
+                    } else if db_order_status == VoyageStatus::UnderRevision
+                        && db_order.0.executant.is_none()
+                        && msg_ver == db_order_ver_nbr
                     {
-                        self.handle_revision_refusal(&satcom_message).await;
-                    } else if concerned_voyage_order_status == VoyageStatus::UnderRevision
-                        && concerned_voyage_order.0.executant.is_none()
-                        && msg_version == concerned_voyage_order_version_number
-                    {
-                        self.handle_initial_revision_refusal(&satcom_message).await;
+                        self.handle_initial_rev_refusal(&satcom_msg).await;
                     }
                 }
                 SatComMessageType::RevisionRequest => {
                     if matches!(
-                        concerned_voyage_order_status,
+                        db_order_status,
                         VoyageStatus::InExecution
                             | VoyageStatus::RevisionAccepted
                             | VoyageStatus::RevisionRefused
-                    ) && corresponds_to_current_version
+                    ) && refers_current_ver
                     {
-                        self.handle_revision_request(&satcom_message).await;
+                        self.handle_rev_request(&satcom_msg).await;
                     }
                 }
                 SatComMessageType::ExecutingLastAgreedRevision => {
                     if matches!(
-                        concerned_voyage_order_status,
+                        db_order_status,
                         VoyageStatus::RevisionAccepted | VoyageStatus::RevisionRefused
-                    ) && corresponds_to_current_version
+                    ) && refers_current_ver
                     {
-                        self.handle_last_agreed_revision_execution(&satcom_message)
-                            .await;
+                        self.handle_last_agreed_rev_execution(&satcom_msg).await;
                     }
                 }
                 SatComMessageType::NoticeOfReadiness => {
-                    if concerned_voyage_order_status == VoyageStatus::InExecution
-                        && corresponds_to_current_version
-                    {
-                        self.handle_notice_of_readiness(&satcom_message).await;
+                    if db_order_status == VoyageStatus::InExecution && refers_current_ver {
+                        self.handle_notice_of_readiness(&satcom_msg).await;
                     }
                 }
                 SatComMessageType::Aborting => {
-                    if corresponds_to_current_version {
-                        self.handle_aborting(&satcom_message).await;
+                    if refers_current_ver {
+                        self.handle_aborting(&satcom_msg).await;
                     }
                 }
                 _ => {}

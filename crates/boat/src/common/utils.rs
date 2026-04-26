@@ -6,23 +6,23 @@ use std::{
 
 use chrono::{DateTime, Datelike, Local, Timelike};
 use colored::{ColoredString, Colorize};
-use shared::common::utils::{datetime_to_slots_idx, get_current_datetime};
+use shared::common::utils::{dt_to_slots_idx, get_current_dt};
 
 static LOG_FILE_LOCK: Mutex<()> = Mutex::new(());
 
 pub fn log(msg: ColoredString) -> () {
-    let cdt: DateTime<Local> = get_current_datetime();
-    let slots: [u16; 2] = datetime_to_slots_idx(Some(cdt));
+    let current_dt: DateTime<Local> = get_current_dt();
+    let slots: [u16; 2] = dt_to_slots_idx(Some(current_dt));
     let log_msg: String = format!(
         "({}, {}), {}/{}/{} {}h:{}mn:{}s :\n\t{}\n",
         slots[0],
         slots[1],
-        cdt.day(),
-        cdt.month(),
-        cdt.year(),
-        cdt.hour(),
-        cdt.minute(),
-        cdt.second(),
+        current_dt.day(),
+        current_dt.month(),
+        current_dt.year(),
+        current_dt.hour(),
+        current_dt.minute(),
+        current_dt.second(),
         msg.clone()
     );
     let file_log_msg: String = format!(
@@ -30,15 +30,15 @@ pub fn log(msg: ColoredString) -> () {
         msg.clear(),
         slots[0],
         slots[1],
-        cdt.day(),
-        cdt.month(),
-        cdt.year(),
-        cdt.hour(),
-        cdt.minute(),
-        cdt.second()
+        current_dt.day(),
+        current_dt.month(),
+        current_dt.year(),
+        current_dt.hour(),
+        current_dt.minute(),
+        current_dt.second()
     );
 
-    let lock: std::sync::MutexGuard<'_, ()> = LOG_FILE_LOCK.lock().unwrap();
+    let _unused: std::sync::MutexGuard<'_, ()> = LOG_FILE_LOCK.lock().unwrap();
 
     let mut log_file: File = OpenOptions::new()
         .create(true)

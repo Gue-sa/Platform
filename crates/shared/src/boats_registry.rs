@@ -7,7 +7,7 @@ pub struct BoatsInfoRegistry {
 }
 
 impl BoatsInfoRegistry {
-    pub fn init() -> Self {
+    pub fn new() -> Self {
         Self {
             registry: DashMap::new(),
         }

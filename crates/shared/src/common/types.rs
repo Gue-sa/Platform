@@ -490,43 +490,43 @@ pub type SatComMessageResult<T> = Result<T, SatComMessageError>;
 pub type DatabaseManagerResult<T> = Result<T, DatabaseManagerError>;
 
 impl From<BitPackerError> for AisMessageError {
-    fn from(value: BitPackerError) -> Self {
-        Self::BitPacker(value)
+    fn from(val: BitPackerError) -> Self {
+        Self::BitPacker(val)
     }
 }
 
 impl From<BitPackerError> for SatComMessageError {
-    fn from(value: BitPackerError) -> Self {
-        Self::BitPacker(value)
+    fn from(val: BitPackerError) -> Self {
+        Self::BitPacker(val)
     }
 }
 
 impl From<BitPackerError> for VoyageOrderError {
-    fn from(value: BitPackerError) -> Self {
-        Self::BitPacker(value)
+    fn from(val: BitPackerError) -> Self {
+        Self::BitPacker(val)
     }
 }
 
 impl From<ClockError> for AisError {
-    fn from(value: ClockError) -> Self {
-        Self::Clock(value)
+    fn from(val: ClockError) -> Self {
+        Self::Clock(val)
     }
 }
 
 impl From<AisMessageError> for AisError {
-    fn from(value: AisMessageError) -> Self {
-        Self::AisMessage(value)
+    fn from(val: AisMessageError) -> Self {
+        Self::AisMessage(val)
     }
 }
 
 impl From<VoyageOrderError> for SatComMessageError {
-    fn from(value: VoyageOrderError) -> Self {
-        Self::VoyageOrder(value)
+    fn from(val: VoyageOrderError) -> Self {
+        Self::VoyageOrder(val)
     }
 }
 
 impl From<SatComMessageError> for SatComError {
-    fn from(value: SatComMessageError) -> Self {
-        Self::SatComMessage(value)
+    fn from(val: SatComMessageError) -> Self {
+        Self::SatComMessage(val)
     }
 }

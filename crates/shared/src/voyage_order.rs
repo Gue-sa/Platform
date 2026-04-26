@@ -39,7 +39,7 @@ impl VoyageOrderHeader {
         })
     }
 
-    pub fn from(id: u16, version: u8) -> Self {
+    pub fn from_data(id: u16, version: u8) -> Self {
         Self {
             id: id,
             version: version,
@@ -68,9 +68,9 @@ impl VoyageOrderBody {
         })
     }
 
-    pub fn from(
+    pub fn from_data(
         destination: String,
-        destination_position: (u16, u16),
+        destination_pos: (u16, u16),
         eta_month: u8,
         eta_day: u8,
         eta_hour: u8,
@@ -80,7 +80,7 @@ impl VoyageOrderBody {
     ) -> Self {
         Self {
             destination: destination,
-            destination_position: destination_position,
+            destination_position: destination_pos,
             eta_month: eta_month,
             eta_day: eta_day,
             eta_hour: eta_hour,
@@ -113,7 +113,7 @@ impl VoyageOrder {
         })
     }
 
-    pub fn from(header: VoyageOrderHeader, body: VoyageOrderBody) -> Self {
+    pub fn from_components(header: VoyageOrderHeader, body: VoyageOrderBody) -> Self {
         Self {
             header: header,
             body: body,
@@ -132,11 +132,11 @@ impl VoyageOrder {
         self.body.to_bitpacker() + self.header.to_bitpacker()
     }
 
-    pub fn is_revision_of(&self, order2: &VoyageOrder) -> bool {
+    pub fn is_rev_of(&self, order2: &VoyageOrder) -> bool {
         self.header.id == order2.header.id && self.header.version > order2.header.version
     }
 
-    pub fn set_version(&mut self, version: u8) -> () {
+    pub fn set_ver(&mut self, version: u8) -> () {
         self.header.set_version(version);
     }
 }

@@ -29,9 +29,9 @@ impl Antenna {
         rx: Receiver<BitPacker>,
         em_port: u16,
         rec_port: u16,
-        channel: Channel,
+        chn: Channel,
     ) -> Self {
-        let socket: UdpSocket = UdpSocket::bind(SocketAddr::new(
+        let sock: UdpSocket = UdpSocket::bind(SocketAddr::new(
             IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
             rec_port,
         ))
@@ -39,8 +39,8 @@ impl Antenna {
         .unwrap();
 
         Self {
-            channel: channel,
-            socket: socket,
+            channel: chn,
+            socket: sock,
             ant_rx: rx,
             ais_tx: ais_tx,
             gps_tx: gps_tx,
@@ -50,18 +50,17 @@ impl Antenna {
         }
     }
 
-    pub async fn send(&self, msg: BitPacker) -> () {
+    pub async fn emit(&self, msg: BitPacker) -> () {
         //let server_ip: IpAddr = *list_afinet_netifas().unwrap().iter().find(|(nom, _)| nom == "wlan0").map(|(_, ip)| ip).unwrap();
-        let server_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));
-        self
-            .socket
-            .send_to(msg.bits(), SocketAddr::new(server_ip, self.em_port))
+        let serv_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));
+        self.socket
+            .send_to(msg.bits(), SocketAddr::new(serv_ip, self.em_port))
             .await
             .unwrap();
     }
 
     pub async fn start(mut self) -> () {
-        self.send(BitPacker::from_str("hello", None)).await;
+        self.emit(BitPacker::from_str("hello", None)).await;
 
         tokio::spawn(async move {
             let mut buf: [u8; 512] = [0; 512];
@@ -88,7 +87,7 @@ impl Antenna {
                         }
                     },
                     Some(msg) = self.ant_rx.recv() => {
-                        self.send(msg).await;
+                        self.emit(msg).await;
                     }
                 }
             }

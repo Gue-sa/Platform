@@ -2,7 +2,8 @@ use std::sync::{Arc, atomic::AtomicU32};
 
 use shared::bitpacker::BitPacker;
 use tokio::sync::{
-    Mutex, Semaphore, mpsc::{Receiver, Sender, channel}
+    Mutex, Semaphore,
+    mpsc::{Receiver, Sender, channel},
 };
 
 use opencv::{
@@ -26,14 +27,14 @@ pub struct HarbourmasterGps {
 }
 
 impl HarbourmasterGps {
-    pub async fn init(rx: Receiver<BitPacker>, antenna_tx: Sender<BitPacker>) -> Self {
+    pub async fn init(rx: Receiver<BitPacker>, ant_tx: Sender<BitPacker>) -> Self {
         let (pos_tx, pos_rx) = channel::<[u32; 2]>(Semaphore::MAX_PERMITS);
 
         Self {
             rx: Mutex::new(rx),
             pos_rx: Mutex::new(pos_rx),
             pos_tx: pos_tx,
-            antenna_tx: antenna_tx,
+            antenna_tx: ant_tx,
             latitude: AtomicU32::new(0),
             longitude: AtomicU32::new(0),
         }
@@ -47,8 +48,10 @@ impl HarbourmasterGps {
     }
 
     fn set_coordinates(&self, lat: u32, lon: u32) {
-        self.latitude.store(lat, std::sync::atomic::Ordering::Relaxed);
-        self.longitude.store(lon, std::sync::atomic::Ordering::Relaxed);
+        self.latitude
+            .store(lat, std::sync::atomic::Ordering::Relaxed);
+        self.longitude
+            .store(lon, std::sync::atomic::Ordering::Relaxed);
     }
 
     async fn run_detect_and_send(&self) -> () {

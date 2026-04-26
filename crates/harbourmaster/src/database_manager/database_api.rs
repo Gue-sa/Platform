@@ -40,12 +40,12 @@ pub struct DatabaseApi {
 impl DatabaseApi {
     pub fn init(
         database_manager: Arc<Mutex<DatabaseManager>>,
-        boats_registry: Arc<BoatsInfoRegistry>,
+        boats_reg: Arc<BoatsInfoRegistry>,
     ) -> Self {
         Self {
             state: Arc::new(DatabaseApiSharedState {
                 database_manager: database_manager,
-                boats_registry: boats_registry,
+                boats_registry: boats_reg,
             }),
         }
     }
@@ -117,11 +117,11 @@ impl DatabaseApi {
     async fn get_destinations(
         State(shared_state): State<Arc<DatabaseApiSharedState>>,
     ) -> Json<Box<[DestinationQueryResult]>> {
-        let mut manager: std::sync::MutexGuard<'_, DatabaseManager> =
+        let mut db_manager: std::sync::MutexGuard<'_, DatabaseManager> =
             shared_state.database_manager.lock().unwrap();
 
         let results: Box<[DestinationQueryResult]> =
-            manager.get_destinations(None, None, None, None).unwrap();
+            db_manager.get_destinations(None, None, None, None).unwrap();
 
         Json(results)
     }
@@ -130,10 +130,10 @@ impl DatabaseApi {
         State(shared_state): State<Arc<DatabaseApiSharedState>>,
         Json(payload): Json<CreateVoyageOrderPayload>,
     ) -> () {
-        let mut manager: std::sync::MutexGuard<'_, DatabaseManager> =
+        let mut db_manager: std::sync::MutexGuard<'_, DatabaseManager> =
             shared_state.database_manager.lock().unwrap();
 
-        manager.add_voyage_order(
+        db_manager.add_voyage_order(
             payload.destination_id.into(),
             1,
             1,

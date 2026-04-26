@@ -89,7 +89,7 @@ impl BoardComputer {
         );
     }
 
-    fn adopt_voyage_order_revision(&mut self) -> () {
+    fn adopt_voyage_order_rev(&mut self) -> () {
         if let Some(order) = self.voyage_order_revision.take() {
             self.adopt_voyage_order(&order);
         }
@@ -97,17 +97,17 @@ impl BoardComputer {
 
     async fn respond(
         &mut self,
-        satcom_message: &SatComMessage,
-        message_type: SatComMessageType,
-        response_order_header: Option<VoyageOrderHeader>,
-        response_order_revision: Option<VoyageOrderBody>,
+        satcom_msg: &SatComMessage,
+        msg_type: SatComMessageType,
+        res_order_header: Option<VoyageOrderHeader>,
+        res_order_revision: Option<VoyageOrderBody>,
     ) -> () {
         let message = SatComMessage::new(
             *self.boat_info.get_static_data().mmsi(),
             HARBOURMASTER_MMSI,
-            response_order_header.unwrap_or(satcom_message.order_header()),
-            message_type,
-            response_order_revision,
+            res_order_header.unwrap_or(satcom_msg.order_header()),
+            msg_type,
+            res_order_revision,
         );
 
         self.satcom_tx.send(message).await;
@@ -116,187 +116,166 @@ impl BoardComputer {
     async fn update_voyage_status_and_respond(
         &mut self,
         new_status: VoyageStatus,
-        satcom_message: &SatComMessage,
-        message_type: SatComMessageType,
-        response_order_header: Option<VoyageOrderHeader>,
-        response_order_revision: Option<VoyageOrderBody>,
+        satcom_msg: &SatComMessage,
+        msg_type: SatComMessageType,
+        res_order_header: Option<VoyageOrderHeader>,
+        res_order_rev: Option<VoyageOrderBody>,
         log_msg: String,
     ) -> () {
         self.update_voyage_status(new_status);
 
-        self.respond(
-            satcom_message,
-            message_type,
-            response_order_header,
-            response_order_revision,
-        )
-        .await;
+        self.respond(satcom_msg, msg_type, res_order_header, res_order_rev)
+            .await;
 
         log(log_msg.cyan());
     }
 
-    async fn handle_offer(&mut self, satcom_message: &SatComMessage) -> () {
-        self.respond(
-            satcom_message,
-            SatComMessageType::Acknowledgement,
-            None,
-            None,
-        )
-        .await;
+    async fn handle_offer(&mut self, satcom_msg: &SatComMessage) -> () {
+        self.respond(satcom_msg, SatComMessageType::Acknowledgement, None, None)
+            .await;
 
         log(format!(
             "Offre d'ordre de voyage reçue (ID {}). Accusé de réception envoyé.",
-            satcom_message.order_header().id()
+            satcom_msg.order_header().id()
         )
         .cyan());
 
         if !self.has_voyage() {
-            let voyage_order: &VoyageOrder = &satcom_message.order().unwrap();
+            let voyage_order: &VoyageOrder = &satcom_msg.order().unwrap();
 
             self.adopt_voyage_order(voyage_order);
 
             self.update_voyage_status_and_respond(
                 VoyageStatus::RevisionAccepted,
-                satcom_message,
+                satcom_msg,
                 SatComMessageType::RevisionAcceptation,
                 None,
                 None,
                 format!(
                     "Ordre de voyage {} accepté.",
-                    satcom_message.order_header().id()
+                    satcom_msg.order_header().id()
                 ),
             )
             .await;
         } else {
-            self.respond(
-                satcom_message,
-                SatComMessageType::RevisionRefusal,
-                None,
-                None,
-            )
-            .await;
+            self.respond(satcom_msg, SatComMessageType::RevisionRefusal, None, None)
+                .await;
 
             log(format!(
                 "Ordre de voyage {} refusé (navire déjà en activité).",
-                satcom_message.order_header().id()
+                satcom_msg.order_header().id()
             )
             .cyan());
         }
     }
 
-    async fn handle_revision_request_acknowledgement(
-        &mut self,
-        satcom_message: &SatComMessage,
-    ) -> () {
+    async fn handle_rev_req_ack(&mut self, satcom_msg: &SatComMessage) -> () {
         self.voyage_order_revision
             .as_mut()
             .unwrap()
-            .set_version(*satcom_message.order_header().version());
+            .set_ver(*satcom_msg.order_header().version());
 
         self.update_voyage_status(VoyageStatus::UnderRevision);
 
         log(format!(
             "Demande de révision de l'ordre {} reçu par la capitainerie. Attente d'une réponse.",
-            satcom_message.order_header().id()
+            satcom_msg.order_header().id()
         )
         .cyan());
     }
 
-    async fn handle_initial_revision_acceptation_acknowledgement(
-        &mut self,
-        satcom_message: &SatComMessage,
-    ) -> () {
+    async fn handle_initial_rev_acceptation_ack(&mut self, satcom_msg: &SatComMessage) -> () {
         self.update_voyage_status_and_respond(
             VoyageStatus::InExecution,
-            satcom_message,
+            satcom_msg,
             SatComMessageType::ExecutingLastAgreedRevision,
             None,
             None,
             format!(
                 "Ordre de voyage {} en cours d'exécution.",
-                satcom_message.order_header().id()
+                satcom_msg.order_header().id()
             ),
         )
         .await;
     }
 
-    async fn handle_revision_acceptation(&mut self, satcom_message: &SatComMessage) -> () {
+    async fn handle_rev_acceptation(&mut self, satcom_msg: &SatComMessage) -> () {
         self.voyage_order_revision
             .as_mut()
             .unwrap()
-            .set_version(*satcom_message.order_header().version());
+            .set_ver(*satcom_msg.order_header().version());
 
         self.update_voyage_status_and_respond(
                 VoyageStatus::RevisionAccepted,
-                satcom_message,
+                satcom_msg,
                 SatComMessageType::RevisionAcceptation,
                 None,
                 None,
                 format!(
                     "Révision de l'ordre de voyage {} acceptée. Nouvelle version : n°{}. Exécution en cours.",
-                    satcom_message.order_header().id(), satcom_message.order_header().version()
+                    satcom_msg.order_header().id(), satcom_msg.order_header().version()
                 )
             )
             .await;
     }
 
-    async fn handle_revision_refusal(&mut self, satcom_message: &SatComMessage) -> () {
+    async fn handle_rev_refusal(&mut self, satcom_msg: &SatComMessage) -> () {
         self.update_voyage_status_and_respond(
                 VoyageStatus::RevisionRefused,
-                satcom_message,
+                satcom_msg,
                 SatComMessageType::RevisionRefusal,
                 None,
                 None,
                 format!(
                     "Révision de l'ordre de voyage {} refusée. Retour à la version n°{}. Exécution en cours.",
-                    satcom_message.order_header().id(), satcom_message.order_header().version()
+                    satcom_msg.order_header().id(), satcom_msg.order_header().version()
                 )
             )
             .await;
     }
 
-    async fn handle_revision_request(&mut self, satcom_message: &SatComMessage) -> () {
-        self.voyage_order_revision = Some(satcom_message.order().unwrap());
+    async fn handle_rev_request(&mut self, satcom_msg: &SatComMessage) -> () {
+        self.voyage_order_revision = Some(satcom_msg.order().unwrap());
 
         self.update_voyage_status_and_respond(
             VoyageStatus::UnderRevision,
-            satcom_message,
+            satcom_msg,
             SatComMessageType::Acknowledgement,
             None,
             None,
             format!(
                 "Demande de révision de l'ordre de voyage {} reçue. Traitement de la demande.",
-                satcom_message.order_header().id()
+                satcom_msg.order_header().id()
             ),
         )
         .await;
 
-        self.adopt_voyage_order_revision();
+        self.adopt_voyage_order_rev();
 
         self.update_voyage_status_and_respond(
                 VoyageStatus::RevisionAccepted,
-                satcom_message,
+                satcom_msg,
                 SatComMessageType::RevisionAcceptation,
                 None,
                 None,
                 format!(
                     "Révision de l'ordre de voyage {} acceptée. Nouvelle version : n°{}. Exécution en cours.",
-                    satcom_message.order_header().id(), satcom_message.order_header().version()
+                    satcom_msg.order_header().id(), satcom_msg.order_header().version()
                 )
             )
             .await;
     }
 
-    async fn handle_end_of_voyage(&mut self, satcom_message: &SatComMessage) -> () {
+    async fn handle_end_of_voyage(&mut self, satcom_msg: &SatComMessage) -> () {
         self.update_voyage_status_and_respond(
             VoyageStatus::Finished,
-            satcom_message,
+            satcom_msg,
             SatComMessageType::Acknowledgement,
             None,
             None,
             format!(
                 "Ordre de voyage {} achevé. Attente d'un nouvel ordre.",
-                satcom_message.order_header().id()
+                satcom_msg.order_header().id()
             ),
         )
         .await;
@@ -305,70 +284,65 @@ impl BoardComputer {
     pub async fn start(mut self) -> () {
         // ATTENTION : tout ce qui touche à la révision d'ordres de voyage en cours de route est très hasardeux, pour ne pas dire 0% fonctionnel.
         tokio::spawn(async move {
-            let my_mmsi: u32 = *self.boat_info.get_static_data().mmsi();
-            while let Some(satcom_message) = self.rx.recv().await {
-                if *satcom_message.target() != my_mmsi
-                    || *satcom_message.source() != HARBOURMASTER_MMSI
-                {
+            let self_mmsi: u32 = *self.boat_info.get_static_data().mmsi();
+            while let Some(satcom_msg) = self.rx.recv().await {
+                if *satcom_msg.target() != self_mmsi || *satcom_msg.source() != HARBOURMASTER_MMSI {
                     continue;
                 }
 
-                let concerns_current_voyage: bool = self.voyage.as_ref().map_or(false, |v| {
-                    v.order().header() == satcom_message.order_header()
-                });
+                let concerns_current_voyage: bool = self
+                    .voyage
+                    .as_ref()
+                    .map_or(false, |v| v.order().header() == satcom_msg.order_header());
 
-                let concerns_current_revision: bool = self
+                let concerns_current_rev: bool = self
                     .voyage_order_revision
                     .as_ref()
-                    .map_or(false, |rev| rev.header() == satcom_message.order_header());
+                    .map_or(false, |rev| rev.header() == satcom_msg.order_header());
 
-                match *satcom_message.message_type() {
+                match *satcom_msg.message_type() {
                     SatComMessageType::Offer => {
-                        self.handle_offer(&satcom_message).await;
+                        self.handle_offer(&satcom_msg).await;
                     }
                     SatComMessageType::Acknowledgement => {
                         if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
-                            && concerns_current_revision
+                            && concerns_current_rev
                         {
-                            self.handle_revision_request_acknowledgement(&satcom_message)
-                                .await;
+                            self.handle_rev_req_ack(&satcom_msg).await;
                         } else if self.matches_status(Some(VoyageStatus::RevisionAccepted))
                             && concerns_current_voyage
                         {
-                            self.handle_initial_revision_acceptation_acknowledgement(
-                                &satcom_message,
-                            )
-                            .await;
+                            self.handle_initial_rev_acceptation_ack(&satcom_msg).await;
                         }
                     }
                     SatComMessageType::RevisionAcceptation => {
                         if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
-                            && concerns_current_revision
+                            && concerns_current_rev
                         {
-                            self.handle_revision_acceptation(&satcom_message).await;
+                            self.handle_rev_acceptation(&satcom_msg).await;
                         }
                     }
                     SatComMessageType::RevisionRefusal => {
                         if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
-                            && concerns_current_revision
+                            && concerns_current_rev
                         {
-                            self.handle_revision_refusal(&satcom_message).await;
+                            self.handle_rev_refusal(&satcom_msg).await;
                         }
                     }
                     SatComMessageType::RevisionRequest => {
                         if (self.matches_status(Some(VoyageStatus::RevisionAccepted))
                             || self.matches_status(Some(VoyageStatus::RevisionRefused))
                             || self.matches_status(Some(VoyageStatus::InExecution)))
-                            && self.order_id() == *satcom_message.order_header().id()
+                            && self.order_id() == *satcom_msg.order_header().id()
                         {
-                            self.handle_revision_request(&satcom_message).await;
+                            self.handle_rev_request(&satcom_msg).await;
                         }
                     }
                     SatComMessageType::EndOfVoyage => {
                         if self.matches_status(Some(VoyageStatus::Completed))
                             && concerns_current_voyage
                         {
-                            self.handle_end_of_voyage(&satcom_message).await;
+                            self.handle_end_of_voyage(&satcom_msg).await;
                         }
                     }
                     _ => {}

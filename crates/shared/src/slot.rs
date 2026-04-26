@@ -9,7 +9,7 @@ pub struct Slot {
     #[getset(get = "pub")]
     channel: Channel,
     #[getset(get = "pub", set = "pub")]
-    assigned: bool,
+    is_assigned: bool,
     #[getset(get = "pub", set = "pub")]
     owner: Option<u32>,
     #[getset(get = "pub", set = "pub")]
@@ -19,11 +19,11 @@ pub struct Slot {
 }
 
 impl Slot {
-    pub fn init(number: u16) -> Self {
+    pub fn new(nbr: u16) -> Self {
         Self {
-            number: number,
-            channel: Slot::idx_to_channel(number).unwrap(),
-            assigned: false,
+            number: nbr,
+            channel: Slot::idx_to_channel(nbr).unwrap(),
+            is_assigned: false,
             owner: None,
             timeout: None,
             frames_since_last_use: -2,
@@ -40,15 +40,15 @@ impl Slot {
         }
     }
 
-    pub fn mark_as_used(&mut self) -> () {
+    pub fn flag_as_used(&mut self) -> () {
         self.frames_since_last_use = -1;
     }
 
-    pub fn book(&mut self, mmsi: u32, timeout: Option<u8>, assigned: bool) -> () {
+    pub fn book(&mut self, mmsi: u32, timeout: Option<u8>, is_assigned: bool) -> () {
         if self.owner.is_none() {
             self.owner = Some(mmsi);
             self.timeout = timeout;
-            self.assigned = assigned;
+            self.is_assigned = is_assigned;
             self.frames_since_last_use = 0;
         }
     }
@@ -56,12 +56,12 @@ impl Slot {
     pub fn release(&mut self) -> () {
         self.owner = None;
         self.timeout = None;
-        self.assigned = false;
+        self.is_assigned = false;
         self.frames_since_last_use = -2;
     }
 
     pub fn tick(&mut self) -> () {
-        self.mark_as_used();
+        self.flag_as_used();
 
         if self.timeout.unwrap() == 0 {
             self.release();

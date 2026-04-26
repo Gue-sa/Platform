@@ -27,8 +27,8 @@ pub struct Boat {
     gps: BoatGps,
     satcom: SatCom,
     board_computer: BoardComputer,
-    antenna_87_b: Antenna,
-    antenna_88_b: Antenna,
+    c87b_antenna: Antenna,
+    c88b_antenna: Antenna,
     gps_antenna: Antenna,
     satcom_antenna: Antenna,
     ui: Ui,
@@ -44,8 +44,8 @@ impl Boat {
         let (board_computer_tx, board_computer_rx) =
             channel::<SatComMessage>(Semaphore::MAX_PERMITS);
 
-        let (c_87_b_tx, c_87_b_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
-        let (c_88_b_tx, c_88_b_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
+        let (c87b_tx, c87b_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
+        let (c88b_tx, c88b_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
         let (c_gps_tx, c_gps_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
         let (c_satcom_tx, c_satcom_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
 
@@ -53,7 +53,7 @@ impl Boat {
             Some(ais_tx.clone()),
             None,
             None,
-            c_87_b_rx,
+            c87b_rx,
             C87B_REC_PORT,
             C87B_EM_PORT,
             Channel::C87B,
@@ -63,7 +63,7 @@ impl Boat {
             Some(ais_tx),
             None,
             None,
-            c_88_b_rx,
+            c88b_rx,
             C88B_REC_PORT,
             C88B_EM_PORT,
             Channel::C88B,
@@ -90,15 +90,15 @@ impl Boat {
         )
         .await;
 
-        let boat_info: Arc<BoatInfo> = Arc::new(BoatInfo::init(None, None, None));
-        let boats_registry: Arc<BoatsInfoRegistry> = Arc::new(BoatsInfoRegistry::init());
+        let boat_info: Arc<BoatInfo> = Arc::new(BoatInfo::new(None, None, None));
+        let boats_registry: Arc<BoatsInfoRegistry> = Arc::new(BoatsInfoRegistry::new());
 
         let system_state: Arc<SystemState> = Arc::new(SystemState::new());
 
         let ais: BoatAisRunner = BoatAisRunner::init(
             ais_rx,
-            c_87_b_tx,
-            c_88_b_tx,
+            c87b_tx,
+            c88b_tx,
             Arc::clone(&boat_info),
             boats_registry.clone(),
             system_state.clone(),
@@ -128,8 +128,8 @@ impl Boat {
 
         Self {
             system_state: system_state,
-            antenna_87_b: ant1,
-            antenna_88_b: ant2,
+            c87b_antenna: ant1,
+            c88b_antenna: ant2,
             gps_antenna: ant3,
             satcom_antenna: ant4,
             ais: ais,
@@ -141,8 +141,8 @@ impl Boat {
     }
 
     pub async fn start(self) -> () {
-        self.antenna_87_b.start().await;
-        self.antenna_88_b.start().await;
+        self.c87b_antenna.start().await;
+        self.c88b_antenna.start().await;
         self.gps_antenna.start().await;
         self.satcom_antenna.start().await;
         self.gps.start().await;

@@ -59,13 +59,13 @@ pub struct BoatInfo {
 }
 
 impl StaticData {
-    pub fn init(
+    pub fn new(
         mmsi: Option<u32>,
-        imo_number: Option<u32>,
+        imo_nbr: Option<u32>,
         call_sign: Option<String>,
         name: Option<String>,
         type_of_ship_and_cargo_type: Option<u8>,
-        position_accuracy: Option<u8>,
+        pos_accuracy: Option<u8>,
         ais_version: Option<u8>,
         type_of_epf_device: Option<u8>,
         a: Option<u16>,
@@ -75,11 +75,11 @@ impl StaticData {
     ) -> Self {
         Self {
             mmsi: mmsi.unwrap_or(0),
-            imo_number: imo_number.unwrap_or(0),
+            imo_number: imo_nbr.unwrap_or(0),
             call_sign: call_sign.unwrap_or("@@@@@@@".to_string()),
             name: name.unwrap_or("@@@@@@@@@@@@@@@@@@@@".to_string()),
             type_of_ship_and_cargo_type: type_of_ship_and_cargo_type.unwrap_or(0),
-            position_accuracy: position_accuracy.unwrap_or(0),
+            position_accuracy: pos_accuracy.unwrap_or(0),
             ais_version: ais_version.unwrap_or(0),
             type_of_epf_device: type_of_epf_device.unwrap_or(0),
             a: a.unwrap_or(0),
@@ -92,22 +92,22 @@ impl StaticData {
 }
 
 impl VoyageData {
-    pub fn init(
-        destination: Option<String>,
+    pub fn new(
+        dest: Option<String>,
         eta_month: Option<u8>,
         eta_day: Option<u8>,
         eta_hour: Option<u8>,
-        eta_minute: Option<u8>,
+        eta_min: Option<u8>,
         maximum_present_static_draught: Option<u8>,
         dte: Option<u8>,
         raim_flag: Option<u8>,
     ) -> Self {
         Self {
-            destination: destination.unwrap_or("@@@@@@@@@@@@@@@@@@@@".to_string()),
+            destination: dest.unwrap_or("@@@@@@@@@@@@@@@@@@@@".to_string()),
             eta_month: eta_month.unwrap_or(0),
             eta_day: eta_day.unwrap_or(0),
             eta_hour: eta_hour.unwrap_or(24),
-            eta_minute: eta_minute.unwrap_or(60),
+            eta_minute: eta_min.unwrap_or(60),
             maximum_present_static_draught: maximum_present_static_draught.unwrap_or(0),
             dte: dte.unwrap_or(1),
             raim_flag: raim_flag.unwrap_or(0),
@@ -116,23 +116,23 @@ impl VoyageData {
 }
 
 impl NavigationData {
-    pub fn init(
-        navigational_status: Option<u8>,
+    pub fn new(
+        nav_status: Option<u8>,
         time_stamp: Option<u8>,
         special_maneuvre_indicator: Option<u8>,
-        latitude: Option<u32>,
-        longitude: Option<u32>,
+        lat: Option<u32>,
+        lon: Option<u32>,
         course_over_ground: Option<u16>,
         speed_over_ground: Option<u16>,
         rate_of_turn: Option<i8>,
         true_heading: Option<u16>,
     ) -> Self {
         Self {
-            navigational_status: navigational_status.unwrap_or(15),
+            navigational_status: nav_status.unwrap_or(15),
             time_stamp: time_stamp.unwrap_or(63),
             special_maneuvre_indicator: special_maneuvre_indicator.unwrap_or(0),
-            latitude: latitude.unwrap_or(0),
-            longitude: longitude.unwrap_or(0),
+            latitude: lat.unwrap_or(0),
+            longitude: lon.unwrap_or(0),
             course_over_ground: course_over_ground.unwrap_or(3601),
             speed_over_ground: speed_over_ground.unwrap_or(1023),
             rate_of_turn: rate_of_turn.unwrap_or(-128),
@@ -142,19 +142,19 @@ impl NavigationData {
 }
 
 impl BoatInfo {
-    pub fn init(
+    pub fn new(
         static_data: Option<StaticData>,
         voyage_data: Option<VoyageData>,
         navigation_data: Option<NavigationData>,
     ) -> Self {
         Self {
-            static_data: RwLock::new(static_data.unwrap_or(StaticData::init(
+            static_data: RwLock::new(static_data.unwrap_or(StaticData::new(
                 None, None, None, None, None, None, None, None, None, None, None, None,
             ))),
-            voyage_data: RwLock::new(voyage_data.unwrap_or(VoyageData::init(
+            voyage_data: RwLock::new(voyage_data.unwrap_or(VoyageData::new(
                 None, None, None, None, None, None, None, None,
             ))),
-            navigation_data: RwLock::new(navigation_data.unwrap_or(NavigationData::init(
+            navigation_data: RwLock::new(navigation_data.unwrap_or(NavigationData::new(
                 None, None, None, None, None, None, None, None, None,
             ))),
         }
@@ -174,20 +174,20 @@ impl BoatInfo {
 
     pub fn update_status(
         &self,
-        navigational_status: Option<u8>,
+        nav_status: Option<u8>,
         time_stamp: Option<u8>,
         special_maneuvre_indicator: Option<u8>,
     ) -> () {
         let mut guard: RwLockWriteGuard<'_, NavigationData> = self.navigation_data.write().unwrap();
-        guard.navigational_status = navigational_status.unwrap_or(15);
+        guard.navigational_status = nav_status.unwrap_or(15);
         guard.time_stamp = time_stamp.unwrap_or(63);
         guard.special_maneuvre_indicator = special_maneuvre_indicator.unwrap_or(0);
     }
 
-    pub fn update_positon(&self, latitude: Option<u32>, longitude: Option<u32>) -> () {
+    pub fn update_positon(&self, lat: Option<u32>, lon: Option<u32>) -> () {
         let mut guard: RwLockWriteGuard<'_, NavigationData> = self.navigation_data.write().unwrap();
-        guard.latitude = latitude.unwrap_or(0);
-        guard.longitude = longitude.unwrap_or(0);
+        guard.latitude = lat.unwrap_or(0);
+        guard.longitude = lon.unwrap_or(0);
     }
 
     pub fn update_movement(
@@ -206,22 +206,22 @@ impl BoatInfo {
 
     pub fn update_voyage_data(
         &self,
-        destination: Option<String>,
+        dest: Option<String>,
         eta_month: Option<u8>,
         eta_day: Option<u8>,
         eta_hour: Option<u8>,
-        eta_minute: Option<u8>,
+        eta_min: Option<u8>,
     ) -> () {
         let mut guard: RwLockWriteGuard<'_, VoyageData> = self.voyage_data.write().unwrap();
-        guard.destination = destination.unwrap_or("@@@@@@@@@@@@@@@@@@@@".to_string());
+        guard.destination = dest.unwrap_or("@@@@@@@@@@@@@@@@@@@@".to_string());
         guard.eta_month = eta_month.unwrap_or(0);
         guard.eta_day = eta_day.unwrap_or(0);
         guard.eta_hour = eta_hour.unwrap_or(24);
-        guard.eta_minute = eta_minute.unwrap_or(60);
+        guard.eta_minute = eta_min.unwrap_or(60);
     }
 
-    pub fn get_as_bits(&self, field_name: &str, msg_type: u8) -> BitPacker {
-        match field_name {
+    pub fn to_bits(&self, field: &str, msg_type: u8) -> BitPacker {
+        match field {
             "mmsi" => BitPacker::from_int::<u32>(self.get_static_data().mmsi, Some(30)),
             "navigational_status" => {
                 BitPacker::from_int::<u8>(self.get_navigation_data().navigational_status, Some(4))

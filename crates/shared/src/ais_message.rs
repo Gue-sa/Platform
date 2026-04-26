@@ -16,7 +16,7 @@ use getset::{CloneGetters, Getters, Setters};
 #[derive(Clone, Debug, PartialEq, Getters, Setters)]
 #[getset(get = "pub")]
 pub struct CommunicationState {
-    cstype: CSType,
+    communication_state_type: CSType,
     sync_state: u8,
     slot_timeout: Option<u8>,
     slot_offset: Option<u16>,
@@ -65,11 +65,11 @@ impl CommunicationState {
         slot_nbr: Option<u16>,
         received_stations: Option<u16>,
         slot_increment: Option<u16>,
-        number_of_slots: Option<u8>,
+        nbr_of_slots: Option<u8>,
         keep_flag: Option<bool>,
     ) -> Self {
         CommunicationState {
-            cstype: if SOTDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
+            communication_state_type: if SOTDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
                 CSType::SOTDMA
             } else {
                 CSType::ITDMA
@@ -79,22 +79,22 @@ impl CommunicationState {
             slot_increment: slot_increment,
             slot_number: slot_nbr,
             slot_offset: slot_offset,
-            number_of_slots: number_of_slots,
+            number_of_slots: nbr_of_slots,
             received_stations: received_stations,
             keep_flag: keep_flag,
-            utc_hour: Some(get_current_datetime().hour() as u8),
-            utc_minute: Some(get_current_datetime().minute() as u8),
+            utc_hour: Some(get_current_dt().hour() as u8),
+            utc_minute: Some(get_current_dt().minute() as u8),
         }
     }
 
-    pub fn parse(communication_state: BitPacker, message_type: u8) -> AisMessageResult<Self> {
-        let mut cs: Self = Self {
-            cstype: if SOTDMA_CS_MSGS.binary_search(&message_type).is_ok() {
+    pub fn parse(com_state_bitpacker: BitPacker, msg_type: u8) -> AisMessageResult<Self> {
+        let mut com_state: Self = Self {
+            communication_state_type: if SOTDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
                 CSType::SOTDMA
             } else {
                 CSType::ITDMA
             },
-            sync_state: communication_state.extract_int(None, Some(1))?,
+            sync_state: com_state_bitpacker.extract_int(None, Some(1))?,
             slot_timeout: None,
             slot_offset: None,
             utc_hour: None,
@@ -106,45 +106,46 @@ impl CommunicationState {
             keep_flag: None,
         };
 
-        match message_type {
+        match msg_type {
             1 | 2 => {
-                let slot_timeout: u8 = communication_state.extract_int::<u8>(Some(2), Some(4))?;
-                let sub_message: BitPacker = communication_state.slice(Some(5), None)?;
+                let slot_timeout: u8 = com_state_bitpacker.extract_int::<u8>(Some(2), Some(4))?;
+                let sub_msg: BitPacker = com_state_bitpacker.slice(Some(5), None)?;
 
-                cs.slot_timeout = Some(slot_timeout);
+                com_state.slot_timeout = Some(slot_timeout);
 
                 match slot_timeout {
                     0 => {
-                        cs.slot_offset = Some(sub_message.extract_int::<u16>(None, None)?);
+                        com_state.slot_offset = Some(sub_msg.extract_int::<u16>(None, None)?);
                     }
                     1 => {
-                        cs.utc_hour = Some(sub_message.extract_int::<u8>(None, Some(7))?);
-                        cs.utc_minute = Some(sub_message.extract_int::<u8>(Some(8), None)?);
+                        com_state.utc_hour = Some(sub_msg.extract_int::<u8>(None, Some(7))?);
+                        com_state.utc_minute = Some(sub_msg.extract_int::<u8>(Some(8), None)?);
                     }
                     2 | 4 | 6 => {
-                        cs.slot_number = Some(sub_message.extract_int::<u16>(None, None)?);
+                        com_state.slot_number = Some(sub_msg.extract_int::<u16>(None, None)?);
                     }
                     3 | 5 | 7 => {
-                        cs.received_stations = Some(sub_message.extract_int::<u16>(None, None)?);
+                        com_state.received_stations = Some(sub_msg.extract_int::<u16>(None, None)?);
                     }
                     _ => return Err(AisMessageError::UnkownSotdmaTimeout),
                 }
             }
             3 => {
-                cs.slot_increment =
-                    Some(communication_state.extract_int::<u16>(Some(2), Some(14))?);
-                cs.number_of_slots =
-                    Some(communication_state.extract_int::<u8>(Some(15), Some(17))?);
-                cs.keep_flag = if communication_state.extract_int::<u8>(Some(18), Some(18))? == 1 {
-                    Some(true)
-                } else {
-                    Some(false)
-                };
+                com_state.slot_increment =
+                    Some(com_state_bitpacker.extract_int::<u16>(Some(2), Some(14))?);
+                com_state.number_of_slots =
+                    Some(com_state_bitpacker.extract_int::<u8>(Some(15), Some(17))?);
+                com_state.keep_flag =
+                    if com_state_bitpacker.extract_int::<u8>(Some(18), Some(18))? == 1 {
+                        Some(true)
+                    } else {
+                        Some(false)
+                    };
             }
             _ => return Err(AisMessageError::UnknownMessageType),
         }
 
-        Ok(cs)
+        Ok(com_state)
     }
 
     fn build_sub_message(&self) -> BitPacker {
@@ -160,15 +161,15 @@ impl CommunicationState {
             BitPacker::from_int(self.slot_number.unwrap(), Some(14))
         } else if self.slot_timeout.unwrap() == 1 {
             BitPacker::from_int(0, Some(3))
-                + BitPacker::from_int(get_current_datetime().hour(), Some(5))
-                + BitPacker::from_int(get_current_datetime().minute(), Some(6))
+                + BitPacker::from_int(get_current_dt().hour(), Some(5))
+                + BitPacker::from_int(get_current_dt().minute(), Some(6))
         } else {
             BitPacker::from_int(self.slot_offset.unwrap(), Some(14))
         }
     }
 
     pub fn build(&self) -> BitPacker {
-        match self.cstype {
+        match self.communication_state_type {
             CSType::SOTDMA => {
                 self.build_sub_message()
                     + BitPacker::from_int(self.slot_timeout.unwrap(), Some(3))
@@ -194,15 +195,15 @@ impl AisMessage {
     ) -> AisMessageResult<(u8, BitPacker, Option<CommunicationState>, u16, BoatInfo)> {
         let msg_type: u8 = msg.extract_int::<u8>(Some(40), Some(45))?;
 
-        let mut static_data: StaticData = StaticData::init(
+        let mut static_data: StaticData = StaticData::new(
             None, None, None, None, None, None, None, None, None, None, None, None,
         );
 
         let mut voyage_data: VoyageData =
-            VoyageData::init(None, None, None, None, None, None, None, None);
+            VoyageData::new(None, None, None, None, None, None, None, None);
 
         let mut navigation_data: NavigationData =
-            NavigationData::init(None, None, None, None, None, None, None, None, None);
+            NavigationData::new(None, None, None, None, None, None, None, None, None);
 
         match msg_type {
             1 | 2 | 3 => {
@@ -236,7 +237,7 @@ impl AisMessage {
                         .set_true_heading(data.extract_int::<u16>(Some(120), Some(128))?);
 
                     let boat_info: BoatInfo =
-                        BoatInfo::init(Some(static_data), Some(voyage_data), Some(navigation_data));
+                        BoatInfo::new(Some(static_data), Some(voyage_data), Some(navigation_data));
 
                     Ok((
                         msg_type,
@@ -282,7 +283,7 @@ impl AisMessage {
                     voyage_data.set_dte(data.extract_int::<u8>(Some(414), Some(414))?);
 
                     let boat_info: BoatInfo =
-                        BoatInfo::init(Some(static_data), Some(voyage_data), None);
+                        BoatInfo::new(Some(static_data), Some(voyage_data), None);
 
                     Ok((msg_type, data, None, msg_crc, boat_info))
                 } else {
@@ -318,7 +319,8 @@ impl AisMessage {
     ) -> Self {
         let data: BitPacker = AisMessage::build_data_bytes(&boat_info, message_type);
         let crc: u16 = AisMessage::compute_crc(
-            AisMessage::build_payload(message_type, data.clone(), communication_state.clone()).bits(),
+            AisMessage::build_payload(message_type, data.clone(), communication_state.clone())
+                .bits(),
         )
         .unwrap();
 
@@ -343,12 +345,12 @@ impl AisMessage {
         match msg_type {
             1 | 2 | 3 => {
                 for field in MSG123_FIELDS {
-                    data_vec = boat_info.get_as_bits(field, msg_type) + data_vec;
+                    data_vec = boat_info.to_bits(field, msg_type) + data_vec;
                 }
             }
             5 => {
                 for field in MSG5_FIELDS {
-                    data_vec = boat_info.get_as_bits(field, msg_type) + data_vec;
+                    data_vec = boat_info.to_bits(field, msg_type) + data_vec;
                 }
             }
             _ => {}

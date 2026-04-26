@@ -27,8 +27,8 @@ pub struct Voyage {
 }
 
 impl VoyageSegment {
-    pub fn new(nav_status: u8, start_p: (u16, u16), end_p: (u16, u16), target_speed: u16) -> Self {
-        let distance: u16 = ((start_p.0 as f64 - end_p.0 as f64).powf(2.)
+    pub fn new(nav_status: u8, start_p: (u16, u16), end_p: (u16, u16), trgt_speed: u16) -> Self {
+        let dist: u16 = ((start_p.0 as f64 - end_p.0 as f64).powf(2.)
             + (start_p.1 as f64 - end_p.1 as f64).powf(2.))
         .sqrt()
         .round() as u16;
@@ -43,7 +43,7 @@ impl VoyageSegment {
             navigational_status: nav_status,
             start_point: start_p,
             end_point: end_p,
-            distance: distance,
+            distance: dist,
             //target_speed: target_speed,
             heading: heading,
             //minutes_duration: minutes_duration
@@ -52,9 +52,13 @@ impl VoyageSegment {
 }
 
 impl Voyage {
-    pub fn from(voyage_order: VoyageOrder, current_position: (u16, u16)) -> Self {
-        let segment: VoyageSegment =
-            VoyageSegment::new(0, current_position, *voyage_order.body().destination_position(), 0);
+    pub fn from(voyage_order: VoyageOrder, current_pos: (u16, u16)) -> Self {
+        let segment: VoyageSegment = VoyageSegment::new(
+            0,
+            current_pos,
+            *voyage_order.body().destination_position(),
+            0,
+        );
 
         Self {
             order: voyage_order,

@@ -66,8 +66,8 @@ impl Ui {
                 let mmsi: u32 = *static_data.mmsi();
                 let imo: u32 = *static_data.imo_number();
                 let boat_type: u8 = *static_data.type_of_ship_and_cargo_type();
-                let longitude: u32 = *nav_data.longitude();
-                let latitude: u32 = *nav_data.latitude();
+                let lon: u32 = *nav_data.longitude();
+                let lat: u32 = *nav_data.latitude();
                 let heading: u16 = *nav_data.true_heading();
                 let speed: u16 = *nav_data.speed_over_ground();
                 let turn_rate: i8 = *nav_data.rate_of_turn();
@@ -75,7 +75,7 @@ impl Ui {
                 let eta_month: u8 = *voyage_data.eta_month();
                 let eta_day: u8 = *voyage_data.eta_day();
                 let eta_hour: u8 = *voyage_data.eta_hour();
-                let eta_minute: u8 = *voyage_data.eta_minute();
+                let eta_min: u8 = *voyage_data.eta_minute();
 
                 let ui_weak: Weak<AppWindow> = ui_handle_clone.clone();
 
@@ -88,8 +88,8 @@ impl Ui {
                         boat_data.set_boat_mmsi(mmsi as i32);
                         boat_data.set_boat_imo(imo as i32);
                         boat_data.set_boat_type(boat_type as i32);
-                        boat_data.set_boat_longitude(longitude as i32);
-                        boat_data.set_boat_latitude(latitude as i32);
+                        boat_data.set_boat_longitude(lon as i32);
+                        boat_data.set_boat_latitude(lat as i32);
                         boat_data.set_boat_heading(heading as i32);
                         boat_data.set_boat_speed(speed as i32);
                         boat_data.set_boat_turn_rate(turn_rate as i32);
@@ -97,7 +97,7 @@ impl Ui {
                         boat_data.set_boat_eta_month(eta_month as i32);
                         boat_data.set_boat_eta_day(eta_day as i32);
                         boat_data.set_boat_eta_hour(eta_hour as i32);
-                        boat_data.set_boat_eta_minute(eta_minute as i32);
+                        boat_data.set_boat_eta_minute(eta_min as i32);
 
                         boat_data.set_log_msgs(logs);
                     }

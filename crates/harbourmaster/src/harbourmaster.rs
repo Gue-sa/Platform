@@ -1,12 +1,9 @@
-use std::sync::{Arc, Mutex};
-
 use crate::{
     database_manager::{database_api::DatabaseApi, manager::DatabaseManager},
     fms::Fms,
     harbourmaster_ais::HarbourmasterAisRunner,
     harbourmaster_gps::HarbourmasterGps,
 };
-
 use shared::{
     antenna::Antenna,
     bitpacker::BitPacker,
@@ -21,6 +18,7 @@ use shared::{
     satcom::SatCom,
     satcom_message::SatComMessage,
 };
+use std::sync::{Arc, Mutex};
 use tokio::sync::{Semaphore, mpsc::channel};
 
 pub struct Harbourmaster {
@@ -93,8 +91,7 @@ impl Harbourmaster {
         let db_manager: Arc<Mutex<DatabaseManager>> =
             Arc::new(Mutex::new(DatabaseManager::init().unwrap()));
 
-        let ais: HarbourmasterAisRunner =
-            HarbourmasterAisRunner::init(ais_rx, boats_reg.clone());
+        let ais: HarbourmasterAisRunner = HarbourmasterAisRunner::init(ais_rx, boats_reg.clone());
         let gps: HarbourmasterGps = HarbourmasterGps::init(gps_rx, c_gps_tx).await;
         let satcom: SatCom = SatCom::new(reader_satcom_rx, sender_satcom_rx, c_satcom_tx, fms_tx);
         let fms = Fms::new(

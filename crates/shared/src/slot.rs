@@ -1,5 +1,4 @@
 use crate::common::{constants::SLOTS_PER_MINUTE, types::Channel};
-
 use getset::{Getters, Setters};
 
 #[derive(Debug, Getters, Setters)]

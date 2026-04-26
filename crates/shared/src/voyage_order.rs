@@ -1,8 +1,6 @@
-use serde::Serialize;
-
 use crate::{bitpacker::BitPacker, common::types::VoyageOrderResult};
-
 use getset::{Getters, Setters};
+use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Getters, Setters)]
 pub struct VoyageOrderHeader {
@@ -69,22 +67,22 @@ impl VoyageOrderBody {
     }
 
     pub fn from_data(
-        destination: String,
-        destination_pos: (u16, u16),
+        dest: String,
+        dest_pos: (u16, u16),
         eta_month: u8,
         eta_day: u8,
         eta_hour: u8,
-        eta_minute: u8,
+        eta_min: u8,
         cargo_type: u8,
         speed_profile: u8,
     ) -> Self {
         Self {
-            destination: destination,
-            destination_position: destination_pos,
+            destination: dest,
+            destination_position: dest_pos,
             eta_month: eta_month,
             eta_day: eta_day,
             eta_hour: eta_hour,
-            eta_minute: eta_minute,
+            eta_minute: eta_min,
             cargo_type: cargo_type,
             speed_profile: speed_profile,
         }
@@ -136,7 +134,7 @@ impl VoyageOrder {
         self.header.id == order2.header.id && self.header.version > order2.header.version
     }
 
-    pub fn set_ver(&mut self, version: u8) -> () {
-        self.header.set_version(version);
+    pub fn set_ver(&mut self, ver: u8) -> () {
+        self.header.set_version(ver);
     }
 }

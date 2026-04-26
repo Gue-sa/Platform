@@ -1,6 +1,3 @@
-use chrono::Timelike;
-use crc::{CRC_16_IBM_SDLC, Crc};
-
 use crate::{
     bitpacker::BitPacker,
     boat_info::{BoatInfo, NavigationData, StaticData, VoyageData},
@@ -10,7 +7,8 @@ use crate::{
         utils::*,
     },
 };
-
+use chrono::Timelike;
+use crc::{CRC_16_IBM_SDLC, Crc};
 use getset::{CloneGetters, Getters, Setters};
 
 #[derive(Clone, Debug, PartialEq, Getters, Setters)]

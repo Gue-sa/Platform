@@ -1,9 +1,7 @@
-use std::sync::{Arc, RwLock};
-
-use colored::Colorize;
-use tokio::sync::Notify;
-
 use crate::common::utils::log;
+use colored::Colorize;
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use tokio::sync::Notify;
 
 pub struct SystemState {
     ais_emission_on: RwLock<bool>,
@@ -39,8 +37,7 @@ impl SystemState {
     }
 
     pub fn stop_ais_emission(&self) -> () {
-        let mut guard: std::sync::RwLockWriteGuard<'_, bool> =
-            self.ais_emission_on.write().unwrap();
+        let mut guard: RwLockWriteGuard<'_, bool> = self.ais_emission_on.write().unwrap();
         if *guard {
             *guard = false;
         }
@@ -48,8 +45,7 @@ impl SystemState {
     }
 
     pub fn start_ais_emission(&self) -> () {
-        let mut guard: std::sync::RwLockWriteGuard<'_, bool> =
-            self.ais_emission_on.write().unwrap();
+        let mut guard: RwLockWriteGuard<'_, bool> = self.ais_emission_on.write().unwrap();
         if !*guard {
             *guard = true;
         }
@@ -57,7 +53,7 @@ impl SystemState {
     }
 
     pub fn stop_gps(&self) -> () {
-        let mut guard: std::sync::RwLockWriteGuard<'_, bool> = self.gps_on.write().unwrap();
+        let mut guard: RwLockWriteGuard<'_, bool> = self.gps_on.write().unwrap();
         if *guard {
             *guard = false;
         }
@@ -65,8 +61,7 @@ impl SystemState {
     }
 
     pub fn start_gps(&self) -> () {
-        let mut guard: std::sync::RwLockWriteGuard<'_, bool> =
-            self.ais_emission_on.write().unwrap();
+        let mut guard: RwLockWriteGuard<'_, bool> = self.ais_emission_on.write().unwrap();
         if !*guard {
             *guard = true;
         }
@@ -74,7 +69,7 @@ impl SystemState {
     }
 
     pub fn start_navigation(&self) -> () {
-        let mut guard: std::sync::RwLockWriteGuard<'_, bool> = self.can_navigate.write().unwrap();
+        let mut guard: RwLockWriteGuard<'_, bool> = self.can_navigate.write().unwrap();
         if *guard {
             *guard = false;
         }
@@ -82,7 +77,7 @@ impl SystemState {
     }
 
     pub fn stop_navigation(&self) -> () {
-        let mut guard: std::sync::RwLockWriteGuard<'_, bool> = self.can_navigate.write().unwrap();
+        let mut guard: RwLockWriteGuard<'_, bool> = self.can_navigate.write().unwrap();
         if !*guard {
             *guard = true;
         }

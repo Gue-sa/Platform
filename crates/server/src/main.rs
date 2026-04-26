@@ -1,5 +1,4 @@
-use std::thread::park;
-
+use crate::radio_frequency::RadioFrequency;
 use shared::common::{
     constants::{
         C87B_EM_PORT, C87B_REC_PORT, C88B_EM_PORT, C88B_REC_PORT, GPS_EM_PORT, GPS_REC_PORT,
@@ -7,8 +6,7 @@ use shared::common::{
     },
     types::Channel,
 };
-
-use crate::radio_frequency::RadioFrequency;
+use std::thread::park;
 
 mod clients_registry;
 mod common;

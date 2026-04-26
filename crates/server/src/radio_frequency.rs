@@ -1,14 +1,11 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
+use crate::{clients_registry::ClientsRegistry, common::constants::HARBOURMASTER_IPADDR};
 use dashmap::DashSet;
-
 use shared::{
     bitpacker::BitPacker,
     common::{constants::GPS_EM_PORT, types::Channel},
 };
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::net::UdpSocket;
-
-use crate::{clients_registry::ClientsRegistry, common::constants::HARBOURMASTER_IPADDR};
 
 pub struct RadioFrequency {
     channel: Channel,

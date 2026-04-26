@@ -1,5 +1,5 @@
-use std::sync::Arc;
-
+use crate::{common::utils::log, voyage::Voyage};
+use colored::*;
 use shared::{
     boat_info::BoatInfo,
     boats_registry::BoatsInfoRegistry,
@@ -10,11 +10,8 @@ use shared::{
     satcom_message::SatComMessage,
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
+use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
-
-use colored::*;
-
-use crate::{common::utils::log, voyage::Voyage};
 
 pub struct BoardComputer {
     boat_info: Arc<BoatInfo>,

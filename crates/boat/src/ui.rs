@@ -1,11 +1,9 @@
-use std::{fs::File, io::BufReader, rc::Rc, sync::Arc};
-
+use crate::common::utils::log;
 use colored::*;
 use rev_lines::RevLines;
 use shared::boat_info::{BoatInfo, NavigationData, StaticData, VoyageData};
 use slint::{ModelRc, SharedString, ToSharedString, VecModel, Weak};
-
-use crate::common::utils::log;
+use std::{fs::File, io::BufReader, rc::Rc, sync::Arc};
 
 slint::include_modules!();
 

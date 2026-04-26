@@ -1,5 +1,7 @@
-use std::sync::Arc;
-
+use crate::{
+    board_computer::BoardComputer, boat_ais::BoatAisRunner, boat_gps::BoatGps,
+    systemstate::SystemState, ui::Ui, voyage::Voyage,
+};
 use shared::{
     antenna::Antenna,
     bitpacker::BitPacker,
@@ -15,12 +17,8 @@ use shared::{
     satcom::SatCom,
     satcom_message::SatComMessage,
 };
-use tokio::sync::{Semaphore, mpsc::*};
-
-use crate::{
-    board_computer::BoardComputer, boat_ais::BoatAisRunner, boat_gps::BoatGps,
-    systemstate::SystemState, ui::Ui, voyage::Voyage,
-};
+use std::sync::Arc;
+use tokio::sync::{Semaphore, mpsc::channel};
 
 pub struct Boat {
     ais: BoatAisRunner,

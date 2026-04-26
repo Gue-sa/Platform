@@ -1,10 +1,7 @@
-use std::sync::{RwLock, RwLockWriteGuard};
-
 use crate::bitpacker::BitPacker;
-
-use serde::Serialize;
-
 use getset::{Getters, Setters};
+use serde::Serialize;
+use std::sync::{RwLock, RwLockWriteGuard};
 
 #[derive(Debug, Clone, Serialize, Getters, Setters, PartialEq)]
 #[getset(get = "pub", set = "pub")]

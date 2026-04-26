@@ -1,9 +1,10 @@
-use std::{net::Ipv4Addr, sync::Arc, u32};
-
-use shared::{bitpacker::BitPacker, boat_info::BoatInfo};
-use tokio::{sync::mpsc::*, time::Duration};
-
 use crate::{common::constants::BOAT_IPV4, systemstate::SystemState};
+use shared::{bitpacker::BitPacker, boat_info::BoatInfo};
+use std::{net::Ipv4Addr, sync::Arc, u32};
+use tokio::{
+    sync::mpsc::{Receiver, Sender},
+    time::{Duration, Interval, interval},
+};
 
 pub struct BoatGps {
     boat_info: Arc<BoatInfo>,
@@ -28,7 +29,7 @@ impl BoatGps {
     }
 
     async fn run_gps(&mut self) -> () {
-        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        let mut interval: Interval = interval(Duration::from_secs(1));
 
         loop {
             tokio::select! {

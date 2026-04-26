@@ -1,8 +1,7 @@
+use crate::database_manager::schema::{DESTINATIONS, ORDER_VERSIONS, VOYAGE_ORDERS};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::Serialize;
-
-use crate::database_manager::schema::{DESTINATIONS, ORDER_VERSIONS, VOYAGE_ORDERS};
 
 #[derive(Queryable, Selectable, Serialize)]
 #[diesel(table_name = DESTINATIONS)]

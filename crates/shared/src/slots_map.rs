@@ -1,14 +1,3 @@
-use std::{
-    array,
-    sync::{Arc, RwLock},
-    time::{SystemTime, UNIX_EPOCH},
-};
-
-use getset::MutGetters;
-use tokio::time::{Duration, Instant, interval_at};
-
-use rand::seq::IndexedRandom;
-
 use crate::{
     common::{
         constants::SLOTS_PER_MINUTE,
@@ -17,6 +6,14 @@ use crate::{
     },
     slot::Slot,
 };
+use getset::MutGetters;
+use rand::seq::IndexedRandom;
+use std::{
+    array,
+    sync::{Arc, RwLock},
+    time::{SystemTime, UNIX_EPOCH},
+};
+use tokio::time::{Duration, Instant, interval_at};
 
 #[derive(Debug, Clone, MutGetters)]
 pub struct SlotsMap {

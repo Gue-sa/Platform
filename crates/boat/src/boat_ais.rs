@@ -1,8 +1,6 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicI64, AtomicU8, AtomicU16, AtomicU32, AtomicU64, Ordering::Relaxed},
-};
-
+use crate::{common::utils::log, systemstate::SystemState};
+use colored::*;
+use rand::{RngExt, seq::IndexedRandom};
 use shared::{
     ais_message::{AisMessage, CommunicationState},
     bitpacker::BitPacker,
@@ -18,15 +16,17 @@ use shared::{
     impl_arc_access, impl_atomic_access,
     slots_map::SlotsMap,
 };
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicI64, AtomicU8, AtomicU16, AtomicU32, AtomicU64, Ordering::Relaxed},
+    },
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tokio::{
     sync::{Mutex, Notify, mpsc::*},
-    time::Duration,
+    time::{Duration, sleep},
 };
-
-use colored::*;
-use rand::{RngExt, seq::IndexedRandom};
-
-use crate::{common::utils::*, systemstate::SystemState};
 
 pub struct BoatAisState {
     c_87_b_tx: Sender<BitPacker>,
@@ -153,9 +153,7 @@ impl BoatAisRunner {
         log("Horloge SOTDMA lancée.".yellow());
 
         loop {
-            let now: Duration = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap();
+            let now: Duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
             let total_ns: u64 = now.as_nanos() as u64;
 
@@ -166,7 +164,7 @@ impl BoatAisRunner {
 
             let delay_ns: u64 = next_slot_start_ns.saturating_sub(total_ns);
 
-            tokio::time::sleep(Duration::from_nanos(delay_ns)).await;
+            sleep(Duration::from_nanos(delay_ns)).await;
 
             self.state.clock_pulse.notify_waiters();
         }
@@ -197,7 +195,8 @@ impl BoatAisRunner {
                 }
 
                 if [1, 2].binary_search(msg.message_type()).is_ok() {
-                    let com_state_timeout: u8 = msg.communication_state().unwrap().slot_timeout().unwrap();
+                    let com_state_timeout: u8 =
+                        msg.communication_state().unwrap().slot_timeout().unwrap();
 
                     if t_si_owner.is_none() && com_state_timeout > 0 {
                         slots_map.book_slot(t_si, boat_mmsi, Some(com_state_timeout), None);
@@ -604,7 +603,7 @@ impl BoatAisRunner {
     async fn sotdma(self: Arc<Self>) -> AisResult<()> {
         log("Initialisation du SOTDMA...".yellow());
 
-        tokio::time::sleep(Duration::from_secs(0)).await;
+        sleep(Duration::from_secs(0)).await;
 
         log("Initialisation du SOTMA terminée.".yellow());
 
@@ -658,44 +657,40 @@ impl BoatAisRunner {
 
             if let Some(pck) = pck_opt {
                 match pck.channel {
-                    Channel::C87B => {
-                        match self.handle_transmission(pck.message, Channel::C87B) {
-                            Ok(msg) => {
-                                log(format!(
-                                    "Message {} reçu du navire {} : {:#?}.",
-                                    msg.message_type(),
-                                    *msg.boat_info().get_static_data().mmsi(),
-                                    msg.boat_info()
-                                )
-                                .blue());
-                            }
-                            Err(e) => match e {
-                                AisError::SelfEmittedMessage => {}
-                                _ => {
-                                    log("Message corrompu reçu et ignoré.".red());
-                                }
-                            },
+                    Channel::C87B => match self.handle_transmission(pck.message, Channel::C87B) {
+                        Ok(msg) => {
+                            log(format!(
+                                "Message {} reçu du navire {} : {:#?}.",
+                                msg.message_type(),
+                                *msg.boat_info().get_static_data().mmsi(),
+                                msg.boat_info()
+                            )
+                            .blue());
                         }
-                    }
-                    Channel::C88B => {
-                        match self.handle_transmission(pck.message, Channel::C88B) {
-                            Ok(msg) => {
-                                log(format!(
-                                    "Message {} reçu du navire {} : {:#?}.",
-                                    *msg.message_type(),
-                                    *msg.boat_info().get_static_data().mmsi(),
-                                    msg.boat_info()
-                                )
-                                .blue());
+                        Err(e) => match e {
+                            AisError::SelfEmittedMessage => {}
+                            _ => {
+                                log("Message corrompu reçu et ignoré.".red());
                             }
-                            Err(e) => match e {
-                                AisError::SelfEmittedMessage => {}
-                                _ => {
-                                    log("Message corrompu reçu et ignoré.".red());
-                                }
-                            },
+                        },
+                    },
+                    Channel::C88B => match self.handle_transmission(pck.message, Channel::C88B) {
+                        Ok(msg) => {
+                            log(format!(
+                                "Message {} reçu du navire {} : {:#?}.",
+                                *msg.message_type(),
+                                *msg.boat_info().get_static_data().mmsi(),
+                                msg.boat_info()
+                            )
+                            .blue());
                         }
-                    }
+                        Err(e) => match e {
+                            AisError::SelfEmittedMessage => {}
+                            _ => {
+                                log("Message corrompu reçu et ignoré.".red());
+                            }
+                        },
+                    },
                     _ => todo!(),
                 }
             }

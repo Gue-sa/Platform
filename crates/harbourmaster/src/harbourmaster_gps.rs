@@ -1,20 +1,26 @@
-use std::sync::{Arc, atomic::AtomicU32};
-
-use shared::bitpacker::BitPacker;
-use tokio::sync::{
-    Mutex, Semaphore,
-    mpsc::{Receiver, Sender, channel},
-};
-
 use opencv::{
-    core::{self, Scalar},
+    core::{self, Moments, Point_, Scalar, Vector},
     highgui,
-    imgproc::{self, INTER_CUBIC},
+    imgproc::{
+        CHAIN_APPROX_SIMPLE, COLOR_BGR2HSV, FONT_HERSHEY_SIMPLEX, LINE_8, MORPH_CLOSE, MORPH_RECT,
+        RETR_EXTERNAL, approx_poly_dp, arc_length, bounding_rect, contour_area, cvt_color,
+        find_contours, get_structuring_element, is_contour_convex, moments, morphology_ex,
+        put_text, rectangle,
+    },
     prelude::*,
     videoio::{
-        self, CAP_ANY, CAP_PROP_BUFFERSIZE, CAP_PROP_EXPOSURE, CAP_PROP_FRAME_HEIGHT,
-        CAP_PROP_FRAME_WIDTH, CAP_V4L, CAP_V4L2, VideoCapture,
+        CAP_PROP_BUFFERSIZE, CAP_PROP_FOURCC, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH,
+        CAP_V4L2, VideoCapture, VideoWriter,
     },
+};
+use shared::bitpacker::BitPacker;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU32, Ordering},
+};
+use tokio::sync::{
+    Mutex, MutexGuard, Semaphore,
+    mpsc::{Receiver, Sender, channel},
 };
 
 pub struct HarbourmasterGps {
@@ -42,26 +48,24 @@ impl HarbourmasterGps {
 
     fn coordinates(&self) -> [u32; 2] {
         [
-            self.latitude.load(std::sync::atomic::Ordering::Relaxed),
-            self.longitude.load(std::sync::atomic::Ordering::Relaxed),
+            self.latitude.load(Ordering::Relaxed),
+            self.longitude.load(Ordering::Relaxed),
         ]
     }
 
     fn set_coordinates(&self, lat: u32, lon: u32) {
-        self.latitude
-            .store(lat, std::sync::atomic::Ordering::Relaxed);
-        self.longitude
-            .store(lon, std::sync::atomic::Ordering::Relaxed);
+        self.latitude.store(lat, Ordering::Relaxed);
+        self.longitude.store(lon, Ordering::Relaxed);
     }
 
     async fn run_detect_and_send(&self) -> () {
         let mut cam = VideoCapture::new(4, CAP_V4L2).unwrap();
 
-        let fourcc = videoio::VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
-        cam.set(videoio::CAP_PROP_FOURCC, fourcc as f64).unwrap();
+        let fourcc = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
+        cam.set(CAP_PROP_FOURCC, fourcc as f64).unwrap();
 
-        cam.set(videoio::CAP_PROP_FRAME_WIDTH, 1920.).unwrap();
-        cam.set(videoio::CAP_PROP_FRAME_HEIGHT, 1080.).unwrap();
+        cam.set(CAP_PROP_FRAME_WIDTH, 1920.).unwrap();
+        cam.set(CAP_PROP_FRAME_HEIGHT, 1080.).unwrap();
 
         cam.set(CAP_PROP_BUFFERSIZE, 1.);
 
@@ -83,14 +87,11 @@ impl HarbourmasterGps {
         let mut contours: core::Vector<core::Vector<core::Point_<i32>>> =
             core::Vector::<core::Vector<core::Point>>::new();
 
-        let kernel: Mat = imgproc::get_structuring_element(
-            imgproc::MORPH_RECT,
-            core::Size::new(5, 5),
-            core::Point::new(-1, -1),
-        )
-        .unwrap();
+        let kernel: Mat =
+            get_structuring_element(MORPH_RECT, core::Size::new(5, 5), core::Point::new(-1, -1))
+                .unwrap();
 
-        let mut approx: core::Vector<core::Point_<i32>> = core::Vector::<core::Point>::new();
+        let mut approx: Vector<Point_<i32>> = Vector::<core::Point>::new();
 
         loop {
             cam.read(&mut frame).unwrap();
@@ -100,10 +101,10 @@ impl HarbourmasterGps {
 
             core::flip(&frame, &mut flipped_frame, 1).unwrap();
 
-            imgproc::cvt_color(
+            cvt_color(
                 &flipped_frame,
                 &mut hsv,
-                imgproc::COLOR_BGR2HSV,
+                COLOR_BGR2HSV,
                 0,
                 core::AlgorithmHint::ALGO_HINT_DEFAULT,
             )
@@ -130,10 +131,10 @@ impl HarbourmasterGps {
             //core::add(&mask1, &mask2, &mut combined_mask, &core::no_array(), -1).unwrap();
 
             // Nettoyage morphologique pour boucher les trous dus aux reflets
-            imgproc::morphology_ex(
+            morphology_ex(
                 &mask,
                 &mut processed_mask,
-                imgproc::MORPH_CLOSE,
+                MORPH_CLOSE,
                 &kernel,
                 core::Point::new(-1, -1),
                 1,
@@ -142,28 +143,28 @@ impl HarbourmasterGps {
             )
             .unwrap();
 
-            imgproc::find_contours(
+            find_contours(
                 &processed_mask,
                 &mut contours,
-                imgproc::RETR_EXTERNAL,
-                imgproc::CHAIN_APPROX_SIMPLE,
+                RETR_EXTERNAL,
+                CHAIN_APPROX_SIMPLE,
                 core::Point::new(0, 0),
             )
             .unwrap();
 
             for contour in contours.iter() {
-                let area: f64 = imgproc::contour_area(&contour, false).unwrap();
+                let area: f64 = contour_area(&contour, false).unwrap();
                 if area > 800.0 {
-                    let perimeter = imgproc::arc_length(&contour, true).unwrap();
+                    let perimeter: f64 = arc_length(&contour, true).unwrap();
 
                     // On augmente légèrement la précision (0.02 au lieu de 0.04)
-                    imgproc::approx_poly_dp(&contour, &mut approx, 0.02 * perimeter, true).unwrap();
+                    approx_poly_dp(&contour, &mut approx, 0.02 * perimeter, true).unwrap();
 
                     // Détection de RECTANGLE (4 sommets + convexe)
-                    if approx.len() == 4 && imgproc::is_contour_convex(&approx).unwrap() {
-                        let rect: core::Rect_<i32> = imgproc::bounding_rect(&approx).unwrap();
+                    if approx.len() == 4 && is_contour_convex(&approx).unwrap() {
+                        let rect: core::Rect_<i32> = bounding_rect(&approx).unwrap();
 
-                        let moments: core::Moments = imgproc::moments(&contour, false).unwrap();
+                        let moments: Moments = moments(&contour, false).unwrap();
                         let mut center_x: u32 = 0;
                         let mut center_y: u32 = 0;
 
@@ -180,25 +181,24 @@ impl HarbourmasterGps {
 
                         self.pos_tx.send([center_x, center_y]).await;
 
-                        // Dessin des résultats
-                        imgproc::rectangle(
+                        rectangle(
                             &mut flipped_frame,
                             rect,
                             Scalar::new(0.0, 255.0, 0.0, 0.0),
                             2,
-                            imgproc::LINE_8,
+                            LINE_8,
                             0,
                         )
                         .unwrap();
-                        imgproc::put_text(
+                        put_text(
                             &mut flipped_frame,
                             &format!("ID: {}x{}", rect.width, rect.height),
                             core::Point::new(rect.x, rect.y - 5),
-                            imgproc::FONT_HERSHEY_SIMPLEX,
+                            FONT_HERSHEY_SIMPLEX,
                             0.5,
                             Scalar::new(0.0, 255.0, 0.0, 0.0),
                             1,
-                            imgproc::LINE_8,
+                            LINE_8,
                             false,
                         )
                         .unwrap();
@@ -214,8 +214,8 @@ impl HarbourmasterGps {
     }
 
     async fn run_listener(&self) -> () {
-        let mut rx = self.rx.lock().await;
-        let mut pos_rx = self.pos_rx.lock().await;
+        let mut rx: MutexGuard<'_, Receiver<BitPacker>> = self.rx.lock().await;
+        let mut pos_rx: MutexGuard<'_, Receiver<[u32; 2]>> = self.pos_rx.lock().await;
 
         loop {
             tokio::select! {
@@ -225,7 +225,7 @@ impl HarbourmasterGps {
                 Some(msg) = rx.recv() => {
                     println!("Requête GPS reçue : {:?}", msg);
 
-                    let res: BitPacker = BitPacker::from_int(self.latitude.load(std::sync::atomic::Ordering::Relaxed), Some(32)) + BitPacker::from_int(self.longitude.load(std::sync::atomic::Ordering::Relaxed), Some(32)) + msg;
+                    let res: BitPacker = BitPacker::from_int(self.latitude.load(Ordering::Relaxed), Some(32)) + BitPacker::from_int(self.longitude.load(Ordering::Relaxed), Some(32)) + msg;
 
                     self.antenna_tx.send(res).await;
                 }
@@ -234,8 +234,8 @@ impl HarbourmasterGps {
     }
 
     pub async fn start(self) -> () {
-        let listener_arc = Arc::new(self);
-        let detect_and_send_arc = listener_arc.clone();
+        let listener_arc: Arc<HarbourmasterGps> = Arc::new(self);
+        let detect_and_send_arc: Arc<HarbourmasterGps> = listener_arc.clone();
 
         tokio::spawn(async move {
             detect_and_send_arc.run_detect_and_send().await;

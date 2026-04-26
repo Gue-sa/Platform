@@ -1,6 +1,5 @@
-use dashmap::{DashMap, mapref::one::Ref};
-
 use crate::boat_info::BoatInfo;
+use dashmap::{DashMap, mapref::one::Ref};
 
 pub struct BoatsInfoRegistry {
     registry: DashMap<u32, BoatInfo>,
@@ -43,6 +42,9 @@ impl BoatsInfoRegistry {
     }
 
     pub fn export(&self) -> Box<[(u32, BoatInfo)]> {
-        self.registry.iter().map(|r| (r.key().clone(), r.value().clone())).collect()
+        self.registry
+            .iter()
+            .map(|r| (r.key().clone(), r.value().clone()))
+            .collect()
     }
 }

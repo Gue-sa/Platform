@@ -1,5 +1,7 @@
-use std::sync::{Arc, Mutex};
-
+use crate::database_manager::{
+    manager::DatabaseManager,
+    models::{DestinationQueryResult, VoyageOrderQueryResult, VoyageOrderVersionQueryResult},
+};
 use axum::{
     Json, Router,
     extract::{Query, State},
@@ -7,13 +9,9 @@ use axum::{
 };
 use serde::Deserialize;
 use shared::{boat_info::BoatInfo, boats_registry::BoatsInfoRegistry};
+use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
-
-use crate::database_manager::{
-    manager::DatabaseManager,
-    models::{DestinationQueryResult, VoyageOrderQueryResult, VoyageOrderVersionQueryResult},
-};
 
 #[derive(Deserialize, Debug)]
 pub struct GetVoyageOrderVersionsFilterParams {

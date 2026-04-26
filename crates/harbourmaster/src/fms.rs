@@ -1,5 +1,4 @@
-use std::{sync::Arc, time::Duration};
-
+use crate::database_manager::manager::DatabaseManager;
 use chrono::{Datelike, Timelike};
 use shared::{
     boat_info::BoatInfo,
@@ -11,12 +10,11 @@ use shared::{
     satcom_message::SatComMessage,
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
+use std::{sync::Arc, time::Duration};
 use tokio::sync::{
     Notify,
     mpsc::{Receiver, Sender},
 };
-
-use crate::database_manager::manager::DatabaseManager;
 
 pub struct Fms {
     boats_registry: Arc<BoatsInfoRegistry>,

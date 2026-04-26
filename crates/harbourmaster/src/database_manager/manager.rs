@@ -1,12 +1,3 @@
-use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
-use diesel::prelude::*;
-use dotenvy::dotenv;
-use shared::{
-    common::types::{DatabaseManagerError, DatabaseManagerResult, VoyageStatus},
-    voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
-};
-use std::env;
-
 use crate::database_manager::{
     models::{
         DestinationInsertionModel, DestinationQueryResult, VoyageOrderQueryResult,
@@ -14,6 +5,14 @@ use crate::database_manager::{
     },
     schema::{DESTINATIONS, ORDER_VERSIONS, VOYAGE_ORDERS},
 };
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use diesel::prelude::*;
+use dotenvy::dotenv;
+use shared::{
+    common::types::{DatabaseManagerError, DatabaseManagerResult, VoyageStatus},
+    voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
+};
+use std::env;
 
 pub struct DatabaseManager {
     connection: SqliteConnection,

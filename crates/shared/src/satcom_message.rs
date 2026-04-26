@@ -3,7 +3,6 @@ use crate::{
     common::types::{SatComMessageResult, SatComMessageType},
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
-
 use getset::{CloneGetters, Getters, Setters};
 
 #[derive(Debug, Clone, Getters, Setters, CloneGetters)]

@@ -1,13 +1,10 @@
-use std::ops::{Add, Index};
-
-use num_traits::PrimInt;
-
 use crate::common::{
     types::{BitPackerError, BitPackerResult},
     utils::{char6, ord6},
 };
-
 use getset::Getters;
+use num_traits::PrimInt;
+use std::ops::{Add, Index};
 
 #[derive(Debug, Clone, PartialEq, Getters)]
 #[getset(get = "pub")]

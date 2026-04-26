@@ -1,6 +1,5 @@
-use std::{thread, time::Duration};
-
 use serialport::{SerialPortType, available_ports};
+use std::{thread, time::Duration};
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub struct SerialDriver {
@@ -52,7 +51,7 @@ impl SerialDriver {
                 println!("Droite.");
 
                 thread::sleep(Duration::from_secs(1));
-                
+
                 port.write_all(b"00\n").unwrap();
                 println!("Gauche.");
 

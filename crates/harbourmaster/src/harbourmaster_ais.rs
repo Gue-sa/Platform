@@ -1,8 +1,4 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU8, AtomicU16},
-};
-
+use colored::*;
 use shared::{
     ais_message::AisMessage,
     bitpacker::BitPacker,
@@ -14,9 +10,11 @@ use shared::{
     impl_atomic_access,
     slots_map::SlotsMap,
 };
+use std::sync::{
+    Arc,
+    atomic::{AtomicU8, AtomicU16},
+};
 use tokio::sync::{Mutex, mpsc::*};
-
-use colored::*;
 
 pub struct HarbourmasterAisState {
     boats_registry: Arc<BoatsInfoRegistry>,

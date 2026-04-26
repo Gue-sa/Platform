@@ -1,12 +1,11 @@
+use chrono::{DateTime, Datelike, Local, Timelike};
+use colored::{ColoredString, Colorize};
+use shared::common::utils::{dt_to_slots_idx, get_current_dt};
 use std::{
     fs::{File, OpenOptions},
     io::Write,
     sync::Mutex,
 };
-
-use chrono::{DateTime, Datelike, Local, Timelike};
-use colored::{ColoredString, Colorize};
-use shared::common::utils::{dt_to_slots_idx, get_current_dt};
 
 static LOG_FILE_LOCK: Mutex<()> = Mutex::new(());
 

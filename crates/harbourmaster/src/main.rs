@@ -1,14 +1,12 @@
+use crate::harbourmaster::Harbourmaster;
 use std::env;
 
-use crate::harbourmaster::Harbourmaster;
-
+mod clients_registry;
+mod database_manager;
+mod fms;
 mod harbourmaster;
 mod harbourmaster_ais;
-mod clients_registry;
 mod harbourmaster_gps;
-mod fms;
-mod database_manager;
-
 
 #[tokio::main]
 async fn main() -> () {

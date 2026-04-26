@@ -1,6 +1,5 @@
-use tokio::sync::mpsc::{Receiver, Sender};
-
 use crate::{bitpacker::BitPacker, satcom_message::SatComMessage};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 pub struct SatCom {
     reader_rx: Receiver<BitPacker>,

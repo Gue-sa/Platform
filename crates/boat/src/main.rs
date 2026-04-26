@@ -1,23 +1,22 @@
+use crate::{boat::Boat, serial_driver::SerialDriver};
 use std::{env, thread};
 
-use crate::{boat::Boat, serial_driver::SerialDriver};
-
+mod board_computer;
 mod boat;
 mod boat_ais;
 mod boat_gps;
 mod common;
+mod serial_driver;
 mod systemstate;
 mod ui;
 mod voyage;
-mod board_computer;
-mod serial_driver;
 
 #[tokio::main]
 async fn main() {
     unsafe {
         env::set_var("RUST_BACKTRACE", "1");
     }
-    
+
     let boat: Boat = Boat::init().await;
 
     boat.start().await;

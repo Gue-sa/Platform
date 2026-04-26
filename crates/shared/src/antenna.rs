@@ -1,13 +1,11 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
-use tokio::{
-    net::UdpSocket,
-    sync::mpsc::{Receiver, Sender},
-};
-
 use crate::{
     bitpacker::BitPacker,
     common::types::{AisPacket, Channel},
+};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use tokio::{
+    net::UdpSocket,
+    sync::mpsc::{Receiver, Sender},
 };
 
 pub struct Antenna {

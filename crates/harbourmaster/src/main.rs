@@ -14,7 +14,9 @@ async fn main() -> () {
         env::set_var("RUST_BACKTRACE", "1");
     }
 
-    let harbourmaster: Harbourmaster = Harbourmaster::init().await;
+    let harbourmaster: Harbourmaster = Harbourmaster::init()
+        .await
+        .expect("L'initialisation de la capitainerie a échoué");
 
     harbourmaster.start().await;
 

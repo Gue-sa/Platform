@@ -5,13 +5,16 @@ use shared::{
     boats_registry::BoatsInfoRegistry,
     common::{
         constants::HARBOURMASTER_MMSI,
-        types::{SatComMessageType, VoyageStatus},
+        types::{BoardComputerError, BoardComputerResult, SatComMessageType, VoyageStatus},
     },
     satcom_message::SatComMessage,
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
 use std::sync::Arc;
-use tokio::{sync::mpsc::{Receiver, Sender}, task::JoinHandle};
+use tokio::{
+    sync::mpsc::{Receiver, Sender},
+    task::JoinHandle,
+};
 
 pub struct BoardComputer {
     boat_info: Arc<BoatInfo>,
@@ -40,8 +43,26 @@ impl BoardComputer {
         }
     }
 
-    fn order_id(&self) -> u16 {
-        *self.voyage.as_ref().unwrap().order().header().id()
+    fn order(&self) -> BoardComputerResult<&VoyageOrder> {
+        Ok(self
+            .voyage
+            .as_ref()
+            .ok_or(BoardComputerError::NoVoyageOrder)?
+            .order())
+    }
+
+    fn order_revision(&self) -> BoardComputerResult<&VoyageOrder> {
+        Ok(self
+            .voyage_order_revision
+            .as_ref()
+            .ok_or(BoardComputerError::NoVoyageOrderRevision)?)
+    }
+
+    fn order_revision_mut(&mut self) -> BoardComputerResult<&mut VoyageOrder> {
+        Ok(self
+            .voyage_order_revision
+            .as_mut()
+            .ok_or(BoardComputerError::NoVoyageOrderRevision)?)
     }
 
     fn has_voyage(&self) -> bool {
@@ -52,9 +73,13 @@ impl BoardComputer {
         self.voyage = Some(new_voyage);
     }
 
-    fn update_voyage_status(&mut self, status: VoyageStatus) -> () {
+    fn update_voyage_status(&mut self, status: VoyageStatus) -> BoardComputerResult<()> {
         if let Some(ref mut voyage) = self.voyage {
             voyage.set_status(status);
+
+            Ok(())
+        } else {
+            Err(BoardComputerError::NoVoyageOrder)
         }
     }
 
@@ -86,9 +111,13 @@ impl BoardComputer {
         );
     }
 
-    fn adopt_voyage_order_rev(&mut self) -> () {
+    fn adopt_voyage_order_rev(&mut self) -> BoardComputerResult<()> {
         if let Some(order) = self.voyage_order_revision.take() {
             self.adopt_voyage_order(&order);
+
+            Ok(())
+        } else {
+            Err(BoardComputerError::NoVoyageOrderRevision)
         }
     }
 
@@ -98,7 +127,7 @@ impl BoardComputer {
         msg_type: SatComMessageType,
         res_order_header: Option<VoyageOrderHeader>,
         res_order_revision: Option<VoyageOrderBody>,
-    ) -> () {
+    ) -> BoardComputerResult<()> {
         let message = SatComMessage::new(
             *self.boat_info.get_static_data().mmsi(),
             HARBOURMASTER_MMSI,
@@ -107,7 +136,9 @@ impl BoardComputer {
             res_order_revision,
         );
 
-        self.satcom_tx.send(message).await;
+        self.satcom_tx.send(message).await?;
+
+        Ok(())
     }
 
     async fn update_voyage_status_and_respond(
@@ -118,18 +149,20 @@ impl BoardComputer {
         res_order_header: Option<VoyageOrderHeader>,
         res_order_rev: Option<VoyageOrderBody>,
         log_msg: String,
-    ) -> () {
-        self.update_voyage_status(new_status);
+    ) -> BoardComputerResult<()> {
+        self.update_voyage_status(new_status)?;
 
         self.respond(satcom_msg, msg_type, res_order_header, res_order_rev)
-            .await;
+            .await?;
 
         log(log_msg.cyan());
+
+        Ok(())
     }
 
-    async fn handle_offer(&mut self, satcom_msg: &SatComMessage) -> () {
+    async fn handle_offer(&mut self, satcom_msg: &SatComMessage) -> BoardComputerResult<()> {
         self.respond(satcom_msg, SatComMessageType::Acknowledgement, None, None)
-            .await;
+            .await?;
 
         log(format!(
             "Offre d'ordre de voyage reçue (ID {}). Accusé de réception envoyé.",
@@ -138,7 +171,9 @@ impl BoardComputer {
         .cyan());
 
         if !self.has_voyage() {
-            let voyage_order: &VoyageOrder = &satcom_msg.order().unwrap();
+            let voyage_order: &VoyageOrder = &satcom_msg
+                .order()
+                .ok_or(BoardComputerError::NoVoyageOrder)?;
 
             self.adopt_voyage_order(voyage_order);
 
@@ -153,10 +188,10 @@ impl BoardComputer {
                     satcom_msg.order_header().id()
                 ),
             )
-            .await;
+            .await?;
         } else {
             self.respond(satcom_msg, SatComMessageType::RevisionRefusal, None, None)
-                .await;
+                .await?;
 
             log(format!(
                 "Ordre de voyage {} refusé (navire déjà en activité).",
@@ -164,24 +199,29 @@ impl BoardComputer {
             )
             .cyan());
         }
+
+        Ok(())
     }
 
-    async fn handle_rev_req_ack(&mut self, satcom_msg: &SatComMessage) -> () {
-        self.voyage_order_revision
-            .as_mut()
-            .unwrap()
+    async fn handle_rev_req_ack(&mut self, satcom_msg: &SatComMessage) -> BoardComputerResult<()> {
+        self.order_revision_mut()?
             .set_ver(*satcom_msg.order_header().version());
 
-        self.update_voyage_status(VoyageStatus::UnderRevision);
+        self.update_voyage_status(VoyageStatus::UnderRevision)?;
 
         log(format!(
             "Demande de révision de l'ordre {} reçu par la capitainerie. Attente d'une réponse.",
             satcom_msg.order_header().id()
         )
         .cyan());
+
+        Ok(())
     }
 
-    async fn handle_initial_rev_acceptation_ack(&mut self, satcom_msg: &SatComMessage) -> () {
+    async fn handle_initial_rev_acceptation_ack(
+        &mut self,
+        satcom_msg: &SatComMessage,
+    ) -> BoardComputerResult<()> {
         self.update_voyage_status_and_respond(
             VoyageStatus::InExecution,
             satcom_msg,
@@ -193,13 +233,16 @@ impl BoardComputer {
                 satcom_msg.order_header().id()
             ),
         )
-        .await;
+        .await?;
+
+        Ok(())
     }
 
-    async fn handle_rev_acceptation(&mut self, satcom_msg: &SatComMessage) -> () {
-        self.voyage_order_revision
-            .as_mut()
-            .unwrap()
+    async fn handle_rev_acceptation(
+        &mut self,
+        satcom_msg: &SatComMessage,
+    ) -> BoardComputerResult<()> {
+        self.order_revision_mut()?
             .set_ver(*satcom_msg.order_header().version());
 
         self.update_voyage_status_and_respond(
@@ -213,10 +256,12 @@ impl BoardComputer {
                     satcom_msg.order_header().id(), satcom_msg.order_header().version()
                 )
             )
-            .await;
+            .await?;
+
+        Ok(())
     }
 
-    async fn handle_rev_refusal(&mut self, satcom_msg: &SatComMessage) -> () {
+    async fn handle_rev_refusal(&mut self, satcom_msg: &SatComMessage) -> BoardComputerResult<()> {
         self.update_voyage_status_and_respond(
                 VoyageStatus::RevisionRefused,
                 satcom_msg,
@@ -228,10 +273,12 @@ impl BoardComputer {
                     satcom_msg.order_header().id(), satcom_msg.order_header().version()
                 )
             )
-            .await;
+            .await?;
+
+        Ok(())
     }
 
-    async fn handle_rev_request(&mut self, satcom_msg: &SatComMessage) -> () {
+    async fn handle_rev_request(&mut self, satcom_msg: &SatComMessage) -> BoardComputerResult<()> {
         self.voyage_order_revision = Some(satcom_msg.order().unwrap());
 
         self.update_voyage_status_and_respond(
@@ -245,9 +292,9 @@ impl BoardComputer {
                 satcom_msg.order_header().id()
             ),
         )
-        .await;
+        .await?;
 
-        self.adopt_voyage_order_rev();
+        self.adopt_voyage_order_rev()?;
 
         self.update_voyage_status_and_respond(
                 VoyageStatus::RevisionAccepted,
@@ -260,10 +307,15 @@ impl BoardComputer {
                     satcom_msg.order_header().id(), satcom_msg.order_header().version()
                 )
             )
-            .await;
+            .await?;
+
+        Ok(())
     }
 
-    async fn handle_end_of_voyage(&mut self, satcom_msg: &SatComMessage) -> () {
+    async fn handle_end_of_voyage(
+        &mut self,
+        satcom_msg: &SatComMessage,
+    ) -> BoardComputerResult<()> {
         self.update_voyage_status_and_respond(
             VoyageStatus::Finished,
             satcom_msg,
@@ -275,75 +327,86 @@ impl BoardComputer {
                 satcom_msg.order_header().id()
             ),
         )
-        .await;
+        .await?;
+
+        Ok(())
+    }
+
+    async fn run_board_computer(&mut self) -> BoardComputerResult<()> {
+        let self_mmsi: u32 = *self.boat_info.get_static_data().mmsi();
+        while let Some(satcom_msg) = self.rx.recv().await {
+            if *satcom_msg.target() != self_mmsi || *satcom_msg.source() != HARBOURMASTER_MMSI {
+                continue;
+            }
+
+            let concerns_current_voyage: bool = self
+                .voyage
+                .as_ref()
+                .map_or(false, |v| v.order().header() == satcom_msg.order_header());
+
+            let concerns_current_rev: bool = self
+                .voyage_order_revision
+                .as_ref()
+                .map_or(false, |rev| rev.header() == satcom_msg.order_header());
+
+            match *satcom_msg.message_type() {
+                SatComMessageType::Offer => {
+                    self.handle_offer(&satcom_msg).await?;
+                }
+                SatComMessageType::Acknowledgement => {
+                    if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
+                        && concerns_current_rev
+                    {
+                        self.handle_rev_req_ack(&satcom_msg).await?;
+                    } else if self.matches_status(Some(VoyageStatus::RevisionAccepted))
+                        && concerns_current_voyage
+                    {
+                        self.handle_initial_rev_acceptation_ack(&satcom_msg).await?;
+                    }
+                }
+                SatComMessageType::RevisionAcceptation => {
+                    if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
+                        && concerns_current_rev
+                    {
+                        self.handle_rev_acceptation(&satcom_msg).await?;
+                    }
+                }
+                SatComMessageType::RevisionRefusal => {
+                    if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
+                        && concerns_current_rev
+                    {
+                        self.handle_rev_refusal(&satcom_msg).await?;
+                    }
+                }
+                SatComMessageType::RevisionRequest => {
+                    if (self.matches_status(Some(VoyageStatus::RevisionAccepted))
+                        || self.matches_status(Some(VoyageStatus::RevisionRefused))
+                        || self.matches_status(Some(VoyageStatus::InExecution)))
+                        && *self.order().unwrap().header().id() == *satcom_msg.order_header().id()
+                    {
+                        self.handle_rev_request(&satcom_msg).await?;
+                    }
+                }
+                SatComMessageType::EndOfVoyage => {
+                    if self.matches_status(Some(VoyageStatus::Completed)) && concerns_current_voyage
+                    {
+                        self.handle_end_of_voyage(&satcom_msg).await?;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
     }
 
     pub fn start(mut self) -> JoinHandle<()> {
         // ATTENTION : tout ce qui touche à la révision d'ordres de voyage en cours de route est très hasardeux, pour ne pas dire 0% fonctionnel.
         tokio::spawn(async move {
-            let self_mmsi: u32 = *self.boat_info.get_static_data().mmsi();
-            while let Some(satcom_msg) = self.rx.recv().await {
-                if *satcom_msg.target() != self_mmsi || *satcom_msg.source() != HARBOURMASTER_MMSI {
-                    continue;
-                }
-
-                let concerns_current_voyage: bool = self
-                    .voyage
-                    .as_ref()
-                    .map_or(false, |v| v.order().header() == satcom_msg.order_header());
-
-                let concerns_current_rev: bool = self
-                    .voyage_order_revision
-                    .as_ref()
-                    .map_or(false, |rev| rev.header() == satcom_msg.order_header());
-
-                match *satcom_msg.message_type() {
-                    SatComMessageType::Offer => {
-                        self.handle_offer(&satcom_msg).await;
-                    }
-                    SatComMessageType::Acknowledgement => {
-                        if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
-                            && concerns_current_rev
-                        {
-                            self.handle_rev_req_ack(&satcom_msg).await;
-                        } else if self.matches_status(Some(VoyageStatus::RevisionAccepted))
-                            && concerns_current_voyage
-                        {
-                            self.handle_initial_rev_acceptation_ack(&satcom_msg).await;
-                        }
-                    }
-                    SatComMessageType::RevisionAcceptation => {
-                        if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
-                            && concerns_current_rev
-                        {
-                            self.handle_rev_acceptation(&satcom_msg).await;
-                        }
-                    }
-                    SatComMessageType::RevisionRefusal => {
-                        if self.matches_status(Some(VoyageStatus::RevisionSubmitted))
-                            && concerns_current_rev
-                        {
-                            self.handle_rev_refusal(&satcom_msg).await;
-                        }
-                    }
-                    SatComMessageType::RevisionRequest => {
-                        if (self.matches_status(Some(VoyageStatus::RevisionAccepted))
-                            || self.matches_status(Some(VoyageStatus::RevisionRefused))
-                            || self.matches_status(Some(VoyageStatus::InExecution)))
-                            && self.order_id() == *satcom_msg.order_header().id()
-                        {
-                            self.handle_rev_request(&satcom_msg).await;
-                        }
-                    }
-                    SatComMessageType::EndOfVoyage => {
-                        if self.matches_status(Some(VoyageStatus::Completed))
-                            && concerns_current_voyage
-                        {
-                            self.handle_end_of_voyage(&satcom_msg).await;
-                        }
-                    }
-                    _ => {}
-                }
+            if let Err(e) = self.run_board_computer().await {
+                log(format!("Board computer exited with error: {:?}", e).red());
+            } else {
+                log("Board computer unexpectedly exited without error.".red());
             }
         })
     }

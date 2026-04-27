@@ -3,7 +3,10 @@ use crate::{
     boat_info::{BoatInfo, NavigationData, StaticData, VoyageData},
     common::{
         constants::{MSG5_FIELDS, MSG123_FIELDS, SOTDMA_CS_MSGS},
-        types::{AisMessageError, AisMessageResult, CSType},
+        types::{
+            AisMessageError, AisMessageResult, CSType, CommunicationStateError,
+            CommunicationStateResult,
+        },
         utils::*,
     },
 };
@@ -11,8 +14,7 @@ use chrono::Timelike;
 use crc::{CRC_16_IBM_SDLC, Crc};
 use getset::{CloneGetters, Getters, Setters};
 
-#[derive(Clone, Debug, PartialEq, Getters, Setters)]
-#[getset(get = "pub")]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CommunicationState {
     communication_state_type: CSType,
     sync_state: u8,
@@ -42,7 +44,6 @@ pub struct AisMessage {
     start_flag: BitPacker,
     #[getset(get = "pub")]
     data: BitPacker,
-    #[getset(get_clone = "pub")]
     communication_state: Option<CommunicationState>,
     #[getset(get = "pub")]
     crc: BitPacker,
@@ -85,7 +86,69 @@ impl CommunicationState {
         }
     }
 
-    pub fn parse(com_state_bitpacker: BitPacker, msg_type: u8) -> AisMessageResult<Self> {
+    pub fn communication_state_type(&self) -> CSType {
+        self.communication_state_type
+    }
+
+    pub fn sync_state(&self) -> u8 {
+        self.sync_state
+    }
+
+    pub fn slot_timeout(&self) -> CommunicationStateResult<&u8> {
+        self.slot_timeout
+            .as_ref()
+            .ok_or_else(|| CommunicationStateError::NoSotdmaTimeout)
+    }
+
+    pub fn slot_offset(&self) -> CommunicationStateResult<&u16> {
+        self.slot_offset
+            .as_ref()
+            .ok_or_else(|| CommunicationStateError::NoSotdmaSlotOffset)
+    }
+
+    pub fn utc_hour(&self) -> CommunicationStateResult<&u8> {
+        self.utc_hour
+            .as_ref()
+            .ok_or_else(|| CommunicationStateError::NoUtcHour)
+    }
+
+    pub fn utc_minute(&self) -> CommunicationStateResult<&u8> {
+        self.utc_minute
+            .as_ref()
+            .ok_or_else(|| CommunicationStateError::NoUtcMinute)
+    }
+
+    pub fn slot_number(&self) -> CommunicationStateResult<&u16> {
+        self.slot_number
+            .as_ref()
+            .ok_or_else(|| CommunicationStateError::NoItdmaSlotNumber)
+    }
+
+    pub fn received_stations(&self) -> CommunicationStateResult<&u16> {
+        self.received_stations
+            .as_ref()
+            .ok_or_else(|| CommunicationStateError::NoSotdmaReceivedStations)
+    }
+
+    pub fn slot_increment(&self) -> CommunicationStateResult<&u16> {
+        self.slot_increment
+            .as_ref()
+            .ok_or_else(|| CommunicationStateError::NoItdmaSlotIncrement)
+    }
+
+    pub fn number_of_slots(&self) -> CommunicationStateResult<&u8> {
+        self.number_of_slots
+            .as_ref()
+            .ok_or_else(|| CommunicationStateError::NoItdmaNumberOfSlots)
+    }
+
+    pub fn keep_flag(&self) -> CommunicationStateResult<&bool> {
+        self.keep_flag
+            .as_ref()
+            .ok_or_else(|| CommunicationStateError::NoItdmaKeepFlag)
+    }
+
+    pub fn parse(com_state_bitpacker: BitPacker, msg_type: u8) -> CommunicationStateResult<Self> {
         let mut com_state: Self = Self {
             communication_state_type: if SOTDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
                 CSType::SOTDMA
@@ -125,7 +188,7 @@ impl CommunicationState {
                     3 | 5 | 7 => {
                         com_state.received_stations = Some(sub_msg.extract_int::<u16>(None, None)?);
                     }
-                    _ => return Err(AisMessageError::UnkownSotdmaTimeout),
+                    _ => return Err(CommunicationStateError::UnkownSotdmaTimeout),
                 }
             }
             3 => {
@@ -140,45 +203,40 @@ impl CommunicationState {
                         Some(false)
                     };
             }
-            _ => return Err(AisMessageError::UnknownMessageType),
+            _ => return Err(CommunicationStateError::UnknownMessageType),
         }
 
         Ok(com_state)
     }
 
-    fn build_sub_message(&self) -> BitPacker {
-        if self.slot_timeout.unwrap() == 3
-            || self.slot_timeout.unwrap() == 5
-            || self.slot_timeout.unwrap() == 7
+    fn build_sub_message(&self) -> CommunicationStateResult<BitPacker> {
+        if *self.slot_timeout()? == 3 || *self.slot_timeout()? == 5 || *self.slot_timeout()? == 7 {
+            Ok(BitPacker::from_int(*self.received_stations()?, Some(14)))
+        } else if *self.slot_timeout()? == 2
+            || *self.slot_timeout()? == 4
+            || *self.slot_timeout()? == 6
         {
-            BitPacker::from_int(self.received_stations.unwrap(), Some(14))
-        } else if self.slot_timeout.unwrap() == 2
-            || self.slot_timeout.unwrap() == 4
-            || self.slot_timeout.unwrap() == 6
-        {
-            BitPacker::from_int(self.slot_number.unwrap(), Some(14))
-        } else if self.slot_timeout.unwrap() == 1 {
-            BitPacker::from_int(0, Some(3))
+            Ok(BitPacker::from_int(*self.slot_number()?, Some(14)))
+        } else if *self.slot_timeout()? == 1 {
+            Ok(BitPacker::from_int(0, Some(3))
                 + BitPacker::from_int(get_current_dt().hour(), Some(5))
-                + BitPacker::from_int(get_current_dt().minute(), Some(6))
+                + BitPacker::from_int(get_current_dt().minute(), Some(6)))
         } else {
-            BitPacker::from_int(self.slot_offset.unwrap(), Some(14))
+            Ok(BitPacker::from_int(*self.slot_offset()?, Some(14)))
         }
     }
 
-    pub fn build(&self) -> BitPacker {
+    pub fn build(&self) -> CommunicationStateResult<BitPacker> {
         match self.communication_state_type {
-            CSType::SOTDMA => {
-                self.build_sub_message()
-                    + BitPacker::from_int(self.slot_timeout.unwrap(), Some(3))
-                    + BitPacker::from_int(self.sync_state, Some(2))
-            }
-            CSType::ITDMA => {
-                BitPacker::from_int(if self.keep_flag.unwrap() { 1 } else { 0 }, Some(1))
-                    + BitPacker::from_int(self.number_of_slots.unwrap(), Some(3))
-                    + BitPacker::from_int(self.slot_increment.unwrap(), Some(13))
-                    + BitPacker::from_int(self.sync_state, Some(2))
-            }
+            CSType::SOTDMA => Ok(self.build_sub_message()?
+                + BitPacker::from_int(*self.slot_timeout()?, Some(3))
+                + BitPacker::from_int(self.sync_state, Some(2))),
+            CSType::ITDMA => Ok(BitPacker::from_int(
+                if *self.keep_flag()? { 1 } else { 0 },
+                Some(1),
+            ) + BitPacker::from_int(*self.number_of_slots()?, Some(3))
+                + BitPacker::from_int(*self.slot_increment()?, Some(13))
+                + BitPacker::from_int(self.sync_state, Some(2))),
         }
     }
 }
@@ -186,6 +244,12 @@ impl CommunicationState {
 impl AisMessage {
     fn compute_crc(bytes: &[u8]) -> Result<u16, &'static str> {
         Ok(X25.checksum(bytes))
+    }
+
+    pub fn communication_state(&self) -> AisMessageResult<CommunicationState> {
+        self.communication_state
+            .clone()
+            .ok_or(AisMessageError::NoCommunicationState)
     }
 
     pub fn parse(
@@ -314,15 +378,15 @@ impl AisMessage {
         boat_info: BoatInfo,
         message_type: u8,
         communication_state: Option<CommunicationState>,
-    ) -> Self {
+    ) -> AisMessageResult<Self> {
         let data: BitPacker = AisMessage::build_data_bytes(&boat_info, message_type);
         let crc: u16 = AisMessage::compute_crc(
-            AisMessage::build_payload(message_type, data.clone(), communication_state.clone())
+            AisMessage::build_payload(message_type, data.clone(), communication_state.clone())?
                 .bits(),
         )
         .unwrap();
 
-        Self {
+        Ok(Self {
             message_type: message_type,
             boat_info: boat_info,
 
@@ -334,7 +398,7 @@ impl AisMessage {
             crc: BitPacker::from_int(crc, Some(16)),
             end_flag: BitPacker::from_int::<u8>(126, Some(8)),
             buffer: BitPacker::from_int::<u32>(8388607, Some(23)),
-        }
+        })
     }
 
     fn build_data_bytes(boat_info: &BoatInfo, msg_type: u8) -> BitPacker {
@@ -361,24 +425,25 @@ impl AisMessage {
         msg_type: u8,
         data: BitPacker,
         communication_state: Option<CommunicationState>,
-    ) -> BitPacker {
+    ) -> AisMessageResult<BitPacker> {
         if communication_state.is_none() {
-            data + BitPacker::from_int::<u8>(3, Some(2))
-                + BitPacker::from_int::<u8>(msg_type, Some(6))
+            Ok(data
+                + BitPacker::from_int::<u8>(3, Some(2))
+                + BitPacker::from_int::<u8>(msg_type, Some(6)))
         } else {
-            communication_state.unwrap().build()
+            Ok(communication_state.unwrap().build()?
                 + data
                 + BitPacker::from_int::<u8>(3, Some(2))
-                + BitPacker::from_int::<u8>(msg_type, Some(6))
+                + BitPacker::from_int::<u8>(msg_type, Some(6)))
         }
     }
 
-    pub fn build(&self) -> BitPacker {
+    pub fn build(&self) -> AisMessageResult<BitPacker> {
         let payload: BitPacker = AisMessage::build_payload(
             self.message_type,
             AisMessage::build_data_bytes(&self.boat_info, self.message_type),
             self.communication_state.clone(),
-        );
+        )?;
         let crc: BitPacker =
             BitPacker::from_int::<u16>(AisMessage::compute_crc(payload.bits()).unwrap(), Some(16));
         let msg: BitPacker = self.buffer.clone()
@@ -389,6 +454,6 @@ impl AisMessage {
             + self.sync_sequence.clone()
             + self.ramp_up_bits.clone();
 
-        msg
+        Ok(msg)
     }
 }

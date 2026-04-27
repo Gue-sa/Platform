@@ -10,7 +10,7 @@ use crate::{
             GPS_FROM_SERVER_PORT, GPS_TO_SERVER_PORT, SATCOM_FROM_SERVER_PORT,
             SATCOM_TO_SERVER_PORT,
         },
-        types::{AisPacket, Channel},
+        types::{AisPacket, Channel, RadioBuilderResult},
     },
     satcom::SatCom,
     satcom_message::SatComMessage,
@@ -20,7 +20,7 @@ use tokio::sync::{
     mpsc::{Receiver, Sender, channel},
 };
 
-pub async fn build_radio() -> (
+pub async fn build_radio() -> RadioBuilderResult<(
     Receiver<AisPacket>,     //ais_rx
     Receiver<BitPacker>,     //gps_rx
     Receiver<SatComMessage>, //fms_rx or board_computer_rx
@@ -33,8 +33,8 @@ pub async fn build_radio() -> (
     Antenna,                 //gps_antenna
     Antenna,                 //satcom_antenna
     SatCom,                  //satcom
-    Arc<BoatsInfoRegistry>,       //boats_reg
-) {
+    Arc<BoatsInfoRegistry>,  //boats_reg
+)> {
     let (ais_tx, ais_rx) = channel::<AisPacket>(Semaphore::MAX_PERMITS);
     let (gps_tx, gps_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
     let (sender_satcom_tx, sender_satcom_rx) = channel::<SatComMessage>(Semaphore::MAX_PERMITS);
@@ -55,7 +55,7 @@ pub async fn build_radio() -> (
         C87B_FROM_SERVER_PORT,
         Channel::C87B,
     )
-    .await;
+    .await?;
     let ant2: Antenna = Antenna::init(
         Some(ais_tx),
         None,
@@ -65,7 +65,7 @@ pub async fn build_radio() -> (
         C88B_FROM_SERVER_PORT,
         Channel::C88B,
     )
-    .await;
+    .await?;
     let ant3: Antenna = Antenna::init(
         None,
         Some(gps_tx),
@@ -75,7 +75,7 @@ pub async fn build_radio() -> (
         GPS_FROM_SERVER_PORT,
         Channel::GPS,
     )
-    .await;
+    .await?;
     let ant4: Antenna = Antenna::init(
         None,
         None,
@@ -85,13 +85,13 @@ pub async fn build_radio() -> (
         SATCOM_FROM_SERVER_PORT,
         Channel::SATCOM,
     )
-    .await;
+    .await?;
 
     let satcom: SatCom = SatCom::init(reader_satcom_rx, sender_satcom_rx, c_satcom_tx, computer_tx);
 
     let boats_reg: Arc<BoatsInfoRegistry> = Arc::new(BoatsInfoRegistry::new());
 
-    (
+    Ok((
         ais_rx,
         gps_rx,
         computer_rx,
@@ -105,5 +105,5 @@ pub async fn build_radio() -> (
         ant4,
         satcom,
         boats_reg,
-    )
+    ))
 }

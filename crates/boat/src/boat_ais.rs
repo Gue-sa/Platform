@@ -10,6 +10,7 @@ use shared::{
         constants::{IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE},
         types::{
             AisError, AisMessageError, AisPacket, AisResult, Channel, ClockError, ClockResult,
+            CommunicationStateError,
         },
         utils::get_timestamp,
     },
@@ -155,11 +156,11 @@ impl BoatAisRunner {
         }
     }
 
-    async fn run_boat_ais_master_clock(&self) {
+    async fn run_boat_ais_master_clock(&self) -> ClockResult<()> {
         log("Horloge SOTDMA lancée.".yellow());
 
         loop {
-            let now: Duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+            let now: Duration = SystemTime::now().duration_since(UNIX_EPOCH)?;
 
             let total_ns: u64 = now.as_nanos() as u64;
 
@@ -201,8 +202,7 @@ impl BoatAisRunner {
                 }
 
                 if [1, 2].binary_search(msg.message_type()).is_ok() {
-                    let com_state_timeout: u8 =
-                        msg.communication_state().unwrap().slot_timeout().unwrap();
+                    let com_state_timeout: u8 = *msg.communication_state()?.slot_timeout()?;
 
                     if t_si_owner.is_none() && com_state_timeout > 0 {
                         slots_map.book_slot(t_si, boat_mmsi, Some(com_state_timeout), None);
@@ -213,18 +213,16 @@ impl BoatAisRunner {
                     }
 
                     if com_state_timeout == 0 {
-                        let cs_offset: u16 =
-                            msg.communication_state().unwrap().slot_offset().unwrap();
+                        let cs_offset: u16 = *msg.communication_state()?.slot_offset()?;
                         let rsv_s: u16 = SlotsMap::offseted_si(t_si, cs_offset);
 
                         slots_map.book_slot(rsv_s, boat_mmsi, Some(com_state_timeout), None);
                         slots_map.release_slot(t_si);
                     }
                 } else if *msg.message_type() == 3 {
-                    let com_state_keep_flag: bool =
-                        msg.communication_state().unwrap().keep_flag().unwrap();
+                    let com_state_keep_flag: bool = *msg.communication_state()?.keep_flag()?;
                     let com_state_slot_increment: u16 =
-                        msg.communication_state().unwrap().slot_increment().unwrap();
+                        *msg.communication_state()?.slot_increment()?;
 
                     if com_state_keep_flag == false {
                         slots_map.release_slot(t_si);
@@ -298,11 +296,9 @@ impl BoatAisRunner {
                 .slots_map()
                 .scan_for_self_owned_ssi(Some(si), Some(start_si), Channel::Any);
 
-        if available_ss.len() == 0 {
-            return Err(AisError::NoOwnedSlot);
-        }
-
-        Ok(*available_ss.choose(&mut rand::rng()).unwrap())
+        Ok(*available_ss
+            .choose(&mut rand::rng())
+            .ok_or(AisError::NoOwnedSlot)?)
     }
 
     fn book_new_nts(&self, ns: u16, keep_nts_channel: bool) -> AisResult<u16> {
@@ -335,7 +331,9 @@ impl BoatAisRunner {
             return Err(AisError::NoValidSlotSelection);
         }
 
-        let next_nts: u16 = *available_nts.choose(&mut rand::rng()).unwrap();
+        let next_nts: u16 = *available_nts
+            .choose(&mut rand::rng())
+            .ok_or(AisError::NoValidSlotSelection)?;
 
         let tmo_min: u8 = self.state.tmo_min();
         let tmo_max: u8 = self.state.tmo_max();
@@ -357,7 +355,7 @@ impl BoatAisRunner {
         offset: Option<u16>,
         slots_nbr: Option<u8>,
         t_si: u16,
-    ) -> () {
+    ) -> AisResult<()> {
         let ant_tx: &Sender<BitPacker> = if self.state.nts() < SLOTS_PER_MINUTE {
             &self.state.c_87_b_tx
         } else {
@@ -387,18 +385,20 @@ impl BoatAisRunner {
         };
 
         let msg: AisMessage =
-            AisMessage::from_info(self.state.boat_info().as_ref().clone(), msg_type, com_state);
+            AisMessage::from_info(self.state.boat_info().as_ref().clone(), msg_type, com_state)?;
 
-        ant_tx.send(msg.build()).await;
+        ant_tx.send(msg.build()?).await;
 
         log(format!(
             "Message {} envoyé avec succès sur le slot {}.",
             msg_type, t_si
         )
         .green());
+
+        Ok(())
     }
 
-    fn ratdma_slot_selection(&self, chn: Channel, lme_rtpri: u8) -> Result<u16, &'static str> {
+    fn ratdma_slot_selection(&self, chn: Channel, lme_rtpri: u8) -> AisResult<u16> {
         let start_s: u16 = SlotsMap::current_si(chn);
 
         let lme_rtes: u16 = SlotsMap::offseted_si(start_s, 150);
@@ -407,31 +407,30 @@ impl BoatAisRunner {
         let mut candidates: Vec<u16> =
             Vec::from(self.state.slots_map().filter_unavailable_ssi(slots_range));
 
-        match candidates.len() {
-            0 => Err("Aucun slot disponible."),
-            _ => {
-                let mut candidate: u16 = *candidates.choose(&mut rand::rng()).unwrap();
+        let mut candidate: u16 = *candidates
+            .choose(&mut rand::rng())
+            .ok_or(AisError::NoValidSlotSelection)?;
 
-                let mut lme_rtcsc: u8 = candidates.len() as u8;
-                let mut lme_rta: u8 = 0;
+        let mut lme_rtcsc: u8 = candidates.len() as u8;
+        let mut lme_rta: u8 = 0;
 
-                let lme_rtps: f64 = 100. / lme_rtcsc as f64;
-                let lme_rtp1: f64 = rand::rng().random_range(0.0..=100.0);
-                let mut lme_rtp2: f64 = lme_rtps;
-                let mut lme_rtpi: f64 = (100. - lme_rtp2) / lme_rtcsc as f64;
+        let lme_rtps: f64 = 100. / lme_rtcsc as f64;
+        let lme_rtp1: f64 = rand::rng().random_range(0.0..=100.0);
+        let mut lme_rtp2: f64 = lme_rtps;
+        let mut lme_rtpi: f64 = (100. - lme_rtp2) / lme_rtcsc as f64;
 
-                while lme_rtp1 > lme_rtp2 as f64 {
-                    lme_rtp2 += lme_rtpi;
-                    lme_rtcsc -= 1;
-                    lme_rta += 1;
-                    lme_rtpi = (100. - lme_rtp2) / lme_rtcsc as f64;
-                    candidates.retain(|c| *c != candidate);
-                    candidate = *candidates.choose(&mut rand::rng()).unwrap();
-                }
-
-                Ok(candidate)
-            }
+        while lme_rtp1 > lme_rtp2 as f64 {
+            lme_rtp2 += lme_rtpi;
+            lme_rtcsc -= 1;
+            lme_rta += 1;
+            lme_rtpi = (100. - lme_rtp2) / lme_rtcsc as f64;
+            candidates.retain(|c| *c != candidate);
+            candidate = *candidates
+                .choose(&mut rand::rng())
+                .ok_or(AisError::NoValidSlotSelection)?;
         }
+
+        Ok(candidate)
     }
 
     async fn itdma(
@@ -465,7 +464,7 @@ impl BoatAisRunner {
     }
 
     async fn sotdma_net_entry(&self) -> AisResult<()> {
-        let initial_nss_and_ns: u16 = self.ratdma_slot_selection(Channel::C87B, 1).unwrap();
+        let initial_nss_and_ns: u16 = self.ratdma_slot_selection(Channel::C87B, 1)?;
         self.state.set_ns(initial_nss_and_ns);
         self.state.set_nss(initial_nss_and_ns);
 

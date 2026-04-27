@@ -2,9 +2,12 @@ use crate::{
     board_computer::BoardComputer, boat_ais::BoatAisRunner, boat_gps::BoatGps,
     systemstate::SystemState, ui::Ui, voyage::Voyage,
 };
-use shared::{antenna::Antenna, boat_info::BoatInfo, radio_builder::build_radio, satcom::SatCom};
-use tokio::task::JoinHandle;
+use shared::{
+    antenna::Antenna, boat_info::BoatInfo, common::types::BoatResult, radio_builder::build_radio,
+    satcom::SatCom,
+};
 use std::sync::Arc;
+use tokio::task::JoinHandle;
 
 pub struct Boat {
     ais: BoatAisRunner,
@@ -20,7 +23,7 @@ pub struct Boat {
 }
 
 impl Boat {
-    pub async fn init() -> Self {
+    pub async fn init() -> BoatResult<Self> {
         let (
             ais_rx,
             gps_rx,
@@ -35,7 +38,7 @@ impl Boat {
             ant4,
             satcom,
             boats_reg,
-        ) = build_radio().await;
+        ) = build_radio().await?;
 
         let boat_info: Arc<BoatInfo> = Arc::new(BoatInfo::new(None, None, None));
         let system_state: Arc<SystemState> = Arc::new(SystemState::new());
@@ -65,7 +68,7 @@ impl Boat {
             sender_satcom_tx,
         );
 
-        Self {
+        Ok(Self {
             system_state: system_state,
             c87b_antenna: ant1,
             c88b_antenna: ant2,
@@ -76,20 +79,27 @@ impl Boat {
             satcom: satcom,
             board_computer: board_computer,
             ui: ui,
-        }
+        })
     }
 
-    pub async fn start(self) -> () {
-        let _c87b_antenna_handle: JoinHandle<()> = self.c87b_antenna.start().await;
-        let _c88b_antenna_handle: JoinHandle<()> = self.c88b_antenna.start().await;
-        let _gps_antenna_handle: JoinHandle<()> = self.gps_antenna.start().await;
-        let _satcom_antenna_handle: JoinHandle<()> = self.satcom_antenna.start().await;
-        
+    pub async fn start(self) -> BoatResult<()> {
+        let _c87b_antenna_handle: JoinHandle<()> = self.c87b_antenna.start().await?;
+        let _c88b_antenna_handle: JoinHandle<()> = self.c88b_antenna.start().await?;
+        let _gps_antenna_handle: JoinHandle<()> = self.gps_antenna.start().await?;
+        let _satcom_antenna_handle: JoinHandle<()> = self.satcom_antenna.start().await?;
+
         let _gps_handle: JoinHandle<()> = self.gps.start();
         let _satcom_handle: JoinHandle<()> = self.satcom.start();
         let _board_computer_handle: JoinHandle<()> = self.board_computer.start();
-        let _ais_handle: (JoinHandle<()>, JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) = self.ais.start();
+        let _ais_handle: (
+            JoinHandle<()>,
+            JoinHandle<()>,
+            JoinHandle<()>,
+            JoinHandle<()>,
+        ) = self.ais.start();
 
         self.ui.start();
+
+        Ok(())
     }
 }

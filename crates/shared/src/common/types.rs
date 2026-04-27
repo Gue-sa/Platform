@@ -1,4 +1,8 @@
-use crate::bitpacker::BitPacker;
+use std::{io::Error, time::SystemTimeError};
+
+use tokio::sync::mpsc::error::SendError;
+
+use crate::{bitpacker::BitPacker, satcom_message::SatComMessage};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AisPacket {
@@ -424,9 +428,10 @@ impl Into<u8> for SpeedProfile {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone)]
 pub enum ClockError {
-    SlotOvershoot
+    SystemTime(SystemTimeError),
+    SlotOvershoot,
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -439,18 +444,37 @@ pub enum AisMessageError {
     UnknownMessageType,
     UnkownSotdmaTimeout,
     CrcMismatch,
+    NoCommunicationState,
     BitPacker(BitPackerError),
+    CommunicationState(CommunicationStateError),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
+pub enum CommunicationStateError {
+    NoSotdmaTimeout,
+    NoSotdmaSlotOffset,
+    NoUtcHour,
+    NoUtcMinute,
+    NoItdmaSlotNumber,
+    NoSotdmaReceivedStations,
+    NoItdmaKeepFlag,
+    NoItdmaSlotIncrement,
+    NoItdmaNumberOfSlots,
+    UnkownSotdmaTimeout,
+    UnknownMessageType,
+    BitPacker(BitPackerError),
+}
+
+#[derive(Debug, Clone)]
 pub enum AisError {
     SelfEmittedMessage,
     NoFreeSlot,
     NoOwnedSlot,
     NoValidSlotSelection,
     SotdmaInitFailed,
+    CommunicationState(CommunicationStateError),
     AisMessage(AisMessageError),
-    Clock(ClockError)
+    Clock(ClockError),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -477,21 +501,79 @@ pub enum DatabaseManagerError {
     InsertionError(diesel::result::Error),
     QueryError(diesel::result::Error),
     UpdateError(diesel::result::Error),
-    DeletionError(diesel::result::Error)
+    DeletionError(diesel::result::Error),
+}
+
+#[derive(Debug)]
+pub enum HarbourmasterError {
+    DatabaseManager(DatabaseManagerError),
+    RadioBuilder(RadioBuilderError),
+    Antenna(AntennaError),
+}
+
+#[derive(Debug)]
+pub enum BoatError {
+    RadioBuilder(RadioBuilderError),
+    Antenna(AntennaError),
+}
+
+#[derive(Debug)]
+pub enum AntennaError {
+    InitError(Error),
+    EmissionError,
+    ReceptionError,
+    SendAisPacketError(SendError<AisPacket>),
+    SendBitPackerError(SendError<BitPacker>),
+}
+
+#[derive(Debug)]
+pub enum RadioBuilderError {
+    Antenna(AntennaError),
+}
+
+#[derive(Debug)]
+pub enum BoardComputerError {
+    NoVoyageOrder,
+    NoVoyageOrderRevision,
+    SendError(SendError<SatComMessage>),
 }
 
 pub type ClockResult<T> = Result<T, ClockError>;
 pub type BitPackerResult<T> = Result<T, BitPackerError>;
 pub type AisResult<T> = Result<T, AisError>;
 pub type AisMessageResult<T> = Result<T, AisMessageError>;
+pub type CommunicationStateResult<T> = Result<T, CommunicationStateError>;
 pub type VoyageOrderResult<T> = Result<T, VoyageOrderError>;
 pub type SatComResult<T> = Result<T, SatComError>;
 pub type SatComMessageResult<T> = Result<T, SatComMessageError>;
 pub type DatabaseManagerResult<T> = Result<T, DatabaseManagerError>;
+pub type HarbourmasterResult<T> = Result<T, HarbourmasterError>;
+pub type AntennaResult<T> = Result<T, AntennaError>;
+pub type RadioBuilderResult<T> = Result<T, RadioBuilderError>;
+pub type BoatResult<T> = Result<T, BoatError>;
+pub type BoardComputerResult<T> = Result<T, BoardComputerError>;
+
+impl From<SystemTimeError> for ClockError {
+    fn from(val: SystemTimeError) -> Self {
+        Self::SystemTime(val)
+    }
+}
 
 impl From<BitPackerError> for AisMessageError {
     fn from(val: BitPackerError) -> Self {
         Self::BitPacker(val)
+    }
+}
+
+impl From<BitPackerError> for CommunicationStateError {
+    fn from(val: BitPackerError) -> Self {
+        Self::BitPacker(val)
+    }
+}
+
+impl From<CommunicationStateError> for AisMessageError {
+    fn from(val: CommunicationStateError) -> Self {
+        Self::CommunicationState(val)
     }
 }
 
@@ -504,6 +586,12 @@ impl From<BitPackerError> for SatComMessageError {
 impl From<BitPackerError> for VoyageOrderError {
     fn from(val: BitPackerError) -> Self {
         Self::BitPacker(val)
+    }
+}
+
+impl From<CommunicationStateError> for AisError {
+    fn from(val: CommunicationStateError) -> Self {
+        Self::CommunicationState(val)
     }
 }
 
@@ -528,5 +616,65 @@ impl From<VoyageOrderError> for SatComMessageError {
 impl From<SatComMessageError> for SatComError {
     fn from(val: SatComMessageError) -> Self {
         Self::SatComMessage(val)
+    }
+}
+
+impl From<DatabaseManagerError> for HarbourmasterError {
+    fn from(val: DatabaseManagerError) -> Self {
+        Self::DatabaseManager(val)
+    }
+}
+
+impl From<RadioBuilderError> for HarbourmasterError {
+    fn from(val: RadioBuilderError) -> Self {
+        Self::RadioBuilder(val)
+    }
+}
+
+impl From<AntennaError> for HarbourmasterError {
+    fn from(val: AntennaError) -> Self {
+        Self::Antenna(val)
+    }
+}
+
+impl From<Error> for AntennaError {
+    fn from(val: Error) -> Self {
+        Self::InitError(val)
+    }
+}
+
+impl From<SendError<AisPacket>> for AntennaError {
+    fn from(val: SendError<AisPacket>) -> Self {
+        Self::SendAisPacketError(val)
+    }
+}
+
+impl From<SendError<BitPacker>> for AntennaError {
+    fn from(val: SendError<BitPacker>) -> Self {
+        Self::SendBitPackerError(val)
+    }
+}
+
+impl From<AntennaError> for RadioBuilderError {
+    fn from(val: AntennaError) -> Self {
+        Self::Antenna(val)
+    }
+}
+
+impl From<AntennaError> for BoatError {
+    fn from(val: AntennaError) -> Self {
+        Self::Antenna(val)
+    }
+}
+
+impl From<RadioBuilderError> for BoatError {
+    fn from(val: RadioBuilderError) -> Self {
+        Self::RadioBuilder(val)
+    }
+}
+
+impl From<SendError<SatComMessage>> for BoardComputerError {
+    fn from(val: SendError<SatComMessage>) -> Self {
+        Self::SendError(val)
     }
 }

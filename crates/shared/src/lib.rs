@@ -1,8 +1,10 @@
 pub mod ais_message;
+pub mod ais_utils;
 pub mod antenna;
 pub mod bitpacker;
 pub mod boat_info;
 pub mod boats_registry;
+pub mod clients_registry;
 pub mod common;
 pub mod radio_builder;
 pub mod satcom;

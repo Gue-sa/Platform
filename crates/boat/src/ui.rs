@@ -56,9 +56,9 @@ impl Ui {
             loop {
                 interval.tick().await;
 
-                let static_data: StaticData = boat_info_clone.get_static_data();
-                let voyage_data: VoyageData = boat_info_clone.get_voyage_data();
-                let nav_data: NavigationData = boat_info_clone.get_navigation_data();
+                let static_data: StaticData = boat_info_clone.get_static_data().unwrap();
+                let voyage_data: VoyageData = boat_info_clone.get_voyage_data().unwrap();
+                let nav_data: NavigationData = boat_info_clone.get_navigation_data().unwrap();
 
                 let name: String = static_data.name().to_string();
                 let mmsi: u32 = *static_data.mmsi();

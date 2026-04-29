@@ -379,7 +379,7 @@ impl AisMessage {
         message_type: u8,
         communication_state: Option<CommunicationState>,
     ) -> AisMessageResult<Self> {
-        let data: BitPacker = AisMessage::build_data_bytes(&boat_info, message_type);
+        let data: BitPacker = AisMessage::build_data_bytes(&boat_info, message_type)?;
         let crc: u16 = AisMessage::compute_crc(
             AisMessage::build_payload(message_type, data.clone(), communication_state.clone())?
                 .bits(),
@@ -401,24 +401,24 @@ impl AisMessage {
         })
     }
 
-    fn build_data_bytes(boat_info: &BoatInfo, msg_type: u8) -> BitPacker {
+    fn build_data_bytes(boat_info: &BoatInfo, msg_type: u8) -> AisMessageResult<BitPacker> {
         let mut data_vec: BitPacker = BitPacker::from_int(0, Some(0));
 
         match msg_type {
             1 | 2 | 3 => {
                 for field in MSG123_FIELDS {
-                    data_vec = boat_info.to_bits(field, msg_type) + data_vec;
+                    data_vec = boat_info.to_bits(field, msg_type)? + data_vec;
                 }
             }
             5 => {
                 for field in MSG5_FIELDS {
-                    data_vec = boat_info.to_bits(field, msg_type) + data_vec;
+                    data_vec = boat_info.to_bits(field, msg_type)? + data_vec;
                 }
             }
             _ => {}
         }
 
-        data_vec
+        Ok(data_vec)
     }
 
     fn build_payload(
@@ -441,7 +441,7 @@ impl AisMessage {
     pub fn build(&self) -> AisMessageResult<BitPacker> {
         let payload: BitPacker = AisMessage::build_payload(
             self.message_type,
-            AisMessage::build_data_bytes(&self.boat_info, self.message_type),
+            AisMessage::build_data_bytes(&self.boat_info, self.message_type)?,
             self.communication_state.clone(),
         )?;
         let crc: BitPacker =

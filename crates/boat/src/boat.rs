@@ -53,7 +53,7 @@ impl Boat {
             Arc::clone(&boat_info),
             boats_reg.clone(),
             system_state.clone(),
-        );
+        ).unwrap();
         let gps: BoatGps = BoatGps::init(
             Arc::clone(&boat_info),
             gps_rx,

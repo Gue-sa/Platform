@@ -69,7 +69,7 @@ impl Harbourmaster {
         let _satcom_antenna_handle: JoinHandle<()> = self.satcom_antenna.start().await?;
 
         let _ais_handle: (JoinHandle<()>, JoinHandle<()>) = self.ais.start();
-        //let _gps_handle: (JoinHandle<()>, JoinHandle<()>) = self.gps.start();
+        let _gps_handle: (JoinHandle<()>, JoinHandle<()>) = self.gps.start();
         let _satcom_handle: JoinHandle<()> = self.satcom.start();
         let _fms_handle: (JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) = self.fms.start();
 

@@ -8,7 +8,6 @@ use shared::common::{
 };
 use std::thread::park;
 
-mod clients_registry;
 mod radio_frequency;
 
 #[tokio::main]

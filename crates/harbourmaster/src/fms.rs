@@ -128,9 +128,16 @@ impl Fms {
                 .boats_registry
                 .export()
                 .iter()
-                .filter(|(_, boat)| boat.get_voyage_data().destination() == "@@@@@@@@@@@@@@@@@@@@")
-                .map(|(_, boat)| *boat.get_static_data().mmsi())
-                .collect();
+                .map(|(_, boat)| {
+                    if boat.get_voyage_data()?.destination() == "@@@@@@@@@@@@@@@@@@@@" {
+                        Ok::<Option<u32>, FmsError>(Some(*boat.get_static_data()?.mmsi()))
+                    } else {
+                        Ok::<Option<u32>, FmsError>(None)
+                    }
+                })
+                .filter_map(|res: Result<Option<u32>, _>| res.transpose()) // Transforme Result<Option<T>> en Option<Result<T>>
+                .collect::<Result<Vec<_>, _>>()? // Collecte et propage l'erreur si besoin
+                .into_boxed_slice();
 
             for i in 0..unassigned_orders.len().min(free_boats_mmsis.len()) {
                 let req: SatComMessage = SatComMessage::new(
@@ -223,10 +230,13 @@ impl Fms {
     }
 
     async fn handle_initial_rev_acceptation(&self, satcom_msg: &SatComMessage) -> FmsResult<()> {
-        self.database_manager.lock().unwrap().assign_voyage_order(
-            *satcom_msg.order_header().id() as i32,
-            *satcom_msg.source() as i32,
-        )?;
+        self.database_manager
+            .lock()
+            .map_err(|_| FmsError::DatabaseManagerPoisoned)?
+            .assign_voyage_order(
+                *satcom_msg.order_header().id() as i32,
+                *satcom_msg.source() as i32,
+            )?;
 
         self.update_associated_order_status_and_respond(
             &satcom_msg,
@@ -356,7 +366,7 @@ impl Fms {
             > = self
                 .database_manager
                 .lock()
-                .unwrap()
+                .map_err(|_| FmsError::DatabaseManagerPoisoned)?
                 .get_voyage_orders(Some(*satcom_msg.order_header().id() as i32), None, None)
                 .unwrap_or(Box::new([]));
 
@@ -378,9 +388,8 @@ impl Fms {
             > = self
                 .database_manager
                 .lock()
-                .unwrap()
-                .get_voyage_order_rev_ver(*satcom_msg.order_header().id() as i32)
-                .unwrap();
+                .map_err(|_| FmsError::DatabaseManagerPoisoned)?
+                .get_voyage_order_rev_ver(*satcom_msg.order_header().id() as i32)?;
 
             let mut db_order_rev_ver_nbr: u8 = db_order_ver_nbr + 1;
 

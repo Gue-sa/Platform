@@ -1,4 +1,4 @@
-use std::{io::Error, sync::PoisonError, time::SystemTimeError};
+use std::{io::Error, time::SystemTimeError};
 
 use tokio::sync::mpsc::error::SendError;
 
@@ -447,6 +447,7 @@ pub enum AisMessageError {
     NoCommunicationState,
     BitPacker(BitPackerError),
     CommunicationState(CommunicationStateError),
+    BoatInfo(BoatInfoError),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -475,6 +476,10 @@ pub enum AisError {
     CommunicationState(CommunicationStateError),
     AisMessage(AisMessageError),
     Clock(ClockError),
+    BoatInfo(BoatInfoError),
+    SlotsMap(SlotsMapError),
+    BoatsRegistry(BoatsRegistryError),
+    SendError(SendError<BitPacker>),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -498,6 +503,7 @@ pub enum SatComError {
 
 #[derive(Debug, PartialEq)]
 pub enum DatabaseManagerError {
+    InvalidNaiveDate,
     InsertionError(diesel::result::Error),
     QueryError(diesel::result::Error),
     UpdateError(diesel::result::Error),
@@ -536,6 +542,7 @@ pub enum BoardComputerError {
     NoVoyageOrder,
     NoVoyageOrderRevision,
     SendError(SendError<SatComMessage>),
+    BoatInfo(BoatInfoError),
 }
 
 #[derive(Debug)]
@@ -544,17 +551,38 @@ pub enum FmsError {
     DatabaseManager(DatabaseManagerError),
     SendError(SendError<SatComMessage>),
     BoatsRegistry(BoatsRegistryError),
+    BoatInfo(BoatInfoError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum ClientsRegistryError {
     ClientsRegistryPoisoned,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum BoatsRegistryError {
     UnkownMmsi,
     MmsiAlreadyRegistered,
+    BoatInfo(BoatInfoError),
+}
+
+#[derive(Debug)]
+pub enum RadioFrequencyError {
+    ClientsRegistry(ClientsRegistryError),
+    SendError,
+    BitPacker(BitPackerError),
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum BoatInfoError {
+    StaticDataPoisoned,
+    VoyageDataPoisoned,
+    NavigationDataPoisoned,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum SlotsMapError {
+    SlotsMapPoisoned,
 }
 
 pub type ClockResult<T> = Result<T, ClockError>;
@@ -574,6 +602,9 @@ pub type BoardComputerResult<T> = Result<T, BoardComputerError>;
 pub type FmsResult<T> = Result<T, FmsError>;
 pub type ClientsRegistryResult<T> = Result<T, ClientsRegistryError>;
 pub type BoatsRegistryResult<T> = Result<T, BoatsRegistryError>;
+pub type RadioFrequencyResult<T> = Result<T, RadioFrequencyError>;
+pub type BoatInfoResult<T> = Result<T, BoatInfoError>;
+pub type SlotsMapResult<T> = Result<T, SlotsMapError>;
 
 impl From<SystemTimeError> for ClockError {
     fn from(val: SystemTimeError) -> Self {
@@ -596,6 +627,12 @@ impl From<BitPackerError> for CommunicationStateError {
 impl From<CommunicationStateError> for AisMessageError {
     fn from(val: CommunicationStateError) -> Self {
         Self::CommunicationState(val)
+    }
+}
+
+impl From<BoatInfoError> for AisMessageError {
+    fn from(val: BoatInfoError) -> Self {
+        Self::BoatInfo(val)
     }
 }
 
@@ -626,6 +663,30 @@ impl From<ClockError> for AisError {
 impl From<AisMessageError> for AisError {
     fn from(val: AisMessageError) -> Self {
         Self::AisMessage(val)
+    }
+}
+
+impl From<BoatInfoError> for AisError {
+    fn from(val: BoatInfoError) -> Self {
+        Self::BoatInfo(val)
+    }
+}
+
+impl From<SlotsMapError> for AisError {
+    fn from(val: SlotsMapError) -> Self {
+        Self::SlotsMap(val)
+    }
+}
+
+impl From<BoatsRegistryError> for AisError {
+    fn from(val: BoatsRegistryError) -> Self {
+        Self::BoatsRegistry(val)
+    }
+}
+
+impl From<SendError<BitPacker>> for AisError {
+    fn from(val: SendError<BitPacker>) -> Self {
+        Self::SendError(val)
     }
 }
 
@@ -701,6 +762,12 @@ impl From<SendError<SatComMessage>> for BoardComputerError {
     }
 }
 
+impl From<BoatInfoError> for BoardComputerError {
+    fn from(val: BoatInfoError) -> Self {
+        Self::BoatInfo(val)
+    }
+}
+
 impl From<DatabaseManagerError> for FmsError {
     fn from(val: DatabaseManagerError) -> Self {
         Self::DatabaseManager(val)
@@ -716,5 +783,35 @@ impl From<BoatsRegistryError> for FmsError {
 impl From<SendError<SatComMessage>> for FmsError {
     fn from(val: SendError<SatComMessage>) -> Self {
         Self::SendError(val)
+    }
+}
+
+impl From<BoatInfoError> for FmsError {
+    fn from(val: BoatInfoError) -> Self {
+        Self::BoatInfo(val)
+    }
+}
+
+impl From<SendError<&[u8]>> for RadioFrequencyError {
+    fn from(_: SendError<&[u8]>) -> Self {
+        Self::SendError
+    }
+}
+
+impl From<ClientsRegistryError> for RadioFrequencyError {
+    fn from(val: ClientsRegistryError) -> Self {
+        Self::ClientsRegistry(val)
+    }
+}
+
+impl From<BitPackerError> for RadioFrequencyError {
+    fn from(val: BitPackerError) -> Self {
+        Self::BitPacker(val)
+    }
+}
+
+impl From<BoatInfoError> for BoatsRegistryError {
+    fn from(val: BoatInfoError) -> Self {
+        Self::BoatInfo(val)
     }
 }

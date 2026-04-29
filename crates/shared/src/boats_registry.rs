@@ -16,10 +16,10 @@ impl BoatsInfoRegistry {
     }
 
     pub fn register(&self, info: BoatInfo) -> BoatsRegistryResult<()> {
-        if self.is_registered(info.get_static_data().mmsi()) {
+        if self.is_registered(info.get_static_data()?.mmsi()) {
             Err(BoatsRegistryError::MmsiAlreadyRegistered)
         } else {
-            self.registry.insert(*info.get_static_data().mmsi(), info);
+            self.registry.insert(*info.get_static_data()?.mmsi(), info);
 
             Ok(())
         }
@@ -37,7 +37,7 @@ impl BoatsInfoRegistry {
     }
 
     pub fn update(&self, new_boat_info: BoatInfo) -> BoatsRegistryResult<BoatInfo> {
-        let mmsi: u32 = *new_boat_info.get_static_data().mmsi();
+        let mmsi: u32 = *new_boat_info.get_static_data()?.mmsi();
         if self.is_registered(&mmsi) {
             Ok(self.registry.insert(mmsi, new_boat_info).unwrap())
         } else {

@@ -1,10 +1,10 @@
-use crate::clients_registry::ClientsRegistry;
 use dashmap::DashSet;
 use shared::{
     bitpacker::BitPacker,
+    clients_registry::ClientsRegistry,
     common::{
         constants::{GPS_FROM_SERVER_PORT, HARBOURMASTER_IPADDR},
-        types::Channel,
+        types::{Channel, RadioFrequencyResult},
     },
 };
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -36,15 +36,17 @@ impl RadioFrequency {
         }
     }
 
-    async fn relay(&self, buf: &[u8]) {
-        for client_ip in self.clients.get() {
+    async fn relay(&self, buf: &[u8]) -> RadioFrequencyResult<()> {
+        for client_ip in self.clients.get()? {
             self.socket
                 .send_to(buf, SocketAddr::new(client_ip, self.em_port))
                 .await;
         }
+
+        Ok(())
     }
 
-    async fn handle_gps_request(&self, msg: BitPacker) -> () {
+    async fn handle_gps_request(&self, msg: BitPacker) -> RadioFrequencyResult<()> {
         self.socket
             .send_to(
                 msg.bits(),
@@ -53,21 +55,24 @@ impl RadioFrequency {
             .await;
         self.pending_gps_clients
             .insert(IpAddr::V4(Ipv4Addr::from_bits(
-                msg.extract_int::<u32>(None, None).unwrap(),
+                msg.extract_int::<u32>(None, None)?,
             )));
+
+        Ok(())
     }
 
-    async fn handle_gps_response(&self, msg: BitPacker) -> () {
-        let client: IpAddr = IpAddr::V4(Ipv4Addr::from_bits(
-            msg.extract_int::<u32>(None, Some(31)).unwrap(),
-        ));
+    async fn handle_gps_response(&self, msg: BitPacker) -> RadioFrequencyResult<()> {
+        let client: IpAddr =
+            IpAddr::V4(Ipv4Addr::from_bits(msg.extract_int::<u32>(None, Some(31))?));
 
-        let data: BitPacker = msg.slice(Some(32), None).unwrap();
+        let data: BitPacker = msg.slice(Some(32), None)?;
 
         self.socket
             .send_to(data.bits(), SocketAddr::new(client, GPS_FROM_SERVER_PORT))
             .await;
         self.pending_gps_clients.remove(&client);
+
+        Ok(())
     }
 
     pub fn start(self) -> JoinHandle<()> {
@@ -75,24 +80,23 @@ impl RadioFrequency {
             let mut buf: [u8; 512] = [0; 512];
 
             loop {
-                let result = self.socket.recv_from(&mut buf).await;
+                if let Ok((size, source)) = self.socket.recv_from(&mut buf).await {
+                    let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8));
 
-                let (size, source) = result.unwrap();
-                let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8));
+                    println!("{}: {}\n", source, msg.to_bin_str());
 
-                println!("{}: {}\n", source, msg.to_bin_str());
+                    self.clients.register_client(source.ip());
 
-                self.clients.register_client(source.ip());
-
-                if msg.bits() != BitPacker::from_str("hello", None).bits() {
-                    if matches!(self.channel, Channel::GPS) {
-                        if source.ip() != HARBOURMASTER_IPADDR {
-                            self.handle_gps_request(msg).await;
+                    if msg.bits() != BitPacker::from_str("hello", None).bits() {
+                        if matches!(self.channel, Channel::GPS) {
+                            if source.ip() != HARBOURMASTER_IPADDR {
+                                self.handle_gps_request(msg).await;
+                            } else {
+                                self.handle_gps_response(msg).await;
+                            }
                         } else {
-                            self.handle_gps_response(msg).await;
+                            self.relay(&msg.bits()).await;
                         }
-                    } else {
-                        self.relay(&msg.bits()).await;
                     }
                 }
             }

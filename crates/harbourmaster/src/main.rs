@@ -1,7 +1,6 @@
 use crate::harbourmaster::Harbourmaster;
 use std::env;
 
-mod clients_registry;
 mod database_manager;
 mod fms;
 mod harbourmaster;

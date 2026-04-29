@@ -62,7 +62,7 @@ impl HarbourmasterGps {
     }
 
     async fn run_detect_and_send(&self) -> () {
-        let mut cam = VideoCapture::new(4, CAP_V4L2).unwrap();
+        let mut cam = VideoCapture::new(0, CAP_V4L2).unwrap();
 
         let fourcc = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
         cam.set(CAP_PROP_FOURCC, fourcc as f64).unwrap();
@@ -79,8 +79,6 @@ impl HarbourmasterGps {
         let mut flipped_frame: Mat = Mat::default();
         let mut processed_mask: Mat = Mat::default();
         let mut hsv: Mat = Mat::default();
-
-        //let mut blurred = Mat::default();
 
         let mut mask1: Mat = Mat::default();
         let mut mask2: Mat = Mat::default();

@@ -11,7 +11,6 @@ use shared::{
         constants::{IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE},
         types::{
             AisError, AisMessageError, AisPacket, AisResult, Channel, ClockError, ClockResult,
-            CommunicationStateError,
         },
         utils::get_timestamp,
     },
@@ -70,15 +69,15 @@ impl BoatAisState {
         boat_info: Arc<BoatInfo>,
         boats_registry: Arc<BoatsInfoRegistry>,
         system_state: Arc<SystemState>,
-    ) -> Self {
-        let mmsi: u32 = *boat_info.get_static_data().mmsi();
+    ) -> AisResult<Self> {
+        let mmsi: u32 = *boat_info.get_static_data()?.mmsi();
 
         let sotdma_ri: u32 = 10;
         let sotdma_rr: f64 = 60. / sotdma_ri as f64;
         let sotdma_ni: u16 = (SLOTS_PER_MINUTE as f64 / sotdma_rr).round() as u16;
         let sotdma_si: u16 = (0.2 * sotdma_ni as f64).round() as u16;
 
-        Self {
+        Ok(Self {
             c_87_b_tx: c_87_b_tx,
             c_88_b_tx: c_88_b_tx,
             clock_pulse: Notify::new(),
@@ -99,7 +98,7 @@ impl BoatAisState {
             sotdma_tmo_max: AtomicU8::from(7),
             sotdma_t_counter: AtomicU64::from(1),
             system_state: system_state,
-        }
+        })
     }
 
     pub fn slots_map(&self) -> &SlotsMap {
@@ -144,17 +143,17 @@ impl BoatAisRunner {
         boat_info: Arc<BoatInfo>,
         boats_reg: Arc<BoatsInfoRegistry>,
         sys_state: Arc<SystemState>,
-    ) -> Self {
-        Self {
+    ) -> AisResult<Self> {
+        Ok(Self {
             state: BoatAisState::init(
                 c87b_tx.clone(),
                 c88b_tx.clone(),
                 boat_info,
                 boats_reg,
                 sys_state,
-            ),
+            )?,
             ais_rx: Mutex::new(rx),
-        }
+        })
     }
 
     async fn run_boat_ais_master_clock(&self) -> ClockResult<()> {
@@ -181,44 +180,44 @@ impl BoatAisRunner {
     fn handle_transmission(&self, msg: BitPacker, channel: Channel) -> AisResult<AisMessage> {
         let t_si: u16 = SlotsMap::current_si(channel);
         let msg: AisMessage = AisMessage::from_bits(msg)?;
-        let boat_mmsi: u32 = *msg.boat_info().get_static_data().mmsi();
-        let self_mmsi: u32 = *self.state.boat_info().get_static_data().mmsi();
+        let boat_mmsi: u32 = *msg.boat_info().get_static_data()?.mmsi();
+        let self_mmsi: u32 = *self.state.boat_info().get_static_data()?.mmsi();
 
         if boat_mmsi != self_mmsi && IMPLEMENTED_MSGS.binary_search(msg.message_type()).is_ok() {
             if self.state.boats_registry.is_registered(&boat_mmsi) {
-                self.state.boats_registry.update(msg.boat_info());
+                self.state.boats_registry.update(msg.boat_info())?;
             } else {
-                self.state.boats_registry.register(msg.boat_info());
+                self.state.boats_registry.register(msg.boat_info())?;
             }
 
             let slots_map: &SlotsMap = self.state.slots_map();
-            let t_si_owner: Option<u32> = slots_map.slot_owner(t_si);
-            let t_si_timeout: Option<u8> = slots_map.slot_timeout(t_si);
+            let t_si_owner: Option<u32> = slots_map.slot_owner(t_si)?;
+            let t_si_timeout: Option<u8> = slots_map.slot_timeout(t_si)?;
 
             if t_si_owner.is_none() || t_si_owner == Some(boat_mmsi) {
                 if t_si_timeout.is_some() {
-                    slots_map.use_slot(t_si);
+                    slots_map.use_slot(t_si)?;
                 } else {
-                    slots_map.flag_slot_as_used(t_si);
+                    slots_map.flag_slot_as_used(t_si)?;
                 }
 
                 if [1, 2].binary_search(msg.message_type()).is_ok() {
                     let com_state_timeout: u8 = *msg.communication_state()?.slot_timeout()?;
 
                     if t_si_owner.is_none() && com_state_timeout > 0 {
-                        slots_map.book_slot(t_si, boat_mmsi, Some(com_state_timeout), None);
+                        slots_map.book_slot(t_si, boat_mmsi, Some(com_state_timeout), None)?;
                     } else if t_si_timeout.is_none() || com_state_timeout > 0 {
-                        slots_map.set_slot_timeout(t_si, Some(com_state_timeout));
+                        slots_map.set_slot_timeout(t_si, Some(com_state_timeout))?;
                     } else if t_si_timeout == Some(0) || com_state_timeout == 0 {
-                        slots_map.release_slot(t_si);
+                        slots_map.release_slot(t_si)?;
                     }
 
                     if com_state_timeout == 0 {
                         let cs_offset: u16 = *msg.communication_state()?.slot_offset()?;
                         let rsv_s: u16 = SlotsMap::offseted_si(t_si, cs_offset);
 
-                        slots_map.book_slot(rsv_s, boat_mmsi, Some(com_state_timeout), None);
-                        slots_map.release_slot(t_si);
+                        slots_map.book_slot(rsv_s, boat_mmsi, Some(com_state_timeout), None)?;
+                        slots_map.release_slot(t_si)?;
                     }
                 } else if *msg.message_type() == 3 {
                     let com_state_keep_flag: bool = *msg.communication_state()?.keep_flag()?;
@@ -226,14 +225,14 @@ impl BoatAisRunner {
                         *msg.communication_state()?.slot_increment()?;
 
                     if com_state_keep_flag == false {
-                        slots_map.release_slot(t_si);
-                    } else if slots_map.slot_owner(t_si).is_none() && com_state_keep_flag {
-                        slots_map.book_slot(t_si, boat_mmsi, None, None);
+                        slots_map.release_slot(t_si)?;
+                    } else if slots_map.slot_owner(t_si)?.is_none() && com_state_keep_flag {
+                        slots_map.book_slot(t_si, boat_mmsi, None, None)?;
                     }
 
                     if com_state_slot_increment > 0 {
                         let rsv_s = SlotsMap::offseted_si(t_si, com_state_slot_increment);
-                        slots_map.book_slot(rsv_s, boat_mmsi, None, None);
+                        slots_map.book_slot(rsv_s, boat_mmsi, None, None)?;
                     }
                 }
             }
@@ -292,10 +291,11 @@ impl BoatAisRunner {
         let si: u16 = self.state.si();
         let start_si: u16 = (upcoming_ns + SLOTS_PER_MINUTE - si.div_euclid(2)) % SLOTS_PER_MINUTE;
 
-        let available_ss: Box<[u16]> =
-            self.state
-                .slots_map()
-                .scan_for_self_owned_ssi(Some(si), Some(start_si), Channel::Any);
+        let available_ss: Box<[u16]> = self.state.slots_map().scan_for_self_owned_ssi(
+            Some(si),
+            Some(start_si),
+            Channel::Any,
+        )?;
 
         Ok(*available_ss
             .choose(&mut rand::rng())
@@ -326,7 +326,7 @@ impl BoatAisRunner {
         let available_nts: Box<[u16]> =
             self.state
                 .slots_map()
-                .scan_for_free_ssi(Some(si), Some(start_si), None, rsv_chn);
+                .scan_for_free_ssi(Some(si), Some(start_si), None, rsv_chn)?;
 
         if available_nts.len() < 4 {
             return Err(AisError::NoValidSlotSelection);
@@ -341,10 +341,10 @@ impl BoatAisRunner {
 
         let timeout: u8 = rand::rng().random_range(tmo_min..=tmo_max) as u8;
 
-        let mmsi: u32 = *self.state.boat_info().get_static_data().mmsi();
+        let mmsi: u32 = *self.state.boat_info().get_static_data()?.mmsi();
         self.state
             .slots_map()
-            .book_slot(next_nts, mmsi, Some(timeout), Some(false));
+            .book_slot(next_nts, mmsi, Some(timeout), Some(false))?;
 
         Ok(next_nts)
     }
@@ -365,7 +365,7 @@ impl BoatAisRunner {
 
         let sync_state: u8 = self.state.sync_state();
 
-        let timeout: Option<u8> = self.state.slots_map().slot_timeout(t_si);
+        let timeout: Option<u8> = self.state.slots_map().slot_timeout(t_si)?;
         let recv_stations: u16 = self.state.recv_stations();
 
         let com_state: Option<CommunicationState> = if NO_CS_MSGS.binary_search(&msg_type).is_err()
@@ -388,7 +388,7 @@ impl BoatAisRunner {
         let msg: AisMessage =
             AisMessage::from_info(self.state.boat_info().as_ref().clone(), msg_type, com_state)?;
 
-        ant_tx.send(msg.build()?).await;
+        ant_tx.send(msg.build()?).await?;
 
         log(format!(
             "Message {} envoyé avec succès sur le slot {}.",
@@ -406,7 +406,7 @@ impl BoatAisRunner {
 
         let slots_range: Box<[u16]> = self.state.slots_map().ssi_range(start_s, lme_rtes, chn);
         let mut candidates: Vec<u16> =
-            Vec::from(self.state.slots_map().filter_unavailable_ssi(slots_range));
+            Vec::from(self.state.slots_map().filter_available_ssi(&slots_range)?);
 
         let mut candidate: u16 = *candidates
             .choose(&mut rand::rng())
@@ -452,11 +452,11 @@ impl BoatAisRunner {
                 t_s,
             )
             .await?;
-            self.state.slots_map().use_slot(t_s);
+            self.state.slots_map().use_slot(t_s)?;
         } else if NO_CS_MSGS.binary_search(&msg_type).is_ok() {
             self.wait_for_slot(t_s).await?;
             self.send(msg_type, None, None, None, t_s).await?;
-            self.state.slots_map().use_slot(t_s);
+            self.state.slots_map().use_slot(t_s)?;
         } else {
             return Err(AisError::AisMessage(AisMessageError::UnknownMessageType));
         }
@@ -505,7 +505,7 @@ impl BoatAisRunner {
 
                 log(format!("NTS réservé pour le prochain message 3 : {}.", next_nts).yellow());
             } else {
-                self.state.slots_map().release_slot(next_nts);
+                self.state.slots_map().release_slot(next_nts)?;
 
                 self.state.set_nts(ref_nts);
             }
@@ -518,7 +518,6 @@ impl BoatAisRunner {
         // Ici, on arrive avec les NS / NTS du message qu'on va envoyer juste après et qu'on doit encore construire
         let nts: u16 = self.state.nts().clone();
         let ns: u16 = self.state.ns().clone();
-        let si: u16 = self.state.si();
 
         let next_ns: u16 = self.upcoming_ns();
 
@@ -529,7 +528,7 @@ impl BoatAisRunner {
                 if last_msg5_timestamp == -1 || get_timestamp(None) - last_msg5_timestamp >= 356 {
                     let msg5_slot: u16 = self.book_new_nts(next_ns, false)?;
 
-                    self.state.slots_map().release_slot(msg5_slot);
+                    self.state.slots_map().release_slot(msg5_slot)?;
 
                     let offset: u16 = SlotsMap::si_offset(Some(nts), msg5_slot);
 
@@ -554,7 +553,7 @@ impl BoatAisRunner {
                             let _ = self.send(5, None, None, None, msg5_slot).await;
                         }
                     });
-                } else if self.state.slots_map().slot_timeout(nts) == Some(0) {
+                } else if self.state.slots_map().slot_timeout(nts)? == Some(0) {
                     let new_nts: u16 = self.book_new_nts(ns, true)?;
 
                     log(format!("NTS {} arrivé à expiration : remplacement par le slot {} après le prochain message.", nts, new_nts).yellow());
@@ -564,7 +563,7 @@ impl BoatAisRunner {
                     self.wait_for_nts().await?;
 
                     self.send(1, None, Some(offset), None, nts).await?;
-                    self.state.slots_map().use_slot(nts);
+                    self.state.slots_map().use_slot(nts)?;
 
                     self.state.increase_t_counter();
                     self.state.set_ns(next_ns);
@@ -573,7 +572,7 @@ impl BoatAisRunner {
                     self.wait_for_nts().await?;
 
                     self.send(1, None, None, None, nts).await?;
-                    self.state.slots_map().use_slot(nts);
+                    self.state.slots_map().use_slot(nts)?;
 
                     self.state.increase_t_counter();
                     self.state.set_ns(next_ns);
@@ -651,8 +650,6 @@ impl BoatAisRunner {
         } else {
             return Err(AisError::SotdmaInitFailed);
         }
-
-        Ok(())
     }
 
     async fn run_listeners(&self) -> () {
@@ -669,7 +666,7 @@ impl BoatAisRunner {
                             log(format!(
                                 "Message {} reçu du navire {} : {:#?}.",
                                 msg.message_type(),
-                                *msg.boat_info().get_static_data().mmsi(),
+                                *msg.boat_info().get_static_data().unwrap().mmsi(),
                                 msg.boat_info()
                             )
                             .blue());
@@ -686,7 +683,7 @@ impl BoatAisRunner {
                             log(format!(
                                 "Message {} reçu du navire {} : {:#?}.",
                                 *msg.message_type(),
-                                *msg.boat_info().get_static_data().mmsi(),
+                                *msg.boat_info().get_static_data().unwrap().mmsi(),
                                 msg.boat_info()
                             )
                             .blue());
@@ -733,11 +730,13 @@ impl BoatAisRunner {
 
         (
             tokio::spawn(async move {
-                slots_map_cleanup_runner_arc
+                let _ = slots_map_cleanup_runner_arc
                     .state
                     .slots_map()
                     .run_cleanup_task()
                     .await;
+                log("Le daemon de nettoyage des slots s'est arrêté de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red());
+                panic!();
             }),
             tokio::spawn(async move {
                 let _ = clock_runner_arc.clone().run_boat_ais_master_clock().await;

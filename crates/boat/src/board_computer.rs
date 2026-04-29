@@ -91,12 +91,12 @@ impl BoardComputer {
         }
     }
 
-    fn adopt_voyage_order(&mut self, order: &VoyageOrder) -> () {
+    fn adopt_voyage_order(&mut self, order: &VoyageOrder) -> BoardComputerResult<()> {
         self.update_voyage(Voyage::from(
             order.clone(),
             (
-                *self.boat_info.get_navigation_data().longitude() as u16, // ATTENTION, CE N'EST PAS CORRECT, MAIS ON PART DU PRINCIPE QUE COMME ON UTILISER UN REPERE 1920x1080, UN u16 SUFFIT !
-                *self.boat_info.get_navigation_data().latitude() as u16,
+                *self.boat_info.get_navigation_data()?.longitude() as u16, // ATTENTION, CE N'EST PAS CORRECT, MAIS ON PART DU PRINCIPE QUE COMME ON UTILISER UN REPERE 1920x1080, UN u16 SUFFIT !
+                *self.boat_info.get_navigation_data()?.latitude() as u16,
             ),
         ));
 
@@ -108,12 +108,14 @@ impl BoardComputer {
             Some(*order_body.eta_day()),
             Some(*order_body.eta_hour()),
             Some(*order_body.eta_minute()),
-        );
+        )?;
+
+        Ok(())
     }
 
     fn adopt_voyage_order_rev(&mut self) -> BoardComputerResult<()> {
         if let Some(order) = self.voyage_order_revision.take() {
-            self.adopt_voyage_order(&order);
+            self.adopt_voyage_order(&order)?;
 
             Ok(())
         } else {
@@ -129,7 +131,7 @@ impl BoardComputer {
         res_order_revision: Option<VoyageOrderBody>,
     ) -> BoardComputerResult<()> {
         let message = SatComMessage::new(
-            *self.boat_info.get_static_data().mmsi(),
+            *self.boat_info.get_static_data()?.mmsi(),
             HARBOURMASTER_MMSI,
             res_order_header.unwrap_or(satcom_msg.order_header()),
             msg_type,
@@ -175,7 +177,7 @@ impl BoardComputer {
                 .order()
                 .ok_or(BoardComputerError::NoVoyageOrder)?;
 
-            self.adopt_voyage_order(voyage_order);
+            self.adopt_voyage_order(voyage_order)?;
 
             self.update_voyage_status_and_respond(
                 VoyageStatus::RevisionAccepted,
@@ -279,7 +281,11 @@ impl BoardComputer {
     }
 
     async fn handle_rev_request(&mut self, satcom_msg: &SatComMessage) -> BoardComputerResult<()> {
-        self.voyage_order_revision = Some(satcom_msg.order().unwrap());
+        self.voyage_order_revision = Some(
+            satcom_msg
+                .order()
+                .ok_or(BoardComputerError::NoVoyageOrderRevision)?,
+        );
 
         self.update_voyage_status_and_respond(
             VoyageStatus::UnderRevision,
@@ -333,7 +339,7 @@ impl BoardComputer {
     }
 
     async fn run_board_computer(&mut self) -> BoardComputerResult<()> {
-        let self_mmsi: u32 = *self.boat_info.get_static_data().mmsi();
+        let self_mmsi: u32 = *self.boat_info.get_static_data()?.mmsi();
         while let Some(satcom_msg) = self.rx.recv().await {
             if *satcom_msg.target() != self_mmsi || *satcom_msg.source() != HARBOURMASTER_MMSI {
                 continue;
@@ -382,7 +388,7 @@ impl BoardComputer {
                     if (self.matches_status(Some(VoyageStatus::RevisionAccepted))
                         || self.matches_status(Some(VoyageStatus::RevisionRefused))
                         || self.matches_status(Some(VoyageStatus::InExecution)))
-                        && *self.order().unwrap().header().id() == *satcom_msg.order_header().id()
+                        && *self.order()?.header().id() == *satcom_msg.order_header().id()
                     {
                         self.handle_rev_request(&satcom_msg).await?;
                     }

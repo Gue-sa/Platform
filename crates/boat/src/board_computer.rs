@@ -403,10 +403,9 @@ impl BoardComputer {
     pub fn start(mut self) -> JoinHandle<()> {
         // ATTENTION : tout ce qui touche à la révision d'ordres de voyage en cours de route est très hasardeux, pour ne pas dire 0% fonctionnel.
         tokio::spawn(async move {
-            if let Err(e) = self.run_board_computer().await {
-                log(format!("Board computer exited with error: {:?}", e).red());
-            } else {
-                log("Board computer unexpectedly exited without error.".red());
+            match self.run_board_computer().await {
+                Ok(()) => log("Board computer exited unexpectedly.".red()),
+                Err(e) => log(format!("Board computer exited with error: {:?}", e).red()),
             }
         })
     }

@@ -1,4 +1,4 @@
-use std::{io::Error, time::SystemTimeError};
+use std::{io::Error, sync::PoisonError, time::SystemTimeError};
 
 use tokio::sync::mpsc::error::SendError;
 
@@ -538,6 +538,25 @@ pub enum BoardComputerError {
     SendError(SendError<SatComMessage>),
 }
 
+#[derive(Debug)]
+pub enum FmsError {
+    DatabaseManagerPoisoned,
+    DatabaseManager(DatabaseManagerError),
+    SendError(SendError<SatComMessage>),
+    BoatsRegistry(BoatsRegistryError),
+}
+
+#[derive(Debug)]
+pub enum ClientsRegistryError {
+    ClientsRegistryPoisoned,
+}
+
+#[derive(Debug)]
+pub enum BoatsRegistryError {
+    UnkownMmsi,
+    MmsiAlreadyRegistered,
+}
+
 pub type ClockResult<T> = Result<T, ClockError>;
 pub type BitPackerResult<T> = Result<T, BitPackerError>;
 pub type AisResult<T> = Result<T, AisError>;
@@ -552,6 +571,9 @@ pub type AntennaResult<T> = Result<T, AntennaError>;
 pub type RadioBuilderResult<T> = Result<T, RadioBuilderError>;
 pub type BoatResult<T> = Result<T, BoatError>;
 pub type BoardComputerResult<T> = Result<T, BoardComputerError>;
+pub type FmsResult<T> = Result<T, FmsError>;
+pub type ClientsRegistryResult<T> = Result<T, ClientsRegistryError>;
+pub type BoatsRegistryResult<T> = Result<T, BoatsRegistryError>;
 
 impl From<SystemTimeError> for ClockError {
     fn from(val: SystemTimeError) -> Self {
@@ -674,6 +696,24 @@ impl From<RadioBuilderError> for BoatError {
 }
 
 impl From<SendError<SatComMessage>> for BoardComputerError {
+    fn from(val: SendError<SatComMessage>) -> Self {
+        Self::SendError(val)
+    }
+}
+
+impl From<DatabaseManagerError> for FmsError {
+    fn from(val: DatabaseManagerError) -> Self {
+        Self::DatabaseManager(val)
+    }
+}
+
+impl From<BoatsRegistryError> for FmsError {
+    fn from(val: BoatsRegistryError) -> Self {
+        Self::BoatsRegistry(val)
+    }
+}
+
+impl From<SendError<SatComMessage>> for FmsError {
     fn from(val: SendError<SatComMessage>) -> Self {
         Self::SendError(val)
     }

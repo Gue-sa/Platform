@@ -1,5 +1,6 @@
 use crate::{common::utils::log, systemstate::SystemState};
 use colored::*;
+use core::panic;
 use rand::{RngExt, seq::IndexedRandom};
 use shared::{
     ais_message::{AisMessage, CommunicationState},
@@ -450,11 +451,11 @@ impl BoatAisRunner {
                 Some(lme_itsl),
                 t_s,
             )
-            .await;
+            .await?;
             self.state.slots_map().use_slot(t_s);
         } else if NO_CS_MSGS.binary_search(&msg_type).is_ok() {
             self.wait_for_slot(t_s).await?;
-            self.send(msg_type, None, None, None, t_s).await;
+            self.send(msg_type, None, None, None, t_s).await?;
             self.state.slots_map().use_slot(t_s);
         } else {
             return Err(AisError::AisMessage(AisMessageError::UnknownMessageType));
@@ -477,11 +478,11 @@ impl BoatAisRunner {
     }
 
     async fn sotdma_first_frame(&self) -> AisResult<()> {
-        let mut virtual_offset: Option<u16> = None;
+        let mut virtual_offset: u16 = u16::MAX;
         let ref_nts: u16 = self.state.nts();
         let si: u16 = self.state.si();
 
-        while virtual_offset.is_none() || virtual_offset != Some(0) {
+        while virtual_offset == u16::MAX || virtual_offset != 0 {
             let nts: u16 = self.state.nts();
             let next_ns: u16 = self.upcoming_ns();
 
@@ -489,17 +490,17 @@ impl BoatAisRunner {
             let offset: u16 = SlotsMap::si_offset(Some(nts), next_nts);
 
             virtual_offset = if SlotsMap::absolute_si_distance(Some(next_nts), ref_nts) >= si {
-                Some(offset)
+                offset
             } else {
-                Some(0)
+                0
             };
 
-            self.itdma(nts, 3, virtual_offset.unwrap(), 1, true).await?;
+            self.itdma(nts, 3, virtual_offset, 1, true).await?;
 
             self.state.increase_t_counter();
             self.state.set_ns(next_ns);
 
-            if virtual_offset.unwrap() != 0 {
+            if virtual_offset != 0 {
                 self.state.set_nts(next_nts);
 
                 log(format!("NTS réservé pour le prochain message 3 : {}.", next_nts).yellow());
@@ -549,8 +550,9 @@ impl BoatAisRunner {
                     self.state.set_last_msg5_timestamp(get_timestamp(None));
 
                     tokio::spawn(async move {
-                        self.wait_for_slot(msg5_slot).await;
-                        self.send(5, None, None, None, msg5_slot).await;
+                        if let Ok(_) = self.wait_for_slot(msg5_slot).await {
+                            let _ = self.send(5, None, None, None, msg5_slot).await;
+                        }
                     });
                 } else if self.state.slots_map().slot_timeout(nts) == Some(0) {
                     let new_nts: u16 = self.book_new_nts(ns, true)?;
@@ -561,7 +563,7 @@ impl BoatAisRunner {
 
                     self.wait_for_nts().await?;
 
-                    self.send(1, None, Some(offset), None, nts).await;
+                    self.send(1, None, Some(offset), None, nts).await?;
                     self.state.slots_map().use_slot(nts);
 
                     self.state.increase_t_counter();
@@ -570,7 +572,7 @@ impl BoatAisRunner {
                 } else {
                     self.wait_for_nts().await?;
 
-                    self.send(1, None, None, None, nts).await;
+                    self.send(1, None, None, None, nts).await?;
                     self.state.slots_map().use_slot(nts);
 
                     self.state.increase_t_counter();
@@ -738,7 +740,9 @@ impl BoatAisRunner {
                     .await;
             }),
             tokio::spawn(async move {
-                clock_runner_arc.clone().run_boat_ais_master_clock().await;
+                let _ = clock_runner_arc.clone().run_boat_ais_master_clock().await;
+                log("L'horloge SOTDMA s'est arrêtée de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red());
+                panic!();
             }),
             tokio::spawn(async move {
                 listeners_runner_arc.run_listeners().await;

@@ -7,6 +7,7 @@ use crate::database_manager::{
 };
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use diesel::prelude::*;
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use dotenvy::dotenv;
 use shared::{
     common::{
@@ -17,17 +18,26 @@ use shared::{
 };
 use std::env;
 
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
 pub struct DatabaseManager {
     connection: SqliteConnection,
 }
 
 impl DatabaseManager {
     pub fn init() -> DatabaseManagerResult<Self> {
-        dotenv().is_ok();
+        let mut path = env::current_exe().expect("Impossible de trouver le chemin de l'exécutable");
 
-        let database_url: String = env::var("DATABASE_URL").expect("DATABASE_URL must be set.");
-        let connection: SqliteConnection = SqliteConnection::establish(&database_url)
-            .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
+        path.pop();
+        path.push("harbourmaster_database.db");
+
+        let db_url: String = path.to_str().expect("Chemin invalide").to_string();
+
+        let mut connection: SqliteConnection = SqliteConnection::establish(&db_url)
+            .unwrap_or_else(|_| panic!("Error connecting to {}", db_url));
+
+        connection.run_pending_migrations(MIGRATIONS)
+            .map_err(|e| DatabaseManagerError::QueryError(diesel::result::Error::NotFound))?;
 
         Ok(Self {
             connection: connection,

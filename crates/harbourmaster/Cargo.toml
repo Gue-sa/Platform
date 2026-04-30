@@ -4,17 +4,22 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chrono = { version = "0.4.44", features = ["serde"]}
+chrono = { version = "0.4.44", features = ["serde"] }
 colored = "3.1.1"
 dashmap = "6.1.0"
 num-traits = "0.2.19"
 opencv = "0.98.2"
 rand = "0.10.1"
-tokio = {version = "1.51.0", features = ["full"]}
+tokio = { version = "1.51.0", features = ["full"] }
 shared = { path = "../shared" }
-diesel = { version = "2.3.7", features = ["sqlite", "chrono", "returning_clauses_for_sqlite_3_35"] }
+diesel = { version = "2.3.7", features = [
+        "sqlite",
+        "chrono",
+        "returning_clauses_for_sqlite_3_35",
+] }
 dotenvy = "0.15.7"
 axum = "0.8.9"
 serde = { version = "1.0.228", features = ["derive"] }
 tower-http = { version = "0.6.8", features = ["cors"] }
 getset = "0.1.6"
+diesel_migrations = "2.3.2"

@@ -4,5 +4,6 @@ members = [
     "crates/harbourmaster",
     "crates/server",
     "crates/shared",
+    "crates/launcher"
 ]
 resolver = "2"

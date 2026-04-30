@@ -5,7 +5,7 @@ use crate::{
     harbourmaster_gps::HarbourmasterGps,
 };
 use shared::{
-    antenna::Antenna, common::types::HarbourmasterResult, radio_builder::build_radio,
+    antenna::Antenna, common::errors::HarbourmasterResult, radio_builder::build_radio,
     satcom::SatCom,
 };
 use std::sync::{Arc, Mutex};

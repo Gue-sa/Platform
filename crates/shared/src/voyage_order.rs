@@ -1,4 +1,4 @@
-use crate::{bitpacker::BitPacker, common::types::VoyageOrderResult};
+use crate::{bitpacker::BitPacker, common::errors::VoyageOrderResult};
 use getset::{Getters, Setters};
 use serde::Serialize;
 

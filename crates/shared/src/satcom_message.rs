@@ -1,6 +1,6 @@
 use crate::{
     bitpacker::BitPacker,
-    common::types::{SatComMessageResult, SatComMessageType},
+    common::{errors::SatComMessageResult, types::SatComMessageType},
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
 use getset::{CloneGetters, Getters, Setters};

@@ -9,7 +9,10 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use diesel::prelude::*;
 use dotenvy::dotenv;
 use shared::{
-    common::types::{DatabaseManagerError, DatabaseManagerResult, VoyageStatus},
+    common::{
+        errors::{DatabaseManagerError, DatabaseManagerResult},
+        types::VoyageStatus,
+    },
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
 use std::env;
@@ -60,8 +63,10 @@ impl DatabaseManager {
         speed_profile: i32,
     ) -> DatabaseManagerResult<()> {
         let eta: NaiveDateTime = NaiveDateTime::new(
-            NaiveDate::from_ymd_opt(0, eta_month as u32, eta_day as u32).ok_or(DatabaseManagerError::InvalidNaiveDate)?,
-            NaiveTime::from_hms_opt(eta_hour as u32, eta_min as u32, 0).ok_or(DatabaseManagerError::InvalidNaiveDate)?,
+            NaiveDate::from_ymd_opt(0, eta_month as u32, eta_day as u32)
+                .ok_or(DatabaseManagerError::InvalidNaiveDate)?,
+            NaiveTime::from_hms_opt(eta_hour as u32, eta_min as u32, 0)
+                .ok_or(DatabaseManagerError::InvalidNaiveDate)?,
         );
 
         let new_voyage_order_version: VoyageOrderVersionInsertionModel<'_> =

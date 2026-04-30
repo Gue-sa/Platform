@@ -16,3 +16,5 @@ getset = "0.1.6"
 num-traits = "0.2.19"
 rand = "0.10.1"
 tokio = { version = "1.51.0", features = ["full"] }
+toml = "1.1.2"
+thiserror = "2.0.18"

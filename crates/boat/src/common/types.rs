@@ -1,4 +1,4 @@
-use shared::common::types::BitPackerError;
+use shared::common::errors::BitPackerError;
 
 pub enum GpsError {
     MalformedResponse,

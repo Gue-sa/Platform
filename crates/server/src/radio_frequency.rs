@@ -2,10 +2,8 @@ use dashmap::DashSet;
 use shared::{
     bitpacker::BitPacker,
     clients_registry::ClientsRegistry,
-    common::{
-        constants::{GPS_FROM_SERVER_PORT, HARBOURMASTER_IPADDR},
-        types::{Channel, RadioFrequencyResult},
-    },
+    common::{constants::GPS_FROM_SERVER_PORT, errors::RadioFrequencyResult, types::Channel},
+    config::Config,
 };
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::{net::UdpSocket, task::JoinHandle};
@@ -50,7 +48,10 @@ impl RadioFrequency {
         self.socket
             .send_to(
                 msg.bits(),
-                SocketAddr::new(HARBOURMASTER_IPADDR, GPS_FROM_SERVER_PORT),
+                SocketAddr::new(
+                    *Config::load().unwrap().harbourmaster_ip(),
+                    GPS_FROM_SERVER_PORT,
+                ),
             )
             .await;
         self.pending_gps_clients
@@ -89,7 +90,7 @@ impl RadioFrequency {
 
                     if msg.bits() != BitPacker::from_str("hello", None).bits() {
                         if matches!(self.channel, Channel::GPS) {
-                            if source.ip() != HARBOURMASTER_IPADDR {
+                            if source.ip() != *Config::load().unwrap().harbourmaster_ip() {
                                 self.handle_gps_request(msg).await;
                             } else {
                                 self.handle_gps_response(msg).await;

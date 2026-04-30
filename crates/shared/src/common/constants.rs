@@ -1,4 +1,7 @@
-use std::net::{IpAddr, Ipv4Addr};
+use std::{
+    net::{IpAddr, Ipv4Addr},
+    time::Duration,
+};
 
 pub const SIX_BITS_ASCII_ALPHABET: &[u8; 64] =
     b"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?";
@@ -66,9 +69,11 @@ pub const MSG5_FIELDS: [&str; 19] = [
     "spare",
 ];
 
-pub const FMS_UPDATE_SECS_INTERVAL: u64 = 1;
+pub const FMS_UPDATE_SECS_INTERVAL: u64 = 30;
 
-pub const HARBOURMASTER_UPDATE_SECS_INTERVAL: u64 = 1;
+pub const HARBOURMASTER_UPDATE_SECS_INTERVAL: u64 = 30;
+
+pub const BOAT_GPS_UPDATE_INTERVAL: Duration = Duration::from_secs(5);
 
 pub const HARBOURMASTER_IPADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
 pub const SERVER_IPADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));

@@ -8,7 +8,8 @@ use shared::{
     boats_registry::BoatsInfoRegistry,
     common::{
         constants::HARBOURMASTER_MMSI,
-        types::{BoardComputerError, BoardComputerResult, SatComMessageType, VoyageStatus},
+        errors::{BoardComputerError, BoardComputerResult},
+        types::{SatComMessageType, VoyageStatus},
     },
     satcom_message::SatComMessage,
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},

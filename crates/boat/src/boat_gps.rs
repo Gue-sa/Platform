@@ -6,7 +6,9 @@ use crate::{
     systemstate::SystemState,
 };
 use colored::Colorize;
-use shared::{bitpacker::BitPacker, boat_info::BoatInfo};
+use shared::{
+    bitpacker::BitPacker, boat_info::BoatInfo, common::constants::BOAT_GPS_UPDATE_INTERVAL,
+};
 use std::{net::Ipv4Addr, sync::Arc, u32};
 use tokio::{
     sync::mpsc::{Receiver, Sender},
@@ -39,7 +41,7 @@ impl BoatGps {
     async fn run_gps(&mut self) -> () {
         system_log("Lancement du GPS...".yellow());
 
-        let mut interval: Interval = interval(Duration::from_secs(1));
+        let mut interval: Interval = interval(BOAT_GPS_UPDATE_INTERVAL);
 
         loop {
             tokio::select! {
@@ -63,7 +65,10 @@ impl BoatGps {
         tokio::spawn(async move {
             self.run_gps().await;
 
-            system_log("Le GPS s'est arrêté de façon inattendue. Veuillez redémarrer le GPS manuellement.".red());
+            system_log(
+                "Le GPS s'est arrêté de façon inattendue. Veuillez redémarrer le GPS manuellement."
+                    .red(),
+            );
         })
     }
 }

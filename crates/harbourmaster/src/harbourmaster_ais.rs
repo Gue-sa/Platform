@@ -5,7 +5,8 @@ use shared::{
     boats_registry::BoatsInfoRegistry,
     common::{
         constants::{HARBOURMASTER_MMSI, IMPLEMENTED_MSGS},
-        types::{AisError, AisPacket, AisResult, Channel},
+        errors::{AisError, AisResult},
+        types::{AisPacket, Channel},
     },
     impl_atomic_access,
     slots_map::SlotsMap,
@@ -63,7 +64,9 @@ impl HarbourmasterAisRunner {
         let msg: AisMessage = AisMessage::from_bits(msg)?;
         let boat_mmsi: u32 = *msg.boat_info().get_static_data()?.mmsi();
 
-        if boat_mmsi != HARBOURMASTER_MMSI && IMPLEMENTED_MSGS.binary_search(msg.message_type()).is_ok() {
+        if boat_mmsi != HARBOURMASTER_MMSI
+            && IMPLEMENTED_MSGS.binary_search(msg.message_type()).is_ok()
+        {
             if self.state.boats_registry.is_registered(&boat_mmsi) {
                 self.state.boats_registry.update(msg.boat_info())?;
             } else {

@@ -1,5 +1,5 @@
 use crate::common::{
-    types::{BitPackerError, BitPackerResult},
+    errors::{BitPackerError, BitPackerResult},
     utils::{char6, ord6},
 };
 use getset::Getters;

@@ -3,10 +3,10 @@ use crate::{
     boat_info::{BoatInfo, NavigationData, StaticData, VoyageData},
     common::{
         constants::{MSG5_FIELDS, MSG123_FIELDS, SOTDMA_CS_MSGS},
-        types::{
-            AisMessageError, AisMessageResult, CSType, CommunicationStateError,
-            CommunicationStateResult,
+        errors::{
+            AisMessageError, AisMessageResult, CommunicationStateError, CommunicationStateResult,
         },
+        types::CSType,
         utils::*,
     },
 };

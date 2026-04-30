@@ -5,7 +5,8 @@ use shared::{
     boats_registry::BoatsInfoRegistry,
     common::{
         constants::{FMS_UPDATE_SECS_INTERVAL, HARBOURMASTER_MMSI},
-        types::{FmsError, FmsResult, SatComMessageType, VoyageStatus},
+        errors::{FmsError, FmsResult},
+        types::{SatComMessageType, VoyageStatus},
     },
     satcom_message::SatComMessage,
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
@@ -178,7 +179,7 @@ impl Fms {
             Some(concerned_voyage_order.1.eta.day() as u8),
             Some(concerned_voyage_order.1.eta.hour() as u8),
             Some(concerned_voyage_order.1.eta.minute() as u8),
-        );
+        )?;
 
         self.boats_registry.update(concerned_boat_info)?;
 

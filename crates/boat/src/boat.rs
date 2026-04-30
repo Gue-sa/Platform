@@ -3,7 +3,7 @@ use crate::{
     systemstate::SystemState, ui::Ui, voyage::Voyage,
 };
 use shared::{
-    antenna::Antenna, boat_info::BoatInfo, common::types::BoatResult, radio_builder::build_radio,
+    antenna::Antenna, boat_info::BoatInfo, common::errors::BoatResult, radio_builder::build_radio,
     satcom::SatCom,
 };
 use std::sync::Arc;
@@ -53,7 +53,8 @@ impl Boat {
             Arc::clone(&boat_info),
             boats_reg.clone(),
             system_state.clone(),
-        ).unwrap();
+        )
+        .unwrap();
         let gps: BoatGps = BoatGps::init(
             Arc::clone(&boat_info),
             gps_rx,

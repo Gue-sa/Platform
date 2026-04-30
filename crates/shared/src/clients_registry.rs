@@ -1,6 +1,5 @@
+use crate::common::errors::{ClientsRegistryError, ClientsRegistryResult};
 use std::{collections::HashSet, net::IpAddr, sync::RwLock};
-
-use crate::common::types::{ClientsRegistryError, ClientsRegistryResult};
 
 pub struct ClientsRegistry {
     clients: RwLock<HashSet<IpAddr>>,
@@ -26,7 +25,7 @@ impl ClientsRegistry {
             .write()
             .map_err(|_| ClientsRegistryError::ClientsRegistryPoisoned)?
             .insert(client);
-        
+
         Ok(())
     }
 
@@ -35,7 +34,7 @@ impl ClientsRegistry {
             .write()
             .map_err(|_| ClientsRegistryError::ClientsRegistryPoisoned)?
             .remove(&client);
-        
+
         Ok(())
     }
 

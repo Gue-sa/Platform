@@ -1,9 +1,7 @@
 use crate::{
     bitpacker::BitPacker,
-    common::{
-        constants::SERVER_IPADDR,
-        types::{AisPacket, AntennaError, AntennaResult, Channel},
-    },
+    common::{errors::{AntennaError, AntennaResult}, types::{AisPacket, Channel}},
+    config::Config,
 };
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::{
@@ -54,7 +52,10 @@ impl Antenna {
     pub async fn emit(&self, msg: BitPacker) -> AntennaResult<()> {
         let _ = self
             .socket
-            .send_to(msg.bits(), SocketAddr::new(SERVER_IPADDR, self.em_port))
+            .send_to(
+                msg.bits(),
+                SocketAddr::new(*Config::load().unwrap().server_ip(), self.em_port),
+            )
             .await
             .map_err(|_| AntennaError::EmissionError);
 

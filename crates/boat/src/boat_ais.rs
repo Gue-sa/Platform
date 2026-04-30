@@ -12,9 +12,8 @@ use shared::{
     boats_registry::BoatsInfoRegistry,
     common::{
         constants::{IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE},
-        types::{
-            AisError, AisMessageError, AisPacket, AisResult, Channel, ClockError, ClockResult,
-        },
+        errors::{AisError, AisMessageError, AisResult, ClockError, ClockResult},
+        types::{AisPacket, Channel},
         utils::get_timestamp,
     },
     impl_arc_access, impl_atomic_access,

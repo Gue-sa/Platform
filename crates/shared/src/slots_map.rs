@@ -1,7 +1,8 @@
 use crate::{
     common::{
         constants::SLOTS_PER_MINUTE,
-        types::{Channel, SlotsMapError, SlotsMapResult},
+        errors::{SlotsMapError, SlotsMapResult},
+        types::Channel,
         utils::{dt_to_slots_idx, get_current_dt},
     },
     slot::Slot,

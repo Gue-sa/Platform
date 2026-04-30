@@ -1,6 +1,6 @@
 use crate::{
     boat_info::BoatInfo,
-    common::types::{BoatResult, BoatsRegistryError, BoatsRegistryResult},
+    common::errors::{BoatsRegistryError, BoatsRegistryResult},
 };
 use dashmap::{DashMap, mapref::one::Ref};
 

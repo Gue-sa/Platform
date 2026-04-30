@@ -1,3 +1,5 @@
+use shared::config::Config;
+
 use crate::{boat::Boat, serial_driver::SerialDriver};
 use std::{env, thread};
 
@@ -13,19 +15,23 @@ mod voyage;
 
 #[tokio::main]
 async fn main() {
-    unsafe {
-        env::set_var("RUST_BACKTRACE", "1");
+    if Config::load().is_some() {
+        unsafe {
+            env::set_var("RUST_BACKTRACE", "1");
+        }
+
+        let boat: Boat = Boat::init()
+            .await
+            .expect("L'initialisation du bateau a échoué");
+
+        boat.start().await;
+
+        //let serialdriver = SerialDriver::init(/*boat.serial_rx, boat.serial_tx*/);
+
+        //serialdriver.start().await;
+
+        thread::park();
+    } else {
+        println!("Fichier de configuration non trouvé. Veuillez lancer le programme depuis le laucher.")
     }
-
-    let boat: Boat = Boat::init()
-        .await
-        .expect("L'initialisation du bateau a échoué");
-
-    boat.start().await;
-
-    //let serialdriver = SerialDriver::init(/*boat.serial_rx, boat.serial_tx*/);
-
-    //serialdriver.start().await;
-
-    thread::park();
 }

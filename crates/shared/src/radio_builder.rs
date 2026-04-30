@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     antenna::Antenna,
     bitpacker::BitPacker,
@@ -10,11 +8,13 @@ use crate::{
             GPS_FROM_SERVER_PORT, GPS_TO_SERVER_PORT, SATCOM_FROM_SERVER_PORT,
             SATCOM_TO_SERVER_PORT,
         },
-        types::{AisPacket, Channel, RadioBuilderResult},
+        errors::RadioBuilderResult,
+        types::{AisPacket, Channel},
     },
     satcom::SatCom,
     satcom_message::SatComMessage,
 };
+use std::sync::Arc;
 use tokio::sync::{
     Semaphore,
     mpsc::{Receiver, Sender, channel},

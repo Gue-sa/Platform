@@ -1,6 +1,6 @@
 use crate::{
     bitpacker::BitPacker,
-    common::types::{BoatInfoError, BoatInfoResult},
+    common::errors::{BoatInfoError, BoatInfoResult},
 };
 use getset::{Getters, Setters};
 use serde::Serialize;

@@ -1,4 +1,4 @@
-use crate::common::utils::log;
+use crate::common::utils::system_log;
 use colored::Colorize;
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use tokio::sync::Notify;
@@ -41,7 +41,7 @@ impl SystemState {
         if *guard {
             *guard = false;
         }
-        log("Emission AIS en cours.".yellow());
+        system_log("Emission AIS en cours.".yellow());
     }
 
     pub fn start_ais_emission(&self) -> () {
@@ -49,7 +49,7 @@ impl SystemState {
         if !*guard {
             *guard = true;
         }
-        log("Emission AIS interrompue.".yellow());
+        system_log("Emission AIS interrompue.".yellow());
     }
 
     pub fn stop_gps(&self) -> () {
@@ -57,7 +57,7 @@ impl SystemState {
         if *guard {
             *guard = false;
         }
-        log("GPS démarré.".yellow());
+        system_log("GPS démarré.".yellow());
     }
 
     pub fn start_gps(&self) -> () {
@@ -65,7 +65,7 @@ impl SystemState {
         if !*guard {
             *guard = true;
         }
-        log("GPS éteint.".yellow());
+        system_log("GPS éteint.".yellow());
     }
 
     pub fn start_navigation(&self) -> () {
@@ -73,7 +73,7 @@ impl SystemState {
         if *guard {
             *guard = false;
         }
-        log("Navigation en cours.".yellow());
+        system_log("Navigation en cours.".yellow());
     }
 
     pub fn stop_navigation(&self) -> () {
@@ -81,6 +81,6 @@ impl SystemState {
         if !*guard {
             *guard = true;
         }
-        log("Navigation interrompue.".yellow());
+        system_log("Navigation interrompue.".yellow());
     }
 }

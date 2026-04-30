@@ -1,9 +1,9 @@
-use crate::common::utils::log;
+use crate::common::utils::system_log;
 use colored::*;
 use rev_lines::RevLines;
 use shared::boat_info::{BoatInfo, NavigationData, StaticData, VoyageData};
 use slint::{ModelRc, SharedString, ToSharedString, VecModel, Weak};
-use std::{fs::File, io::BufReader, rc::Rc, sync::Arc};
+use std::{fs::File, io::BufReader, process, rc::Rc, sync::Arc};
 
 slint::include_modules!();
 
@@ -14,19 +14,22 @@ pub struct Ui {
 }
 
 impl Ui {
-    fn get_last_logs_entries(count: usize) -> ModelRc<SharedString> {
-        let file: File = File::open("logs.log").unwrap();
-        let rev_lines: RevLines<BufReader<File>> = RevLines::new(BufReader::new(file));
+    fn get_last_logs_entries(count: usize, logs_filename: &str) -> ModelRc<SharedString> {
+        if let Ok(file) = File::open(format!("{}.log", logs_filename)) {
+            let rev_lines: RevLines<BufReader<File>> = RevLines::new(BufReader::new(file));
 
-        let unwraped_logs: VecModel<SharedString> = VecModel::<SharedString>::default();
+            let unwraped_logs: VecModel<SharedString> = VecModel::<SharedString>::default();
 
-        for entry in rev_lines.take(count) {
-            if let Ok(line) = entry {
-                unwraped_logs.push(line.into());
+            for entry in rev_lines.take(count) {
+                if let Ok(line) = entry {
+                    unwraped_logs.push(line.into());
+                }
             }
-        }
 
-        Rc::new(unwraped_logs).clone().into()
+            Rc::new(unwraped_logs).clone().into()
+        } else {
+            Rc::new(VecModel::<SharedString>::default()).clone().into()
+        }
     }
 
     pub fn init(boat_info: Arc<BoatInfo>) -> Self {
@@ -45,8 +48,9 @@ impl Ui {
         let boat_info_clone: Arc<BoatInfo> = self.boat_info.clone();
 
         self.ui.on_close(move || {
-            log("Extinction du système...".yellow());
+            system_log("Extinction du système...".yellow());
             slint::quit_event_loop().expect("Erreur lors de la fermeture");
+            process::exit(0);
         });
 
         tokio::spawn(async move {
@@ -77,10 +81,19 @@ impl Ui {
 
                 let ui_weak: Weak<AppWindow> = ui_handle_clone.clone();
 
-                slint::invoke_from_event_loop(move || {
+                let _ = slint::invoke_from_event_loop(move || {
                     if let Some(ui) = ui_weak.upgrade() {
                         let boat_data = ui.global::<BoatData>();
-                        let logs: ModelRc<SharedString> = Ui::get_last_logs_entries(300);
+                        let system_logs: ModelRc<SharedString> =
+                            Ui::get_last_logs_entries(300, "system_logs");
+                        let ais_logs: ModelRc<SharedString> =
+                            Ui::get_last_logs_entries(300, "ais_logs");
+                        let gps_logs: ModelRc<SharedString> =
+                            Ui::get_last_logs_entries(300, "gps_logs");
+                        let satcom_logs: ModelRc<SharedString> =
+                            Ui::get_last_logs_entries(300, "satcom_logs");
+                        let computer_logs: ModelRc<SharedString> =
+                            Ui::get_last_logs_entries(300, "computer_logs");
 
                         boat_data.set_boat_name(name.to_shared_string());
                         boat_data.set_boat_mmsi(mmsi as i32);
@@ -97,12 +110,16 @@ impl Ui {
                         boat_data.set_boat_eta_hour(eta_hour as i32);
                         boat_data.set_boat_eta_minute(eta_min as i32);
 
-                        boat_data.set_log_msgs(logs);
+                        boat_data.set_sys_log_msgs(system_logs);
+                        boat_data.set_ais_log_msgs(ais_logs);
+                        boat_data.set_gps_log_msgs(gps_logs);
+                        boat_data.set_satcom_log_msgs(satcom_logs);
+                        boat_data.set_computer_log_msgs(computer_logs);
                     }
                 });
             }
         });
 
-        self.ui.run();
+        let _ = self.ui.run();
     }
 }

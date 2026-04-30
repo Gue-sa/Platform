@@ -1,4 +1,7 @@
-use crate::{common::utils::log, voyage::Voyage};
+use crate::{
+    common::utils::{computer_log, system_log},
+    voyage::Voyage,
+};
 use colored::*;
 use shared::{
     boat_info::BoatInfo,
@@ -157,7 +160,7 @@ impl BoardComputer {
         self.respond(satcom_msg, msg_type, res_order_header, res_order_rev)
             .await?;
 
-        log(log_msg.cyan());
+        computer_log(log_msg.cyan());
 
         Ok(())
     }
@@ -166,11 +169,13 @@ impl BoardComputer {
         self.respond(satcom_msg, SatComMessageType::Acknowledgement, None, None)
             .await?;
 
-        log(format!(
-            "Offre d'ordre de voyage reçue (ID {}). Accusé de réception envoyé.",
-            satcom_msg.order_header().id()
-        )
-        .cyan());
+        computer_log(
+            format!(
+                "Offre d'ordre de voyage reçue (ID {}). Accusé de réception envoyé.",
+                satcom_msg.order_header().id()
+            )
+            .cyan(),
+        );
 
         if !self.has_voyage() {
             let voyage_order: &VoyageOrder = &satcom_msg
@@ -195,11 +200,13 @@ impl BoardComputer {
             self.respond(satcom_msg, SatComMessageType::RevisionRefusal, None, None)
                 .await?;
 
-            log(format!(
-                "Ordre de voyage {} refusé (navire déjà en activité).",
-                satcom_msg.order_header().id()
-            )
-            .cyan());
+            computer_log(
+                format!(
+                    "Ordre de voyage {} refusé (navire déjà en activité).",
+                    satcom_msg.order_header().id()
+                )
+                .cyan(),
+            );
         }
 
         Ok(())
@@ -211,7 +218,7 @@ impl BoardComputer {
 
         self.update_voyage_status(VoyageStatus::UnderRevision)?;
 
-        log(format!(
+        computer_log(format!(
             "Demande de révision de l'ordre {} reçu par la capitainerie. Attente d'une réponse.",
             satcom_msg.order_header().id()
         )
@@ -339,7 +346,10 @@ impl BoardComputer {
     }
 
     async fn run_board_computer(&mut self) -> BoardComputerResult<()> {
+        system_log("Lancement de l'ordinateur de bord...".yellow());
+
         let self_mmsi: u32 = *self.boat_info.get_static_data()?.mmsi();
+
         while let Some(satcom_msg) = self.rx.recv().await {
             if *satcom_msg.target() != self_mmsi || *satcom_msg.source() != HARBOURMASTER_MMSI {
                 continue;
@@ -409,10 +419,9 @@ impl BoardComputer {
     pub fn start(mut self) -> JoinHandle<()> {
         // ATTENTION : tout ce qui touche à la révision d'ordres de voyage en cours de route est très hasardeux, pour ne pas dire 0% fonctionnel.
         tokio::spawn(async move {
-            match self.run_board_computer().await {
-                Ok(()) => log("Board computer exited unexpectedly.".red()),
-                Err(e) => log(format!("Board computer exited with error: {:?}", e).red()),
-            }
+            let _ = self.run_board_computer().await;
+
+            system_log("L'ordinateur de bord s'est arrêté de façon innatendue. Veuillez le relancer manuellement.".red());
         })
     }
 }

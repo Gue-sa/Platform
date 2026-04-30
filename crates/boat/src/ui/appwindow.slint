@@ -1,9 +1,16 @@
-import { Button, VerticalBox, LineEdit, Palette, HorizontalBox, ListView } from "std-widgets.slint";
+import {
+    Button,
+    VerticalBox,
+    LineEdit,
+    Palette,
+    HorizontalBox,
+    ListView,
+} from "std-widgets.slint";
 
 
 export global BoatData {
-    in-out property<string> boat-name: "default";
-    in-out property<int> boat-mmsi: 0;
+    in-out property <string> boat-name: "default";
+    in-out property <int> boat-mmsi: 0;
     in-out property <int> boat-imo: 0;
     in-out property <int> boat-type: 0;
     in-out property <int> boat-longitude: 0;
@@ -17,7 +24,17 @@ export global BoatData {
     in-out property <int> boat-eta-hour: 12;
     in-out property <int> boat-eta-minute: 59;
 
-    in-out property <[string]> log_msgs: [];
+    in-out property <bool> system-logs-focused: false;
+    in-out property <bool> ais-logs-focused: false;
+    in-out property <bool> gps-logs-focused: false;
+    in-out property <bool> satcom-logs-focused: false;
+    in-out property <bool> computer-logs-focused: false;
+
+    in-out property <[string]> sys_log_msgs: [];
+    in-out property <[string]> ais_log_msgs: [];
+    in-out property <[string]> gps_log_msgs: [];
+    in-out property <[string]> satcom_log_msgs: [];
+    in-out property <[string]> computer_log_msgs: [];
 
     in-out property <int> active-page: 0;
 }
@@ -108,7 +125,6 @@ export component ConfigView inherits Rectangle {
     }
 }
 
-
 export component DataView inherits Rectangle {
     HorizontalBox {
         VerticalBox {
@@ -157,19 +173,115 @@ export component DataView inherits Rectangle {
     }
 }
 
+export component SystemLogs inherits VerticalBox {
+    ListView {
+        for entry in BoatData.sys_log_msgs: Text {
+            text: entry;
+        }
+    }
+}
 
-export component AisView inherits Rectangle {
-    VerticalBox {
-        ListView {
-            for entry in BoatData.log_msgs : Text {
-                text: entry;
+export component AisLogs inherits VerticalBox {
+    ListView {
+        for entry in BoatData.ais_log_msgs: Text {
+            text: entry;
+        }
+    }
+}
+
+export component GpsLogs inherits VerticalBox {
+    ListView {
+        for entry in BoatData.gps_log_msgs: Text {
+            text: entry;
+        }
+    }
+}
+
+export component SatComLogs inherits VerticalBox {
+    ListView {
+        for entry in BoatData.satcom_log_msgs: Text {
+            text: entry;
+        }
+    }
+}
+
+export component ComputerLogs inherits VerticalBox {
+    ListView {
+        for entry in BoatData.computer_log_msgs: Text {
+            text: entry;
+        }
+    }
+}
+
+
+export component LogsView inherits Rectangle {
+    if (BoatData.system-logs-focused): SystemLogs { }
+    if (BoatData.ais-logs-focused): AisLogs { }
+    if (BoatData.gps-logs-focused): GpsLogs { }
+    if (BoatData.satcom-logs-focused): SatComLogs { }
+    if (BoatData.computer-logs-focused): ComputerLogs { }
+    if (!BoatData.system-logs-focused && !BoatData.ais-logs-focused && !BoatData.gps-logs-focused && !BoatData.satcom-logs-focused && !BoatData.computer-logs-focused): VerticalBox {
+        VerticalBox {
+            Button {
+                text: "Logs système";
+                clicked => {
+                    BoatData.system-logs-focused = true;
+                    BoatData.ais-logs-focused = false;
+                    BoatData.gps-logs-focused = false;
+                    BoatData.satcom-logs-focused = false;
+                    BoatData.computer-logs-focused = false;
+                }
+            }
+
+            Button {
+                text: "Logs AIS";
+                clicked => {
+                    BoatData.ais-logs-focused = true;
+                    BoatData.system-logs-focused = false;
+                    BoatData.gps-logs-focused = false;
+                    BoatData.satcom-logs-focused = false;
+                    BoatData.computer-logs-focused = false;
+                }
+            }
+
+            Button {
+                text: "Logs GPS";
+                clicked => {
+                    BoatData.gps-logs-focused = true;
+                    BoatData.system-logs-focused = false;
+                    BoatData.ais-logs-focused = false;
+                    BoatData.satcom-logs-focused = false;
+                    BoatData.computer-logs-focused = false;
+                }
+            }
+
+            Button {
+                text: "Logs SatCom";
+                clicked => {
+                    BoatData.satcom-logs-focused = true;
+                    BoatData.system-logs-focused = false;
+                    BoatData.ais-logs-focused = false;
+                    BoatData.gps-logs-focused = false;
+                    BoatData.computer-logs-focused = false;
+                }
+            }
+
+            Button {
+                text: "Logs ordinateur de bord";
+                clicked => {
+                    BoatData.computer-logs-focused = true;
+                    BoatData.system-logs-focused = false;
+                    BoatData.ais-logs-focused = false;
+                    BoatData.gps-logs-focused = false;
+                    BoatData.satcom-logs-focused = false;
+                }
             }
         }
     }
 }
 
 
-export component GpsView inherits Rectangle {
+export component GpsBeaconView inherits Rectangle {
     Rectangle {
         background: red;
     }
@@ -179,32 +291,44 @@ export component NavBar {
     HorizontalBox {
         Button {
             text: "Configuration";
-            clicked => { BoatData.active-page = 0; }
+            clicked => {
+                BoatData.active-page = 0;
+            }
         }
 
         Button {
             text: "Données";
-            clicked => { BoatData.active-page = 1; }
+            clicked => {
+                BoatData.active-page = 1;
+            }
         }
 
         Button {
-            text: "AIS";
-            clicked => { BoatData.active-page = 2; }
+            text: "Logs";
+            clicked => {
+                BoatData.active-page = 2;
+                BoatData.system-logs-focused = false;
+                BoatData.ais-logs-focused = false;
+                BoatData.gps-logs-focused = false;
+                BoatData.satcom-logs-focused = false;
+                BoatData.computer-logs-focused = false;
+            }
         }
 
         Button {
-            text: "GPS";
-            clicked => { BoatData.active-page = 3; }
+            text: "Balise GPS";
+            clicked => {
+                BoatData.active-page = 3;
+            }
         }
     }
 }
-
 
 export component AppWindow inherits Window {
     icon: @image-url("assets/absolute-absolute-foshu-4042990837.png");
 
     callback close();
-    
+
     width: 480px;
     height: 320px;
     title: "Tableau de Bord";
@@ -214,13 +338,17 @@ export component AppWindow inherits Window {
     full-screen: false;
 
     VerticalBox {
-        NavBar {}
+        NavBar { }
 
         Rectangle {
-            if (BoatData.active-page == 0) : ConfigView { request-close => { root.close(); } }
-            if (BoatData.active-page == 1) : DataView {}
-            if (BoatData.active-page == 2) : AisView {}
-            if (BoatData.active-page == 3) : GpsView {}
+            if (BoatData.active-page == 0): ConfigView {
+                request-close => {
+                    root.close();
+                }
+            }
+            if (BoatData.active-page == 1): DataView { }
+            if (BoatData.active-page == 2): LogsView { }
+            if (BoatData.active-page == 3): GpsBeaconView { }
         }
     }
 }

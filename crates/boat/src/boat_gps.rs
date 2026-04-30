@@ -1,4 +1,11 @@
-use crate::{common::constants::BOAT_IPV4, systemstate::SystemState};
+use crate::{
+    common::{
+        constants::BOAT_IPV4,
+        utils::{gps_log, system_log},
+    },
+    systemstate::SystemState,
+};
+use colored::Colorize;
 use shared::{bitpacker::BitPacker, boat_info::BoatInfo};
 use std::{net::Ipv4Addr, sync::Arc, u32};
 use tokio::{
@@ -30,19 +37,23 @@ impl BoatGps {
     }
 
     async fn run_gps(&mut self) -> () {
+        system_log("Lancement du GPS...".yellow());
+
         let mut interval: Interval = interval(Duration::from_secs(1));
 
         loop {
             tokio::select! {
                 Some(msg) = self.rx.recv() => {
                     if let Ok(latitude) = msg.extract_int::<u32>(None, Some(31)) && let Ok(longitude) = msg.extract_int::<u32>(Some(32), None) {
-                        self.boat_info.update_positon(Some(latitude), Some(longitude));
+                        let _ = self.boat_info.update_positon(Some(latitude), Some(longitude));
 
-                        //log(format!("Position mise à jour depuis le GPS : {latitude} | {longitude}").white().italic());
+                        gps_log(format!("Position mise à jour depuis le GPS : {latitude} | {longitude}").white().italic());
                     }
                 },
                 _ = interval.tick() => {
-                    self.antenna_tx.send(BitPacker::from_int(Ipv4Addr::to_bits(BOAT_IPV4), Some(32))).await;
+                    let _ = self.antenna_tx.send(BitPacker::from_int(Ipv4Addr::to_bits(BOAT_IPV4), Some(32))).await;
+
+                    gps_log("Demande de positionnement envoyée à la capitainerie.".white());
                 }
             };
         }
@@ -51,6 +62,8 @@ impl BoatGps {
     pub fn start(mut self) -> JoinHandle<()> {
         tokio::spawn(async move {
             self.run_gps().await;
+
+            system_log("Le GPS s'est arrêté de façon inattendue. Veuillez redémarrer le GPS manuellement.".red());
         })
     }
 }

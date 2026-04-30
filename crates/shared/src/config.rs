@@ -9,6 +9,7 @@ use std::{
 #[derive(Serialize, Deserialize, Debug, Getters, Setters)]
 #[getset(get = "pub", set = "pub")]
 pub struct Config {
+    is_simulation: bool,
     server_ip: IpAddr,
     harbourmaster_ip: IpAddr,
 }
@@ -16,6 +17,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            is_simulation: false,
             server_ip: IpAddr::V4(Ipv4Addr::from_str("0.0.0.0").unwrap()),
             harbourmaster_ip: IpAddr::V4(Ipv4Addr::from_str("0.0.0.0").unwrap()),
         }
@@ -23,8 +25,9 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn init(serv_ip: IpAddr, harbourmaster_ip: IpAddr) -> Self {
+    pub fn init(is_sim: bool, serv_ip: IpAddr, harbourmaster_ip: IpAddr) -> Self {
         Self {
+            is_simulation: is_sim,
             server_ip: serv_ip,
             harbourmaster_ip: harbourmaster_ip,
         }

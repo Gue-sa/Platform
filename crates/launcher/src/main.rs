@@ -193,7 +193,7 @@ fn build_config() -> () {
 fn change_settings() -> () {
     let config: Config = Config::load().unwrap();
 
-    let settings: [&str; 11] = [
+    let settings: [&str; 12] = [
         &format!(
             "Activer / désactiver le mode simulation (valeur actuelle = {}, défaut = Désactivé)",
             if *config.is_simulation() {
@@ -221,6 +221,14 @@ fn change_settings() -> () {
         &format!(
             "Activer / désactiver l'interface graphique bateau (valeur actuelle = {}, défaut = Activé)",
             if *config.gui() {
+                "Activé"
+            } else {
+                "Désactivé"
+            }
+        ),
+        &format!(
+            "Activer / désactiver l'interface web armateur (valeur actuelle = {}, défaut = Activé)",
+            if *config.wui() {
                 "Activé"
             } else {
                 "Désactivé"
@@ -335,6 +343,23 @@ fn change_settings() -> () {
 
                 match choice {
                     0 => {
+                        config.set_wui(true);
+                    }
+                    1 => {
+                        config.set_wui(false);
+                    }
+                    _ => {}
+                }
+            }
+            6 => {
+                let choice: usize = tert_input(
+                    "Veuillez choisir une option",
+                    Some("Activer"),
+                    Some("Désactiver"),
+                );
+
+                match choice {
+                    0 => {
                         config.set_api(true);
                     }
                     1 => {
@@ -343,7 +368,7 @@ fn change_settings() -> () {
                     _ => {}
                 }
             }
-            6 => {
+            7 => {
                 let choice: usize = tert_input(
                     "Veuillez choisir une option",
                     Some("Activer"),
@@ -360,19 +385,19 @@ fn change_settings() -> () {
                     _ => {}
                 }
             }
-            7 => {
+            8 => {
                 let d: u64 =
                     int_input::<u64>("Veuillez entrer le nouveau délai (en secondes)", None);
 
                 config.set_gps_refresh_delay(d);
             }
-            8 => {
+            9 => {
                 let n: usize =
                     int_input::<usize>("Veuillez entrer le nouveau nombre de lignes maximal", None);
 
                 config.set_max_cli_logs_history_length(n);
             }
-            9 => {
+            10 => {
                 let d: u64 =
                     int_input::<u64>("Veuillez entrer le nouveau délai (en millisecondes)", None);
 
@@ -383,7 +408,7 @@ fn change_settings() -> () {
             }
         }
 
-        if param <= 9 {
+        if param <= settings.len() - 2 {
             config.write();
 
             println!("\nParamètres modifiés avec succès.\n");

@@ -7,6 +7,7 @@ mod fms;
 mod harbourmaster;
 mod harbourmaster_ais;
 mod harbourmaster_gps;
+mod harbourmaster_web_ui;
 
 #[tokio::main]
 async fn main() -> () {

@@ -23,3 +23,11 @@ serde = { version = "1.0.228", features = ["derive"] }
 tower-http = { version = "0.6.8", features = ["cors"] }
 getset = "0.1.6"
 diesel_migrations = "2.3.2"
+rust-embed = "8.11.0"
+mime_guess = "2.0.5"
+open = "5.3.4"
+
+[features]
+arch-based = []
+rasp-based = []
+debian-based = []

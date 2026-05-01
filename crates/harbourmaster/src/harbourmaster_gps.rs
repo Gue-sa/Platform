@@ -116,14 +116,14 @@ impl HarbourmasterGps {
 
             core::flip(&frame, &mut flipped_frame, 1).unwrap();
 
-            cvt_color(
-                &flipped_frame,
-                &mut hsv,
-                COLOR_BGR2HSV,
-                0,
-                core::AlgorithmHint::ALGO_HINT_DEFAULT,
-            )
-            .unwrap();
+            #[cfg(feature = "arch-based")]
+            cvt_color(&flipped_frame, &mut hsv,COLOR_BGR2HSV, 0, core::AlgorithmHint::ALGO_HINT_DEFAULT).unwrap();
+
+            #[cfg(feature = "rasp-based")]
+            cvt_color(&flipped_frame, &mut hsv,COLOR_BGR2HSV, 0, core::AlgorithmHint::ALGO_HINT_DEFAULT).unwrap();
+
+            #[cfg(feature = "debian-based")]
+            cvt_color(&flipped_frame, &mut hsv,COLOR_BGR2HSV, 0).unwrap();
 
             // --- SEUILLAGE DU ROUGE ---
             // On baisse la saturation minimale (S=70 -> 50) pour capter le rouge "lavé" par la lumière de l'écran

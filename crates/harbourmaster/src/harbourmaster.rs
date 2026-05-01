@@ -2,7 +2,7 @@ use crate::{
     database_manager::{database_api::DatabaseApi, manager::DatabaseManager},
     fms::Fms,
     harbourmaster_ais::HarbourmasterAisRunner,
-    harbourmaster_gps::HarbourmasterGps,
+    harbourmaster_gps::HarbourmasterGps, harbourmaster_web_ui::{self, HarbourmasterWebUi},
 };
 use shared::{
     antenna::Antenna,
@@ -25,6 +25,7 @@ pub struct Harbourmaster {
     gps_antenna: Antenna,
     satcom_antenna: Antenna,
     database_api: DatabaseApi,
+    web_ui: HarbourmasterWebUi,
     logs_cli: LogsCli,
 }
 
@@ -84,6 +85,7 @@ impl Harbourmaster {
             gps_antenna: ant3,
             satcom_antenna: ant4,
             database_api: db_api,
+            web_ui: HarbourmasterWebUi::new().await,
             logs_cli: cli,
         })
     }
@@ -103,6 +105,12 @@ impl Harbourmaster {
 
         let _database_api_handle: Option<JoinHandle<()>> = if *config.api() {
             Some(self.database_api.start().await)
+        } else {
+            None
+        };
+
+        let _harbourmaster_wui_handle: Option<JoinHandle<()>> = if *config.wui() {
+            Some(self.web_ui.start().await)
         } else {
             None
         };

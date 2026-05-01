@@ -8,13 +8,6 @@ use std::{
 
 #[derive(Serialize, Deserialize, Debug, Getters, Setters)]
 #[getset(get = "pub", set = "pub")]
-/*
-pub struct Config {
-    is_simulation: bool,
-    server_ip: IpAddr,
-    harbourmaster_ip: IpAddr,
-}
-*/
 pub struct Config {
     is_simulation: bool,
 
@@ -23,6 +16,7 @@ pub struct Config {
 
     cli: bool,
     gui: bool,
+    wui: bool,
 
     api: bool,
 
@@ -55,6 +49,7 @@ impl Default for Config {
 
             cli: true,
             gui: true,
+            wui: true,
 
             api: true,
 

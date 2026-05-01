@@ -7,6 +7,7 @@ pub mod boats_registry;
 pub mod clients_registry;
 pub mod common;
 pub mod config;
+pub mod logs_cli;
 pub mod radio_builder;
 pub mod satcom;
 pub mod satcom_message;

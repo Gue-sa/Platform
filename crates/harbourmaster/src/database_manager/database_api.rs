@@ -7,10 +7,11 @@ use axum::{
     extract::{Query, State},
     routing::{get, post},
 };
+use colored::Colorize;
 use serde::Deserialize;
-use shared::{boat_info::BoatInfo, boats_registry::BoatsInfoRegistry};
-use std::sync::{Arc, Mutex};
-use tokio::net::TcpListener;
+use shared::{boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, common::types::LogEvent};
+use std::sync::{Arc, Mutex, mpsc::Sender};
+use tokio::{net::TcpListener, task::JoinHandle};
 use tower_http::cors::CorsLayer;
 
 #[derive(Deserialize, Debug)]
@@ -29,42 +30,57 @@ pub struct CreateVoyageOrderPayload {
 pub struct DatabaseApiSharedState {
     database_manager: Arc<Mutex<DatabaseManager>>,
     boats_registry: Arc<BoatsInfoRegistry>,
+    logs_cli_tx: Sender<LogEvent>,
 }
 
 pub struct DatabaseApi {
     state: Arc<DatabaseApiSharedState>,
 }
 
+impl DatabaseApiSharedState {
+    fn logs_cli_tx(&self) -> Sender<LogEvent> {
+        self.logs_cli_tx.clone()
+    }
+}
+
 impl DatabaseApi {
     pub fn init(
         database_manager: Arc<Mutex<DatabaseManager>>,
         boats_reg: Arc<BoatsInfoRegistry>,
+        cli_tx: Sender<LogEvent>,
     ) -> Self {
         Self {
             state: Arc::new(DatabaseApiSharedState {
                 database_manager: database_manager,
                 boats_registry: boats_reg,
+                logs_cli_tx: cli_tx,
             }),
         }
     }
 
-    pub async fn start(self) -> () {
-        let api: Router = Router::new()
-            .route("/get_voyage_orders", get(Self::get_voyage_orders))
-            .route(
-                "/get_voyage_order_versions",
-                get(Self::get_voyage_order_versions),
-            )
-            .route("/get_boats_list", get(Self::get_boats_list))
-            .route("/get_destinations", get(Self::get_destinations))
-            //.route("/get_statistics", get(Self::get_statistics))
-            .route("/add_voyage_order", post(Self::create_voyage_order))
-            .with_state(self.state.clone())
-            .layer(CorsLayer::permissive());
+    pub async fn start(self) -> JoinHandle<()> {
+        self.state
+            .logs_cli_tx()
+            .send(LogEvent::System("Lancement de l'API armateur...".yellow()));
 
-        let listener: TcpListener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
+        tokio::spawn(async move {
+            let api: Router = Router::new()
+                .route("/get_voyage_orders", get(Self::get_voyage_orders))
+                .route(
+                    "/get_voyage_order_versions",
+                    get(Self::get_voyage_order_versions),
+                )
+                .route("/get_boats_list", get(Self::get_boats_list))
+                .route("/get_destinations", get(Self::get_destinations))
+                //.route("/get_statistics", get(Self::get_statistics))
+                .route("/add_voyage_order", post(Self::create_voyage_order))
+                .with_state(self.state.clone())
+                .layer(CorsLayer::permissive());
 
-        axum::serve(listener, api).await.unwrap();
+            let listener: TcpListener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
+
+            axum::serve(listener, api).await.unwrap();
+        })
     }
 
     async fn get_voyage_orders(

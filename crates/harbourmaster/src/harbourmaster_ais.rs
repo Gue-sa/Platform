@@ -6,7 +6,7 @@ use shared::{
     common::{
         constants::{HARBOURMASTER_MMSI, IMPLEMENTED_MSGS},
         errors::{AisError, AisResult},
-        types::{AisPacket, Channel},
+        types::{AisPacket, Channel, LogEvent},
     },
     impl_atomic_access,
     slots_map::SlotsMap,
@@ -31,6 +31,7 @@ pub struct HarbourmasterAisState {
 pub struct HarbourmasterAisRunner {
     state: HarbourmasterAisState,
     ais_rx: Mutex<Receiver<AisPacket>>,
+    logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
 }
 
 impl HarbourmasterAisState {
@@ -52,11 +53,20 @@ impl HarbourmasterAisState {
 }
 
 impl HarbourmasterAisRunner {
-    pub fn init(rx: Receiver<AisPacket>, boats_registry: Arc<BoatsInfoRegistry>) -> Self {
+    pub fn init(
+        rx: Receiver<AisPacket>,
+        boats_registry: Arc<BoatsInfoRegistry>,
+        cli_tx: std::sync::mpsc::Sender<LogEvent>,
+    ) -> Self {
         Self {
             state: HarbourmasterAisState::init(boats_registry),
             ais_rx: Mutex::new(rx),
+            logs_cli_tx: cli_tx,
         }
+    }
+
+    fn logs_cli_tx(&self) -> std::sync::mpsc::Sender<LogEvent> {
+        self.logs_cli_tx.clone()
     }
 
     fn handle_transmission(&self, msg: BitPacker, channel: Channel) -> AisResult<AisMessage> {
@@ -127,6 +137,9 @@ impl HarbourmasterAisRunner {
     }
 
     async fn run_listeners(&self) -> () {
+        self.logs_cli_tx()
+            .send(LogEvent::System("Lancement de l'écoute AIS...".yellow()));
+
         loop {
             let pck_opt = {
                 let mut rx = self.ais_rx.lock().await;
@@ -137,41 +150,41 @@ impl HarbourmasterAisRunner {
                 match pck.channel {
                     Channel::C87B => match self.handle_transmission(pck.message, Channel::C87B) {
                         Ok(msg) => {
-                            println!(
-                                "{}",
+                            self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(
-                                    "Message {} reçu du navire {} : {:#?}.",
+                                    "Message {} reçu du navire {}.",
                                     msg.message_type(),
-                                    *msg.boat_info().get_static_data().unwrap().mmsi(),
-                                    msg.boat_info()
+                                    *msg.boat_info().get_static_data().unwrap().mmsi()
                                 )
-                                .blue()
-                            );
+                                .green(),
+                            ));
                         }
                         Err(e) => match e {
                             AisError::SelfEmittedMessage => {}
                             _ => {
-                                println!("{}", "Message corrompu reçu et ignoré.".red());
+                                self.logs_cli_tx().send(LogEvent::Ais(
+                                    format!("{}", "Message corrompu reçu et ignoré.").red(),
+                                ));
                             }
                         },
                     },
                     Channel::C88B => match self.handle_transmission(pck.message, Channel::C88B) {
                         Ok(msg) => {
-                            println!(
-                                "{}",
+                            self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(
-                                    "Message {} reçu du navire {} : {:#?}.",
-                                    *msg.message_type(),
-                                    *msg.boat_info().get_static_data().unwrap().mmsi(),
-                                    msg.boat_info()
+                                    "Message {} reçu du navire {}.",
+                                    msg.message_type(),
+                                    *msg.boat_info().get_static_data().unwrap().mmsi()
                                 )
-                                .blue()
-                            );
+                                .green(),
+                            ));
                         }
                         Err(e) => match e {
                             AisError::SelfEmittedMessage => {}
                             _ => {
-                                println!("{}", "Message corrompu reçu et ignoré.".red());
+                                self.logs_cli_tx().send(LogEvent::Ais(
+                                    format!("{}", "Message corrompu reçu et ignoré.").red(),
+                                ));
                             }
                         },
                     },
@@ -182,9 +195,18 @@ impl HarbourmasterAisRunner {
     }
 
     pub fn start(self) -> (JoinHandle<()>, JoinHandle<()>) {
+        self.logs_cli_tx()
+            .send(LogEvent::System("Lancement de l'AIS...".yellow()));
+
         let listeners_runner_arc: Arc<HarbourmasterAisRunner> = Arc::new(self);
         let slots_map_cleanup_runner_arc: Arc<HarbourmasterAisRunner> =
             listeners_runner_arc.clone();
+
+        slots_map_cleanup_runner_arc
+            .logs_cli_tx()
+            .send(LogEvent::System(
+                "Lancement du nettoyage automatique de la table des slots AIS...".yellow(),
+            ));
 
         (
             tokio::spawn(async move {
@@ -193,9 +215,16 @@ impl HarbourmasterAisRunner {
                     .slots_map()
                     .run_cleanup_task()
                     .await;
+
+                slots_map_cleanup_runner_arc
+                    .logs_cli_tx()
+                    .send(LogEvent::System("Le daemon de nettoyage de la table des slots s'est arrêté de façon innatendue. Veuillez redémarrer l'AIS manuellement.".yellow()));
             }),
             tokio::spawn(async move {
                 listeners_runner_arc.run_listeners().await;
+
+                listeners_runner_arc.logs_cli_tx()
+                    .send(LogEvent::System("L'écoute AIS s'est arrêtée de façon innatendue. Veuillez redémarrer l'AIS manuellement.".yellow()));
             }),
         )
     }

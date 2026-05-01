@@ -191,6 +191,8 @@ pub enum BoatError {
     RadioBuilder(#[from] RadioBuilderError),
     #[error(transparent)]
     Antenna(#[from] AntennaError),
+    #[error(transparent)]
+    BoatInfo(#[from] BoatInfoError),
 }
 
 #[derive(Error, Debug)]

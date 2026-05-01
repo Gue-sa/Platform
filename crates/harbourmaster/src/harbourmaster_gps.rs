@@ -1,3 +1,4 @@
+use colored::Colorize;
 use opencv::{
     core::{self, Moments, Point_, Scalar, Vector},
     highgui,
@@ -13,7 +14,7 @@ use opencv::{
         CAP_V4L2, VideoCapture, VideoWriter,
     },
 };
-use shared::bitpacker::BitPacker;
+use shared::{bitpacker::BitPacker, common::types::LogEvent};
 use std::sync::{
     Arc,
     atomic::{AtomicU32, Ordering},
@@ -33,10 +34,15 @@ pub struct HarbourmasterGps {
     antenna_tx: Sender<BitPacker>,
     latitude: AtomicU32,
     longitude: AtomicU32,
+    logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
 }
 
 impl HarbourmasterGps {
-    pub async fn init(rx: Receiver<BitPacker>, ant_tx: Sender<BitPacker>) -> Self {
+    pub async fn init(
+        rx: Receiver<BitPacker>,
+        ant_tx: Sender<BitPacker>,
+        cli_tx: std::sync::mpsc::Sender<LogEvent>,
+    ) -> Self {
         let (pos_tx, pos_rx) = channel::<[u32; 2]>(Semaphore::MAX_PERMITS);
 
         Self {
@@ -46,7 +52,12 @@ impl HarbourmasterGps {
             antenna_tx: ant_tx,
             latitude: AtomicU32::new(0),
             longitude: AtomicU32::new(0),
+            logs_cli_tx: cli_tx,
         }
+    }
+
+    fn logs_cli_tx(&self) -> std::sync::mpsc::Sender<LogEvent> {
+        self.logs_cli_tx.clone()
     }
 
     fn coordinates(&self) -> [u32; 2] {
@@ -62,6 +73,9 @@ impl HarbourmasterGps {
     }
 
     async fn run_detect_and_send(&self) -> () {
+        self.logs_cli_tx()
+            .send(LogEvent::System("Lancement du satellite GPS...".yellow()));
+
         let mut cam = VideoCapture::new(0, CAP_V4L2).unwrap();
 
         let fourcc = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
@@ -158,7 +172,6 @@ impl HarbourmasterGps {
                 if area > 800.0 {
                     let perimeter: f64 = arc_length(&contour, true).unwrap();
 
-                    // On augmente légèrement la précision (0.02 au lieu de 0.04)
                     approx_poly_dp(&contour, &mut approx, 0.02 * perimeter, true).unwrap();
 
                     // Détection de RECTANGLE (4 sommets + convexe)
@@ -176,7 +189,7 @@ impl HarbourmasterGps {
                                 .min(1080)
                                 .max(0);
 
-                            // Si tu as fait un downscaling, multiplie par 2 pour dessiner sur l'image originale
+                            // Si downscaling, multiplier par 2 pour dessiner sur l'image originale
                             // let final_x = center_x * 2;
                         }
 
@@ -207,14 +220,19 @@ impl HarbourmasterGps {
                 }
             }
 
+            /*
             highgui::imshow("Tracking Multi-Rectangles", &flipped_frame).unwrap();
             if highgui::wait_key(1).unwrap() == 'q' as i32 {
                 break;
             }
+            */
         }
     }
 
     async fn run_listener(&self) -> () {
+        self.logs_cli_tx()
+            .send(LogEvent::System("Lancement de l'écoute GPS...".yellow()));
+
         let mut rx: MutexGuard<'_, Receiver<BitPacker>> = self.rx.lock().await;
         let mut pos_rx: MutexGuard<'_, Receiver<[u32; 2]>> = self.pos_rx.lock().await;
 
@@ -224,17 +242,22 @@ impl HarbourmasterGps {
                     self.set_coordinates(pos_arr[1], pos_arr[0]);
                 },
                 Some(msg) = rx.recv() => {
-                    println!("Requête GPS reçue : {:?}", msg);
+                    self.logs_cli_tx().send(LogEvent::Gps(format!("Demande de positionnement GPS reçue : {:?}", msg.bits()).green()));
 
                     let res: BitPacker = BitPacker::from_int(self.latitude.load(Ordering::Relaxed), Some(32)) + BitPacker::from_int(self.longitude.load(Ordering::Relaxed), Some(32)) + msg;
 
-                    self.antenna_tx.send(res).await;
+                    self.antenna_tx.send(res.clone()).await;
+
+                    self.logs_cli_tx().send(LogEvent::Gps(format!("Position GPS envoyée : {:?}", res.bits()).green()));
                 }
             }
         }
     }
 
     pub fn start(self) -> (JoinHandle<()>, JoinHandle<()>) {
+        self.logs_cli_tx()
+            .send(LogEvent::System("Lancement du GPS...".yellow()));
+
         let listener_arc: Arc<HarbourmasterGps> = Arc::new(self);
         let detect_and_send_arc: Arc<HarbourmasterGps> = listener_arc.clone();
 

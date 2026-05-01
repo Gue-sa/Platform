@@ -1,5 +1,8 @@
 use rev_lines::RevLines;
-use shared::boat_info::{BoatInfo, NavigationData, StaticData, VoyageData};
+use shared::{
+    boat_info::{BoatInfo, NavigationData, StaticData, VoyageData},
+    config::Config,
+};
 use slint::{ModelRc, SharedString, ToSharedString, VecModel, Weak};
 use std::{fs::File, io::BufReader, process, rc::Rc, sync::Arc};
 
@@ -22,7 +25,7 @@ pub struct Ui {
 
 impl Ui {
     fn get_last_logs_entries(count: usize, logs_filename: &str) -> ModelRc<SharedString> {
-        if let Ok(file) = File::open(format!("{}.log", logs_filename)) {
+        if let Ok(file) = File::open(logs_filename) {
             let rev_lines: RevLines<BufReader<File>> = RevLines::new(BufReader::new(file));
 
             let unwraped_logs: VecModel<SharedString> = VecModel::<SharedString>::default();
@@ -87,18 +90,20 @@ impl Ui {
                 let ui_weak: Weak<AppWindow> = ui_handle_clone.clone();
 
                 let _ = slint::invoke_from_event_loop(move || {
+                    let config: Config = Config::load().unwrap();
+                    
                     if let Some(ui) = ui_weak.upgrade() {
                         let boat_data = ui.global::<BoatData>();
                         let system_logs: ModelRc<SharedString> =
-                            Ui::get_last_logs_entries(300, "system_logs");
+                            Ui::get_last_logs_entries(300, config.boat_sys_logs_filename());
                         let ais_logs: ModelRc<SharedString> =
-                            Ui::get_last_logs_entries(300, "ais_logs");
+                            Ui::get_last_logs_entries(300, config.boat_ais_logs_filename());
                         let gps_logs: ModelRc<SharedString> =
-                            Ui::get_last_logs_entries(300, "gps_logs");
+                            Ui::get_last_logs_entries(300, config.boat_gps_logs_filename());
                         let satcom_logs: ModelRc<SharedString> =
-                            Ui::get_last_logs_entries(300, "satcom_logs");
+                            Ui::get_last_logs_entries(300, config.boat_satcom_logs_filename());
                         let computer_logs: ModelRc<SharedString> =
-                            Ui::get_last_logs_entries(300, "computer_logs");
+                            Ui::get_last_logs_entries(300, config.boat_computer_logs_filename());
 
                         boat_data.set_boat_name(name.to_shared_string());
                         boat_data.set_boat_mmsi(mmsi as i32);

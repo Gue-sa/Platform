@@ -4,6 +4,13 @@ members = [
     "crates/harbourmaster",
     "crates/server",
     "crates/shared",
-    "crates/launcher"
+    "crates/launcher",
 ]
 resolver = "2"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

@@ -5,10 +5,14 @@ use crate::{
     harbourmaster_gps::HarbourmasterGps,
 };
 use shared::{
-    antenna::Antenna, common::errors::HarbourmasterResult, radio_builder::build_radio,
+    antenna::Antenna,
+    common::{constants::HARBOURMASTER_MMSI, errors::HarbourmasterResult, types::LogEvent},
+    config::Config,
+    logs_cli::LogsCli,
+    radio_builder::build_radio,
     satcom::SatCom,
 };
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc::channel};
 use tokio::task::JoinHandle;
 
 pub struct Harbourmaster {
@@ -21,10 +25,23 @@ pub struct Harbourmaster {
     gps_antenna: Antenna,
     satcom_antenna: Antenna,
     database_api: DatabaseApi,
+    logs_cli: LogsCli,
 }
 
 impl Harbourmaster {
     pub async fn init() -> HarbourmasterResult<Self> {
+        let config: Config = Config::load().unwrap();
+
+        let (cli_tx, cli_rx) = channel::<LogEvent>();
+        let cli: LogsCli = LogsCli::new(
+            cli_rx,
+            (*config.harbourmaster_sys_logs_filename().clone()).to_string(),
+            (*config.harbourmaster_ais_logs_filename().clone()).to_string(),
+            (*config.harbourmaster_gps_logs_filename().clone()).to_string(),
+            (*config.harbourmaster_satcom_logs_filename().clone()).to_string(),
+            (*config.harbourmaster_computer_logs_filename().clone()).to_string(),
+        );
+
         let (
             ais_rx,
             gps_rx,
@@ -39,15 +56,23 @@ impl Harbourmaster {
             ant4,
             satcom,
             boats_reg,
-        ) = build_radio().await?;
+        ) = build_radio(cli_tx.clone(), HARBOURMASTER_MMSI).await?;
 
         let db_manager: Arc<Mutex<DatabaseManager>> =
             Arc::new(Mutex::new(DatabaseManager::init()?));
-        let db_api: DatabaseApi = DatabaseApi::init(db_manager.clone(), boats_reg.clone());
+        let db_api: DatabaseApi =
+            DatabaseApi::init(db_manager.clone(), boats_reg.clone(), cli_tx.clone());
 
-        let ais: HarbourmasterAisRunner = HarbourmasterAisRunner::init(ais_rx, boats_reg.clone());
-        let gps: HarbourmasterGps = HarbourmasterGps::init(gps_rx, c_gps_tx).await;
-        let fms: Fms = Fms::init(boats_reg, db_manager, fms_rx, sender_satcom_tx);
+        let ais: HarbourmasterAisRunner =
+            HarbourmasterAisRunner::init(ais_rx, boats_reg.clone(), cli_tx.clone());
+        let gps: HarbourmasterGps = HarbourmasterGps::init(gps_rx, c_gps_tx, cli_tx.clone()).await;
+        let fms: Fms = Fms::init(
+            boats_reg,
+            db_manager,
+            fms_rx,
+            sender_satcom_tx,
+            cli_tx.clone(),
+        );
 
         Ok(Self {
             ais: ais,
@@ -59,10 +84,13 @@ impl Harbourmaster {
             gps_antenna: ant3,
             satcom_antenna: ant4,
             database_api: db_api,
+            logs_cli: cli,
         })
     }
 
     pub async fn start(self) -> HarbourmasterResult<()> {
+        let config: Config = Config::load().unwrap();
+
         let _c87b_antenna_handle: JoinHandle<()> = self.c87b_antenna.start().await?;
         let _c88b_antenna_handle: JoinHandle<()> = self.c88b_antenna.start().await?;
         let _gps_antenna_handle: JoinHandle<()> = self.gps_antenna.start().await?;
@@ -73,7 +101,19 @@ impl Harbourmaster {
         let _satcom_handle: JoinHandle<()> = self.satcom.start();
         let _fms_handle: (JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) = self.fms.start();
 
-        self.database_api.start().await;
+        let _database_api_handle: Option<JoinHandle<()>> = if *config.api() {
+            Some(self.database_api.start().await)
+        } else {
+            None
+        };
+
+        let _logs_cli_handle: Option<JoinHandle<()>> = if *config.cli() {
+            Some(self.logs_cli.run().unwrap())
+        } else {
+            None
+        };
+
+        std::thread::park();
 
         Ok(())
     }

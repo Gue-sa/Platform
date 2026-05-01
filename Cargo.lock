@@ -694,17 +694,14 @@ dependencies = [
 name = "boat"
 version = "0.1.0"
 dependencies = [
- "ansi-to-tui",
  "chrono",
  "colored",
  "crc",
  "crossterm",
  "dashmap",
  "getset",
- "libc",
  "num-traits",
  "rand 0.10.1",
- "ratatui",
  "rev_lines",
  "serde",
  "serialport",
@@ -3206,6 +3203,7 @@ dependencies = [
  "ctrlc",
  "dialoguer",
  "getset",
+ "num-traits",
  "serde",
  "shared",
  "sudo",
@@ -5354,14 +5352,18 @@ dependencies = [
 name = "shared"
 version = "0.1.0"
 dependencies = [
+ "ansi-to-tui",
  "chrono",
  "colored",
  "crc",
+ "crossterm",
  "dashmap",
  "diesel",
  "getset",
+ "libc",
  "num-traits",
  "rand 0.10.1",
+ "ratatui",
  "serde",
  "thiserror 2.0.18",
  "tokio",

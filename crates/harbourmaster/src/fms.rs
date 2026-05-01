@@ -1,12 +1,13 @@
 use crate::database_manager::manager::DatabaseManager;
 use chrono::{Datelike, Timelike};
+use colored::Colorize;
 use shared::{
     boat_info::BoatInfo,
     boats_registry::BoatsInfoRegistry,
     common::{
         constants::{FMS_UPDATE_SECS_INTERVAL, HARBOURMASTER_MMSI},
         errors::{FmsError, FmsResult},
-        types::{SatComMessageType, VoyageStatus},
+        types::{LogEvent, SatComMessageType, VoyageStatus},
     },
     satcom_message::SatComMessage,
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
@@ -26,6 +27,7 @@ pub struct Fms {
     rx: tokio::sync::Mutex<Receiver<SatComMessage>>,
     satcom_tx: Sender<SatComMessage>,
     clock_pulse: Arc<Notify>,
+    logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
 }
 
 impl Fms {
@@ -34,6 +36,7 @@ impl Fms {
         db_manager: Arc<std::sync::Mutex<DatabaseManager>>,
         rx: Receiver<SatComMessage>,
         satcom_tx: Sender<SatComMessage>,
+        cli_tx: std::sync::mpsc::Sender<LogEvent>,
     ) -> Self {
         Self {
             boats_registry: boats_reg,
@@ -41,7 +44,12 @@ impl Fms {
             rx: tokio::sync::Mutex::new(rx),
             satcom_tx: satcom_tx,
             clock_pulse: Arc::new(Notify::new()),
+            logs_cli_tx: cli_tx,
         }
+    }
+
+    fn logs_cli_tx(&self) -> std::sync::mpsc::Sender<LogEvent> {
+        self.logs_cli_tx.clone()
     }
 
     async fn run_fms_master_clock(&self) -> () {
@@ -95,6 +103,8 @@ impl Fms {
     }
 
     async fn run_order_dispatcher(&self) -> FmsResult<()> {
+        self.logs_cli_tx().send(LogEvent::System("Lancement du distributeur d'ordres...".yellow()));
+
         loop {
             self.clock_pulse.notified().await;
 
@@ -151,11 +161,11 @@ impl Fms {
 
                 self.satcom_tx.send(req).await?;
 
-                println!(
+                self.logs_cli_tx.send(LogEvent::Computer(format!(
                     "Offre pour l'ordre de voyage {} envoyée au bateau {}.",
                     unassigned_orders[i].header().id(),
                     free_boats_mmsis[i]
-                );
+                ).green()));
             }
         }
     }
@@ -183,11 +193,11 @@ impl Fms {
 
         self.boats_registry.update(concerned_boat_info)?;
 
-        println!(
+        self.logs_cli_tx.send(LogEvent::Computer(format!(
             "Offre pour l'ordre de voyage {} reçue par le bateau {}. Attente d'une réponse pour la révision initiale.",
             *satcom_msg.order_header().id(),
             *satcom_msg.source()
-        );
+        ).green()));
 
         Ok(())
     }
@@ -195,11 +205,11 @@ impl Fms {
     async fn handle_rev_req_ack(&self, satcom_msg: &SatComMessage) -> FmsResult<()> {
         self.update_associated_order_status(&satcom_msg, VoyageStatus::UnderRevision)?;
 
-        println!(
+        self.logs_cli_tx.send(LogEvent::Computer(format!(
             "Révision de l'ordre de voyage {} demandée par le bateau {}. Attente d'une réponse pour la révision.",
             *satcom_msg.order_header().id(),
             *satcom_msg.source()
-        );
+        ).green()));
 
         Ok(())
     }
@@ -220,12 +230,12 @@ impl Fms {
         )
         .await?;
 
-        println!(
+        self.logs_cli_tx.send(LogEvent::Computer(format!(
             "Révision de l'ordre {} acceptée par le bateau {}. Nouvelle version : {}. Accusé de réception envoyé.",
             *satcom_msg.order_header().id(),
             *satcom_msg.source(),
             *satcom_msg.order_header().version()
-        );
+        ).green()));
 
         Ok(())
     }
@@ -246,11 +256,11 @@ impl Fms {
         )
         .await?;
 
-        println!(
+        self.logs_cli_tx.send(LogEvent::Computer(format!(
             "Révision initiale de l'ordre {} acceptée par le bateau {}. Accusé de réception envoyé. Assignation officielle au bateau.",
             *satcom_msg.order_header().id(),
             *satcom_msg.source()
-        );
+        ).green()));
 
         Ok(())
     }
@@ -271,11 +281,11 @@ impl Fms {
         )
         .await?;
 
-        println!(
-            "Révision de l'ordre {} refusé par le bateau {}. Accusé de réception envoyé.",
+        self.logs_cli_tx.send(LogEvent::Computer(format!(
+            "Révision de l'ordre {} refusée par le bateau {}. Accusé de réception envoyé.",
             *satcom_message.order_header().id(),
             *satcom_message.source()
-        );
+        ).red()));
 
         Ok(())
     }
@@ -288,11 +298,11 @@ impl Fms {
         )
         .await?;
 
-        println!(
+        self.logs_cli_tx.send(LogEvent::Computer(format!(
             "Révision initiale de l'ordre {} refusée par le bateau {}. Accusé de réception envoyé. Ordre à nouveau non-assigné.",
             *satcom_msg.order_header().id(),
             *satcom_msg.source()
-        );
+        ).red()));
 
         Ok(())
     }
@@ -309,11 +319,11 @@ impl Fms {
         )
         .await?;
 
-        println!(
+        self.logs_cli_tx.send(LogEvent::Computer(format!(
             "Ordre {} en cours d'exécution par le bateau {}. Accusé de réception envoyé.",
             *satcom_msg.order_header().id(),
             *satcom_msg.source()
-        );
+        ).green()));
 
         Ok(())
     }
@@ -326,11 +336,11 @@ impl Fms {
         )
         .await?;
 
-        println!(
+        self.logs_cli_tx.send(LogEvent::Computer(format!(
             "Ordre {} achevé par le bateau {}. Notification de fin de voyage envoyée.",
             *satcom_msg.order_header().id(),
             *satcom_msg.source()
-        );
+        ).green()));
 
         Ok(())
     }
@@ -343,16 +353,18 @@ impl Fms {
         )
         .await?;
 
-        println!(
+        self.logs_cli_tx.send(LogEvent::Computer(format!(
             "Exécution de l'ordre {} définitivement abandonnée par le bateau {}. Accusé de réception envoyé. Terminaison de l'ordre.",
             *satcom_msg.order_header().id(),
             *satcom_msg.source()
-        );
+        ).red()));
 
         Ok(())
     }
 
     async fn run_message_listener(&self) -> FmsResult<()> {
+        self.logs_cli_tx().send(LogEvent::System("Lancement de l'écoute FMS...".yellow()));
+
         while let Some(satcom_msg) = self.rx.lock().await.recv().await {
             if *satcom_msg.target() != HARBOURMASTER_MMSI {
                 continue;
@@ -471,6 +483,8 @@ impl Fms {
     }
 
     pub fn start(self) -> (JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) {
+        self.logs_cli_tx().send(LogEvent::System("Lancement du FMS...".yellow()));
+
         let runner_arc: Arc<Self> = Arc::new(self);
         let order_dispatcher_runer_arc: Arc<Self> = runner_arc.clone();
         let clock_runner_arc: Arc<Self> = runner_arc.clone();
@@ -480,16 +494,20 @@ impl Fms {
                 clock_runner_arc.run_fms_master_clock().await;
             }),
             tokio::spawn(async move {
-                match order_dispatcher_runer_arc.run_order_dispatcher().await {
-                    Ok(()) => eprintln!("Order dispatcher exited unexpectedly."),
-                    Err(e) => eprintln!("Error in order dispatcher: {:?}", e),
-                }
+                order_dispatcher_runer_arc.run_order_dispatcher().await;
+
+                order_dispatcher_runer_arc.logs_cli_tx().send(LogEvent::System(
+                    "Le distributeur d'ordres s'est arrêté de façon inattendue. Veuillez redémarrer le FMS manuellement."
+                    .red()
+                ));
             }),
             tokio::spawn(async move {
-                match runner_arc.run_message_listener().await {
-                    Ok(()) => eprintln!("FMS exited unexpectedly."),
-                    Err(e) => eprintln!("Error in message listener: {:?}", e),
-                }
+                runner_arc.run_message_listener().await;
+
+                runner_arc.logs_cli_tx().send(LogEvent::System(
+                    "Le FMS s'est arrêté de façon inattendue. Veuillez le redémarrer manuellement."
+                        .red(),
+                ));
             }),
         )
     }

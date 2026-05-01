@@ -9,7 +9,7 @@ use crate::{
             SATCOM_TO_SERVER_PORT,
         },
         errors::RadioBuilderResult,
-        types::{AisPacket, Channel},
+        types::{AisPacket, Channel, LogEvent},
     },
     satcom::SatCom,
     satcom_message::SatComMessage,
@@ -20,7 +20,10 @@ use tokio::sync::{
     mpsc::{Receiver, Sender, channel},
 };
 
-pub async fn build_radio() -> RadioBuilderResult<(
+pub async fn build_radio(
+    logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
+    mmsi: u32,
+) -> RadioBuilderResult<(
     Receiver<AisPacket>,     //ais_rx
     Receiver<BitPacker>,     //gps_rx
     Receiver<SatComMessage>, //fms_rx or board_computer_rx
@@ -87,7 +90,14 @@ pub async fn build_radio() -> RadioBuilderResult<(
     )
     .await?;
 
-    let satcom: SatCom = SatCom::init(reader_satcom_rx, sender_satcom_rx, c_satcom_tx, computer_tx);
+    let satcom: SatCom = SatCom::init(
+        reader_satcom_rx,
+        sender_satcom_rx,
+        c_satcom_tx,
+        computer_tx,
+        logs_cli_tx,
+        mmsi,
+    );
 
     let boats_reg: Arc<BoatsInfoRegistry> = Arc::new(BoatsInfoRegistry::new());
 

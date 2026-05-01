@@ -1,11 +1,13 @@
 use crate::{
     board_computer::BoardComputer, boat_ais::BoatAisRunner, boat_gps::BoatGps,
-    boat_logs_cli::BoatLogsCli, systemstate::SystemState, ui::Ui, voyage::Voyage,
+    systemstate::SystemState, ui::Ui, voyage::Voyage,
 };
 use shared::{
     antenna::Antenna,
     boat_info::BoatInfo,
     common::{errors::BoatResult, types::LogEvent},
+    config::Config,
+    logs_cli::LogsCli,
     radio_builder::build_radio,
     satcom::SatCom,
 };
@@ -22,12 +24,26 @@ pub struct Boat {
     gps_antenna: Antenna,
     satcom_antenna: Antenna,
     ui: Ui,
-    logs_cli: BoatLogsCli,
+    logs_cli: LogsCli,
     system_state: Arc<SystemState>,
 }
 
 impl Boat {
     pub async fn init() -> BoatResult<Self> {
+        let config: Config = Config::load().unwrap();
+
+        let boat_info: Arc<BoatInfo> = Arc::new(BoatInfo::new(None, None, None));
+
+        let (cli_tx, cli_rx) = channel::<LogEvent>();
+        let cli: LogsCli = LogsCli::new(
+            cli_rx,
+            (*config.boat_sys_logs_filename().clone()).to_string(),
+            (*config.boat_ais_logs_filename().clone()).to_string(),
+            (*config.boat_gps_logs_filename().clone()).to_string(),
+            (*config.boat_satcom_logs_filename().clone()).to_string(),
+            (*config.boat_computer_logs_filename().clone()).to_string(),
+        );
+
         let (
             ais_rx,
             gps_rx,
@@ -42,13 +58,8 @@ impl Boat {
             ant4,
             satcom,
             boats_reg,
-        ) = build_radio().await?;
+        ) = build_radio(cli_tx.clone(), *boat_info.get_static_data()?.mmsi()).await?;
 
-        let (cli_tx, cli_rx) = channel::<LogEvent>();
-
-        let cli: BoatLogsCli = BoatLogsCli::new(cli_rx);
-
-        let boat_info: Arc<BoatInfo> = Arc::new(BoatInfo::new(None, None, None));
         let system_state: Arc<SystemState> = Arc::new(SystemState::new(cli_tx.clone()));
         let voyage: Option<Voyage> = None;
 
@@ -96,12 +107,19 @@ impl Boat {
     }
 
     pub async fn start(self) -> BoatResult<()> {
+        let config: Config = Config::load().unwrap();
+
         let _c87b_antenna_handle: JoinHandle<()> = self.c87b_antenna.start().await?;
         let _c88b_antenna_handle: JoinHandle<()> = self.c88b_antenna.start().await?;
         let _gps_antenna_handle: JoinHandle<()> = self.gps_antenna.start().await?;
         let _satcom_antenna_handle: JoinHandle<()> = self.satcom_antenna.start().await?;
 
-        let _gps_handle: JoinHandle<()> = self.gps.start();
+        let _gps_handle: Option<JoinHandle<()>> = if *config.gps_detection() {
+            Some(self.gps.start())
+        } else {
+            None
+        };
+
         let _satcom_handle: JoinHandle<()> = self.satcom.start();
         let _board_computer_handle: JoinHandle<()> = self.board_computer.start();
         let _ais_handle: (
@@ -111,9 +129,15 @@ impl Boat {
             JoinHandle<()>,
         ) = self.ais.start();
 
-        let _logs_cli_handle: Result<JoinHandle<()>, std::io::Error> = self.logs_cli.run();
+        let _logs_cli_handle: Option<JoinHandle<()>> = if *config.cli() {
+            Some(self.logs_cli.run().unwrap())
+        } else {
+            None
+        };
 
-        self.ui.start();
+        if *config.gui() {
+            self.ui.start();
+        };
 
         Ok(())
     }

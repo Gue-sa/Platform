@@ -748,6 +748,8 @@ impl BoatAisRunner {
         let sotdma_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
         let clock_runner_arc: Arc<BoatAisRunner> = runner_arc.clone();
 
+        runner_arc.logs_cli_tx().send(LogEvent::System("Lancement du nettoyage automatique de la table des slots AIS...".yellow()));
+
         (
             tokio::spawn(async move {
                 let _ = slots_map_cleanup_runner_arc

@@ -1,3 +1,10 @@
+use crate::{
+    common::{
+        types::LogEvent,
+        utils::{dt_to_slots_idx, get_current_dt},
+    },
+    config::Config,
+};
 use ansi_to_tui::IntoText;
 use chrono::{Datelike, Local, Timelike};
 use colored::{ColoredString, Colorize};
@@ -15,11 +22,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Text},
-    widgets::{Block, Borders, Paragraph},
-};
-use shared::common::{
-    types::LogEvent,
-    utils::{dt_to_slots_idx, get_current_dt},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 use std::{
     fs::OpenOptions,
@@ -27,7 +30,10 @@ use std::{
     sync::mpsc::Receiver,
     time::Duration,
 };
-use tokio::task::JoinHandle;
+use tokio::{
+    task::JoinHandle,
+    time::{Interval, interval},
+};
 
 #[cfg(unix)]
 fn force_wake_launcher() {
@@ -48,7 +54,7 @@ enum SelectedBox {
     Gps = 4,
 }
 
-pub struct BoatLogsCli {
+pub struct LogsCli {
     system_logs: Vec<Line<'static>>,
     ais_logs: Vec<Line<'static>>,
     gps_logs: Vec<Line<'static>>,
@@ -59,10 +65,22 @@ pub struct BoatLogsCli {
     areas: [Rect; 5],
     focused: SelectedBox,
     rx: Receiver<LogEvent>,
+    sys_logs_filename: String,
+    ais_logs_filename: String,
+    gps_logs_filename: String,
+    satcom_logs_filename: String,
+    computer_logs_filename: String,
 }
 
-impl BoatLogsCli {
-    pub fn new(rx: Receiver<LogEvent>) -> Self {
+impl LogsCli {
+    pub fn new(
+        rx: Receiver<LogEvent>,
+        sys_logs_filename: String,
+        ais_logs_filename: String,
+        gps_logs_filename: String,
+        satcom_logs_filename: String,
+        computer_logs_filename: String,
+    ) -> Self {
         Self {
             system_logs: Vec::new(),
             ais_logs: Vec::new(),
@@ -74,11 +92,37 @@ impl BoatLogsCli {
             areas: [Rect::default(); 5],
             focused: SelectedBox::Ais,
             rx,
+            sys_logs_filename,
+            ais_logs_filename,
+            gps_logs_filename,
+            satcom_logs_filename,
+            computer_logs_filename,
         }
+    }
+
+    fn get_visual_line_count(logs: &[Line<'static>], width: u16) -> usize {
+        if width == 0 {
+            return 0;
+        }
+        let width = width as usize;
+        let mut count = 0;
+        for line in logs {
+            let lw = line.width();
+            if lw == 0 {
+                count += 1;
+            } else {
+                count += (lw + width - 1) / width;
+            }
+        }
+        count
     }
 
     pub fn run(mut self) -> Result<JoinHandle<()>, io::Error> {
         let mut out = stdout();
+
+        let mut refresh_interval: Interval = interval(Duration::from_millis(
+            *Config::load().unwrap().cli_refresh_delay(),
+        ));
 
         let raw_was_on = is_raw_mode_enabled().unwrap_or(false);
         if !raw_was_on {
@@ -131,7 +175,7 @@ impl BoatLogsCli {
             print!("\x1b[6n");
             let _ = stdout().flush();
 
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            refresh_interval.tick().await;
 
             force_wake_launcher();
         }))
@@ -170,17 +214,18 @@ impl BoatLogsCli {
         let clean_msg: String = msg
             .to_string()
             .chars()
-            .map(|c: char| if c == '\t' { ' ' } else { c })
-            .filter(|c: &char| !c.is_control() || *c == '\x1b')
+            .filter(|c: &char| {
+                !c.is_control() || *c == '\x1b' || *c == '\n' || *c == '\r' || *c == '\t'
+            })
             .collect();
 
         if let Ok(mut file) = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(format!("{}.log", log_filename))
+            .open(log_filename)
         {
-            let file_log_msg = format!(
-                "({}, {}), {}/{}/{} {}h:{}mn:{}s: {}",
+            let file_log_msg: String = format!(
+                "({}, {}), {}/{}/{} {}h:{}mn:{}s:\n{}\n",
                 slots[0],
                 slots[1],
                 current_dt.day(),
@@ -194,48 +239,59 @@ impl BoatLogsCli {
             let _ = writeln!(file, "{}", file_log_msg);
         }
 
-        let log_str = format!(
-            "{} ({}, {}) : {}",
-            current_dt.format("[%H:%M:%S]").to_string().white(),
+        let log_str: String = format!(
+            "({}, {}), {}/{}/{} {}h:{}mn:{}s:\n{}",
             slots[0],
             slots[1],
+            current_dt.day(),
+            current_dt.month(),
+            current_dt.year(),
+            current_dt.hour(),
+            current_dt.minute(),
+            current_dt.second(),
             clean_msg
         );
 
         if let Ok(tui_text) = log_str.into_text() {
             logs_vec.extend(tui_text.lines);
+            logs_vec.push(Line::default()); // Saut de ligne
         }
 
-        if logs_vec.len() > 1000 {
-            let excess: usize = logs_vec.len() - 1000;
+        let max_logs_history_length: usize = *Config::load().unwrap().max_cli_logs_history_length();
+
+        if logs_vec.len() > max_logs_history_length {
+            let excess: usize = logs_vec.len() - max_logs_history_length;
             logs_vec.drain(0..excess);
         }
     }
 
     pub fn system_log(&mut self, msg: ColoredString) {
-        BoatLogsCli::log(msg, "system_logs", &mut self.system_logs);
+        LogsCli::log(msg, &self.sys_logs_filename, &mut self.system_logs);
     }
     pub fn ais_log(&mut self, msg: ColoredString) {
-        BoatLogsCli::log(msg, "ais_logs", &mut self.ais_logs);
+        LogsCli::log(msg, &self.ais_logs_filename, &mut self.ais_logs);
     }
     pub fn gps_log(&mut self, msg: ColoredString) {
-        BoatLogsCli::log(msg, "gps_logs", &mut self.gps_logs);
+        LogsCli::log(msg, &self.gps_logs_filename, &mut self.gps_logs);
     }
     pub fn satcom_log(&mut self, msg: ColoredString) {
-        BoatLogsCli::log(msg, "satcom_logs", &mut self.satcom_logs);
+        LogsCli::log(msg, &self.satcom_logs_filename, &mut self.satcom_logs);
     }
     pub fn computer_log(&mut self, msg: ColoredString) {
-        BoatLogsCli::log(msg, "computer_logs", &mut self.computer_logs);
+        LogsCli::log(msg, &self.computer_logs_filename, &mut self.computer_logs);
     }
 
     fn scroll_current(&mut self, delta: i16) {
-        let (scroll_idx, line_count) = match self.focused {
-            SelectedBox::Ais => (0, self.ais_logs.len()),
-            SelectedBox::System => (1, self.system_logs.len()),
-            SelectedBox::Computer => (2, self.computer_logs.len()),
-            SelectedBox::Satcom => (3, self.satcom_logs.len()),
-            SelectedBox::Gps => (4, self.gps_logs.len()),
+        let (scroll_idx, logs) = match self.focused {
+            SelectedBox::Ais => (0, &self.ais_logs),
+            SelectedBox::System => (1, &self.system_logs),
+            SelectedBox::Computer => (2, &self.computer_logs),
+            SelectedBox::Satcom => (3, &self.satcom_logs),
+            SelectedBox::Gps => (4, &self.gps_logs),
         };
+
+        let area_width = self.areas[scroll_idx].width.saturating_sub(2);
+        let line_count = Self::get_visual_line_count(logs, area_width);
 
         let area_height: usize = self.areas[scroll_idx].height.saturating_sub(2) as usize;
         let max_scroll: i16 = (line_count as i16)
@@ -291,11 +347,11 @@ impl BoatLogsCli {
         self.areas[4] = right[3];
 
         let logs_lens = [
-            self.ais_logs.len(),
-            self.system_logs.len(),
-            self.computer_logs.len(),
-            self.satcom_logs.len(),
-            self.gps_logs.len(),
+            Self::get_visual_line_count(&self.ais_logs, self.areas[0].width.saturating_sub(2)),
+            Self::get_visual_line_count(&self.system_logs, self.areas[1].width.saturating_sub(2)),
+            Self::get_visual_line_count(&self.computer_logs, self.areas[2].width.saturating_sub(2)),
+            Self::get_visual_line_count(&self.satcom_logs, self.areas[3].width.saturating_sub(2)),
+            Self::get_visual_line_count(&self.gps_logs, self.areas[4].width.saturating_sub(2)),
         ];
 
         for i in 0..5 {
@@ -326,7 +382,7 @@ impl BoatLogsCli {
         self.draw_box(
             f,
             self.areas[2],
-            " Ordinateur de bord ",
+            " Ordinateur ",
             &self.computer_logs,
             self.scrolls[2],
             Color::Magenta,
@@ -384,6 +440,7 @@ impl BoatLogsCli {
                     .title(title)
                     .border_style(border),
             )
+            .wrap(Wrap { trim: false })
             .scroll((scroll, 0));
 
         f.render_widget(p, area);

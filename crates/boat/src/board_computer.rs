@@ -1,7 +1,4 @@
-use crate::{
-    common::utils::{computer_log, system_log},
-    voyage::Voyage,
-};
+use crate::voyage::Voyage;
 use colored::*;
 use shared::{
     boat_info::BoatInfo,
@@ -9,7 +6,7 @@ use shared::{
     common::{
         constants::HARBOURMASTER_MMSI,
         errors::{BoardComputerError, BoardComputerResult},
-        types::{SatComMessageType, VoyageStatus},
+        types::{LogEvent, SatComMessageType, VoyageStatus},
     },
     satcom_message::SatComMessage,
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
@@ -27,6 +24,7 @@ pub struct BoardComputer {
     rx: Receiver<SatComMessage>,
     satcom_tx: Sender<SatComMessage>,
     voyage_order_revision: Option<VoyageOrder>,
+    logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
 }
 
 impl BoardComputer {
@@ -36,6 +34,7 @@ impl BoardComputer {
         voyage: Option<Voyage>,
         rx: Receiver<SatComMessage>,
         satcom_tx: Sender<SatComMessage>,
+        logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
     ) -> Self {
         Self {
             boat_info: boat_info,
@@ -44,7 +43,12 @@ impl BoardComputer {
             rx: rx,
             satcom_tx: satcom_tx,
             voyage_order_revision: None,
+            logs_cli_tx: logs_cli_tx,
         }
+    }
+
+    fn logs_cli_tx(&self) -> std::sync::mpsc::Sender<LogEvent> {
+        self.logs_cli_tx.clone()
     }
 
     fn order(&self) -> BoardComputerResult<&VoyageOrder> {
@@ -161,7 +165,7 @@ impl BoardComputer {
         self.respond(satcom_msg, msg_type, res_order_header, res_order_rev)
             .await?;
 
-        computer_log(log_msg.cyan());
+        self.logs_cli_tx().send(LogEvent::Computer(log_msg.cyan()));
 
         Ok(())
     }
@@ -170,13 +174,13 @@ impl BoardComputer {
         self.respond(satcom_msg, SatComMessageType::Acknowledgement, None, None)
             .await?;
 
-        computer_log(
+        self.logs_cli_tx().send(LogEvent::Computer(
             format!(
                 "Offre d'ordre de voyage reçue (ID {}). Accusé de réception envoyé.",
                 satcom_msg.order_header().id()
             )
             .cyan(),
-        );
+        ));
 
         if !self.has_voyage() {
             let voyage_order: &VoyageOrder = &satcom_msg
@@ -201,13 +205,13 @@ impl BoardComputer {
             self.respond(satcom_msg, SatComMessageType::RevisionRefusal, None, None)
                 .await?;
 
-            computer_log(
+            self.logs_cli_tx().send(LogEvent::Computer(
                 format!(
                     "Ordre de voyage {} refusé (navire déjà en activité).",
                     satcom_msg.order_header().id()
                 )
                 .cyan(),
-            );
+            ));
         }
 
         Ok(())
@@ -219,11 +223,11 @@ impl BoardComputer {
 
         self.update_voyage_status(VoyageStatus::UnderRevision)?;
 
-        computer_log(format!(
+        self.logs_cli_tx().send(LogEvent::Computer(format!(
             "Demande de révision de l'ordre {} reçu par la capitainerie. Attente d'une réponse.",
             satcom_msg.order_header().id()
         )
-        .cyan());
+        .cyan()));
 
         Ok(())
     }
@@ -347,7 +351,9 @@ impl BoardComputer {
     }
 
     async fn run_board_computer(&mut self) -> BoardComputerResult<()> {
-        system_log("Lancement de l'ordinateur de bord...".yellow());
+        self.logs_cli_tx().send(LogEvent::System(
+            "Lancement de l'ordinateur de bord...".yellow(),
+        ));
 
         let self_mmsi: u32 = *self.boat_info.get_static_data()?.mmsi();
 
@@ -422,7 +428,7 @@ impl BoardComputer {
         tokio::spawn(async move {
             let _ = self.run_board_computer().await;
 
-            system_log("L'ordinateur de bord s'est arrêté de façon innatendue. Veuillez le relancer manuellement.".red());
+            self.logs_cli_tx().send(LogEvent::System("L'ordinateur de bord s'est arrêté de façon innatendue. Veuillez le relancer manuellement.".red()));
         })
     }
 }

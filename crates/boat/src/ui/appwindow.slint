@@ -127,27 +127,44 @@ export component ConfigView inherits Rectangle {
 
 export component DataView inherits Rectangle {
     HorizontalBox {
+        // 1. Resserrer l'espace entre les colonnes et les bords
+        spacing: 5px; 
+        padding: 5px;
+
         VerticalBox {
+            // 2. Force cette colonne à ne pas dépasser 50% de la largeur
+            horizontal-stretch: 1; 
+            spacing: 2px; // Espace entre les blocs de texte
+
             Text {
                 text: "Nom :\n" + BoatData.boat-name;
+                overflow: elide; 
             }
 
             Text {
                 text: "MMSI :\n" + BoatData.boat-mmsi;
+                overflow: elide;
             }
 
             Text {
                 text: "IMO :\n" + BoatData.boat-imo;
+                overflow: elide;
             }
 
             Text {
                 text: "Type de navire :\n" + BoatData.boat-type;
+                wrap: word-wrap; // Si le type est long, il passe à la ligne au lieu de déborder
             }
         }
 
         VerticalBox {
+            // Force la deuxième colonne à partager l'espace équitablement
+            horizontal-stretch: 1;
+            spacing: 2px;
+
             Text {
                 text: "Position :\n" + BoatData.boat-latitude + " / " + BoatData.boat-longitude;
+                overflow: elide;
             }
 
             Text {
@@ -164,10 +181,12 @@ export component DataView inherits Rectangle {
 
             Text {
                 text: "Destination :\n" + BoatData.boat-destination;
+                overflow: elide;
             }
 
             Text {
-                text: "ETA :\n" + BoatData.boat-eta-day + " / " + BoatData.boat-eta-month + ", " + BoatData.boat-eta-hour + " h " + BoatData.boat-eta-minute + " min";
+                text: "ETA :\n" + BoatData.boat-eta-day + "/" + BoatData.boat-eta-month + " " + BoatData.boat-eta-hour + ":" + BoatData.boat-eta-minute;
+                font-size: 12px; // Légère réduction pour les lignes très denses
             }
         }
     }

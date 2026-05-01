@@ -1,9 +1,16 @@
-use crate::common::utils::system_log;
-use colored::*;
 use rev_lines::RevLines;
 use shared::boat_info::{BoatInfo, NavigationData, StaticData, VoyageData};
 use slint::{ModelRc, SharedString, ToSharedString, VecModel, Weak};
 use std::{fs::File, io::BufReader, process, rc::Rc, sync::Arc};
+
+// AJOUT DES IMPORTS CROSSTERM
+use crossterm::{
+    cursor::Show,
+    event::DisableMouseCapture,
+    execute,
+    terminal::{LeaveAlternateScreen, disable_raw_mode},
+};
+use std::io::stdout;
 
 slint::include_modules!();
 
@@ -48,9 +55,7 @@ impl Ui {
         let boat_info_clone: Arc<BoatInfo> = self.boat_info.clone();
 
         self.ui.on_close(move || {
-            system_log("Extinction du système...".yellow());
-            slint::quit_event_loop().expect("Erreur lors de la fermeture");
-            process::exit(0);
+            let _ = slint::quit_event_loop();
         });
 
         tokio::spawn(async move {
@@ -121,5 +126,10 @@ impl Ui {
         });
 
         let _ = self.ui.run();
+
+        let _ = disable_raw_mode();
+        let _ = execute!(stdout(), LeaveAlternateScreen, DisableMouseCapture, Show);
+
+        process::exit(0);
     }
 }

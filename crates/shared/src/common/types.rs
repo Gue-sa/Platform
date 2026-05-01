@@ -1,5 +1,6 @@
 use std::{io::Error, time::SystemTimeError};
 
+use colored::ColoredString;
 use tokio::sync::mpsc::error::SendError;
 
 use crate::{bitpacker::BitPacker, satcom_message::SatComMessage};
@@ -456,4 +457,12 @@ impl Into<u8> for SpeedProfile {
             SpeedProfile::Unknown => u8::MAX,
         }
     }
+}
+
+pub enum LogEvent {
+    System(ColoredString),
+    Ais(ColoredString),
+    Gps(ColoredString),
+    Satcom(ColoredString),
+    Computer(ColoredString),
 }

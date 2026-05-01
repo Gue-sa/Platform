@@ -1,7 +1,4 @@
-use crate::{
-    common::utils::{ais_log, system_log},
-    systemstate::SystemState,
-};
+use crate::systemstate::SystemState;
 use colored::*;
 use core::panic;
 use rand::{RngExt, seq::IndexedRandom};
@@ -13,7 +10,7 @@ use shared::{
     common::{
         constants::{IMPLEMENTED_MSGS, ITDMA_CS_MSGS, NO_CS_MSGS, SLOTS_PER_MINUTE},
         errors::{AisError, AisMessageError, AisResult, ClockError, ClockResult},
-        types::{AisPacket, Channel},
+        types::{AisPacket, Channel, LogEvent},
         utils::get_timestamp,
     },
     impl_arc_access, impl_atomic_access,
@@ -62,6 +59,7 @@ pub struct BoatAisState {
 pub struct BoatAisRunner {
     state: BoatAisState,
     ais_rx: Mutex<Receiver<AisPacket>>,
+    logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
 }
 
 impl BoatAisState {
@@ -145,6 +143,7 @@ impl BoatAisRunner {
         boat_info: Arc<BoatInfo>,
         boats_reg: Arc<BoatsInfoRegistry>,
         sys_state: Arc<SystemState>,
+        logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
     ) -> AisResult<Self> {
         Ok(Self {
             state: BoatAisState::init(
@@ -155,11 +154,17 @@ impl BoatAisRunner {
                 sys_state,
             )?,
             ais_rx: Mutex::new(rx),
+            logs_cli_tx: logs_cli_tx,
         })
     }
 
+    fn logs_cli_tx(&self) -> std::sync::mpsc::Sender<LogEvent> {
+        self.logs_cli_tx.clone()
+    }
+
     async fn run_boat_ais_master_clock(&self) -> ClockResult<()> {
-        system_log("Lancement de l'horloge AIS...".yellow());
+        self.logs_cli_tx()
+            .send(LogEvent::System("Lancement de l'horloge AIS...".yellow()));
 
         loop {
             let now: Duration = SystemTime::now().duration_since(UNIX_EPOCH)?;
@@ -392,13 +397,13 @@ impl BoatAisRunner {
 
         ant_tx.send(msg.build()?).await?;
 
-        ais_log(
+        self.logs_cli_tx().send(LogEvent::Ais(
             format!(
                 "Message {} envoyé avec succès sur le slot {}.",
                 msg_type, t_si
             )
             .green(),
-        );
+        ));
 
         Ok(())
     }
@@ -475,7 +480,9 @@ impl BoatAisRunner {
 
         let next_nts: u16 = self.book_new_nts(initial_nss_and_ns, true)?;
         self.state.set_nts(next_nts);
-        ais_log(format!("Premier NTS réservé : {}", self.state.nts()).yellow());
+        self.logs_cli_tx().send(LogEvent::Ais(
+            format!("Premier NTS réservé : {}", self.state.nts()).yellow(),
+        ));
         self.wait_for_nts().await?;
 
         Ok(())
@@ -507,7 +514,9 @@ impl BoatAisRunner {
             if virtual_offset != 0 {
                 self.state.set_nts(next_nts);
 
-                ais_log(format!("NTS réservé pour le prochain message 3 : {}.", next_nts).yellow());
+                self.logs_cli_tx().send(LogEvent::Ais(
+                    format!("NTS réservé pour le prochain message 3 : {}.", next_nts).yellow(),
+                ));
             } else {
                 self.state.slots_map().release_slot(next_nts)?;
 
@@ -536,13 +545,13 @@ impl BoatAisRunner {
 
                     let offset: u16 = SlotsMap::si_offset(Some(nts), msg5_slot);
 
-                    ais_log(
+                    self.logs_cli_tx().send(LogEvent::Ais(
                         format!(
                             "Réservation du slot {} pour émettre le prochain message 5.",
                             msg5_slot
                         )
                         .yellow(),
-                    );
+                    ));
 
                     self.wait_for_nts().await?;
 
@@ -562,7 +571,7 @@ impl BoatAisRunner {
                 } else if self.state.slots_map().slot_timeout(nts)? == Some(0) {
                     let new_nts: u16 = self.book_new_nts(ns, true)?;
 
-                    ais_log(format!("NTS {} arrivé à expiration : remplacement par le slot {} après le prochain message.", nts, new_nts).yellow());
+                    self.logs_cli_tx().send(LogEvent::Ais(format!("NTS {} arrivé à expiration : remplacement par le slot {} après le prochain message.", nts, new_nts).yellow()));
 
                     let offset: u16 = SlotsMap::si_offset(Some(nts), new_nts);
 
@@ -589,13 +598,13 @@ impl BoatAisRunner {
                 let new_nts: u16 = self.book_new_nts(next_ns, false)?;
                 let offset: u16 = SlotsMap::si_offset(Some(nts), new_nts);
 
-                ais_log(
+                self.logs_cli_tx().send(LogEvent::Ais(
                     format!(
                         "NTS manquant détecté. Réservation du NTS {} pour le remplacer.",
                         new_nts
                     )
                     .yellow(),
-                );
+                ));
 
                 self.wait_for_nts().await?;
 
@@ -615,20 +624,25 @@ impl BoatAisRunner {
     }
 
     async fn run_sotdma(self: Arc<Self>) -> AisResult<()> {
-        system_log("Initialisation du SOTDMA...".yellow());
+        self.logs_cli_tx()
+            .send(LogEvent::System("Initialisation du SOTDMA...".yellow()));
 
         sleep(Duration::from_secs(0)).await;
 
         if self.state.ri() <= 120 {
-            system_log("Entrée sur le réseau SOTDMA...".yellow());
+            self.logs_cli_tx()
+                .send(LogEvent::System("Entrée sur le réseau SOTDMA...".yellow()));
 
             match self.sotdma_net_entry().await {
                 Ok(_) => {}
                 Err(_) => return Err(AisError::SotdmaInitFailed),
             }
 
-            system_log("Entrée sur le réseau terminée.".yellow());
-            system_log("Début de la première frame SOTMA...".yellow());
+            self.logs_cli_tx()
+                .send(LogEvent::System("Entrée sur le réseau terminée.".yellow()));
+            self.logs_cli_tx().send(LogEvent::System(
+                "Début de la première frame SOTMA...".yellow(),
+            ));
 
             match self.sotdma_first_frame().await {
                 Ok(_) => {}
@@ -638,8 +652,11 @@ impl BoatAisRunner {
                 }
             }
 
-            system_log("Fin de la première frame.".yellow());
-            system_log("Lancement de la phase continue SOTDMA.".yellow());
+            self.logs_cli_tx()
+                .send(LogEvent::System("Fin de la première frame.".yellow()));
+            self.logs_cli_tx().send(LogEvent::System(
+                "Lancement de la phase continue SOTDMA.".yellow(),
+            ));
 
             loop {
                 match self.clone().sotdma_continuous().await {
@@ -649,7 +666,7 @@ impl BoatAisRunner {
                         self.state.set_ns(self.upcoming_ns());
                         self.state.set_nts(self.upcoming_nts()?);
 
-                        ais_log("L'AIS a subi une erreur qui a rendu l'émission du message initialement prévu impossible. Il continuera probablement à fonctionner normalement, mais il est préférable de surveiller son bon comportement pour une durée d'une minute révolue.".red());
+                        self.logs_cli_tx().send(LogEvent::Ais("L'AIS a subi une erreur qui a rendu l'émission du message initialement prévu impossible. Il continuera probablement à fonctionner normalement, mais il est préférable de surveiller son bon comportement pour une durée d'une minute révolue.".red()));
                     }
                 }
             }
@@ -659,7 +676,9 @@ impl BoatAisRunner {
     }
 
     async fn run_listeners(&self) -> () {
-        system_log("Lancement de l'écoute de l'AIS...".yellow());
+        self.logs_cli_tx().send(LogEvent::System(
+            "Lancement de l'écoute de l'AIS...".yellow(),
+        ));
 
         loop {
             let pck_opt = {
@@ -671,7 +690,7 @@ impl BoatAisRunner {
                 match pck.channel {
                     Channel::C87B => match self.handle_transmission(pck.message, Channel::C87B) {
                         Ok(msg) => {
-                            ais_log(
+                            self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(
                                     "Message {} reçu du navire {} : {:#?}.",
                                     msg.message_type(),
@@ -679,18 +698,19 @@ impl BoatAisRunner {
                                     msg.boat_info()
                                 )
                                 .blue(),
-                            );
+                            ));
                         }
                         Err(e) => match e {
                             AisError::SelfEmittedMessage => {}
                             _ => {
-                                ais_log("Message corrompu reçu et ignoré.".red());
+                                self.logs_cli_tx()
+                                    .send(LogEvent::Ais("Message corrompu reçu et ignoré.".red()));
                             }
                         },
                     },
                     Channel::C88B => match self.handle_transmission(pck.message, Channel::C88B) {
                         Ok(msg) => {
-                            ais_log(
+                            self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(
                                     "Message {} reçu du navire {} : {:#?}.",
                                     *msg.message_type(),
@@ -698,12 +718,13 @@ impl BoatAisRunner {
                                     msg.boat_info()
                                 )
                                 .blue(),
-                            );
+                            ));
                         }
                         Err(e) => match e {
                             AisError::SelfEmittedMessage => {}
                             _ => {
-                                ais_log("Message corrompu reçu et ignoré.".red());
+                                self.logs_cli_tx()
+                                    .send(LogEvent::Ais("Message corrompu reçu et ignoré.".red()));
                             }
                         },
                     },
@@ -734,22 +755,22 @@ impl BoatAisRunner {
                     .slots_map()
                     .run_cleanup_task()
                     .await;
-                system_log("Le daemon de nettoyage des slots s'est arrêté de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red());
+                slots_map_cleanup_runner_arc.logs_cli_tx().send(LogEvent::System("Le daemon de nettoyage des slots s'est arrêté de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red()));
                 panic!();
             }),
             tokio::spawn(async move {
                 let _ = clock_runner_arc.clone().run_boat_ais_master_clock().await;
-                system_log("L'horloge AIS s'est arrêtée de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red());
+                clock_runner_arc.logs_cli_tx().send(LogEvent::System("L'horloge AIS s'est arrêtée de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red()));
                 panic!();
             }),
             tokio::spawn(async move {
                 listeners_runner_arc.run_listeners().await;
-                system_log("L'écoute AIS s'est arrêtée de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red());
+                listeners_runner_arc.logs_cli_tx().send(LogEvent::System("L'écoute AIS s'est arrêtée de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red()));
                 panic!();
             }),
             tokio::spawn(async move {
                 let _ = sotdma_runner_arc.clone().run_sotdma().await;
-                system_log("Le SOTDMA s'est arrêté de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red());
+                sotdma_runner_arc.logs_cli_tx().send(LogEvent::System("Le SOTDMA s'est arrêté de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red()));
                 panic!();
             }),
         )

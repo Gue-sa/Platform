@@ -1,12 +1,15 @@
 use crate::{
     board_computer::BoardComputer, boat_ais::BoatAisRunner, boat_gps::BoatGps,
-    systemstate::SystemState, ui::Ui, voyage::Voyage,
+    boat_logs_cli::BoatLogsCli, systemstate::SystemState, ui::Ui, voyage::Voyage,
 };
 use shared::{
-    antenna::Antenna, boat_info::BoatInfo, common::errors::BoatResult, radio_builder::build_radio,
+    antenna::Antenna,
+    boat_info::BoatInfo,
+    common::{errors::BoatResult, types::LogEvent},
+    radio_builder::build_radio,
     satcom::SatCom,
 };
-use std::sync::Arc;
+use std::sync::{Arc, mpsc::channel};
 use tokio::task::JoinHandle;
 
 pub struct Boat {
@@ -19,6 +22,7 @@ pub struct Boat {
     gps_antenna: Antenna,
     satcom_antenna: Antenna,
     ui: Ui,
+    logs_cli: BoatLogsCli,
     system_state: Arc<SystemState>,
 }
 
@@ -40,8 +44,12 @@ impl Boat {
             boats_reg,
         ) = build_radio().await?;
 
+        let (cli_tx, cli_rx) = channel::<LogEvent>();
+
+        let cli: BoatLogsCli = BoatLogsCli::new(cli_rx);
+
         let boat_info: Arc<BoatInfo> = Arc::new(BoatInfo::new(None, None, None));
-        let system_state: Arc<SystemState> = Arc::new(SystemState::new());
+        let system_state: Arc<SystemState> = Arc::new(SystemState::new(cli_tx.clone()));
         let voyage: Option<Voyage> = None;
 
         let ui: Ui = Ui::init(boat_info.clone());
@@ -53,6 +61,7 @@ impl Boat {
             Arc::clone(&boat_info),
             boats_reg.clone(),
             system_state.clone(),
+            cli_tx.clone(),
         )
         .unwrap();
         let gps: BoatGps = BoatGps::init(
@@ -60,6 +69,7 @@ impl Boat {
             gps_rx,
             c_gps_tx,
             system_state.clone(),
+            cli_tx.clone(),
         );
         let board_computer = BoardComputer::init(
             boat_info.clone(),
@@ -67,6 +77,7 @@ impl Boat {
             voyage,
             board_computer_rx,
             sender_satcom_tx,
+            cli_tx.clone(),
         );
 
         Ok(Self {
@@ -79,6 +90,7 @@ impl Boat {
             gps: gps,
             satcom: satcom,
             board_computer: board_computer,
+            logs_cli: cli,
             ui: ui,
         })
     }
@@ -98,6 +110,8 @@ impl Boat {
             JoinHandle<()>,
             JoinHandle<()>,
         ) = self.ais.start();
+
+        let _logs_cli_handle: Result<JoinHandle<()>, std::io::Error> = self.logs_cli.run();
 
         self.ui.start();
 

@@ -1,12 +1,13 @@
 use shared::config::Config;
 
-use crate::{boat::Boat, serial_driver::SerialDriver};
+use crate::{boat::Boat, boat_logs_cli::BoatLogsCli, serial_driver::SerialDriver};
 use std::{env, thread};
 
 mod board_computer;
 mod boat;
 mod boat_ais;
 mod boat_gps;
+mod boat_logs_cli;
 mod common;
 mod serial_driver;
 mod systemstate;
@@ -32,6 +33,8 @@ async fn main() {
 
         thread::park();
     } else {
-        println!("Fichier de configuration non trouvé. Veuillez lancer le programme depuis le laucher.")
+        println!(
+            "Fichier de configuration non trouvé. Veuillez lancer le programme depuis le laucher."
+        )
     }
 }

@@ -1,6 +1,6 @@
-use crate::common::utils::system_log;
 use colored::Colorize;
-use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use shared::common::types::LogEvent;
+use std::sync::{Arc, RwLock, RwLockWriteGuard, mpsc::Sender};
 use tokio::sync::Notify;
 
 pub struct SystemState {
@@ -10,10 +10,11 @@ pub struct SystemState {
     ais_notifier: Arc<Notify>,
     gps_notifier: Arc<Notify>,
     navigation_notifier: Arc<Notify>,
+    logs_cli_tx: Sender<LogEvent>,
 }
 
 impl SystemState {
-    pub fn new() -> Self {
+    pub fn new(logs_cli_tx: Sender<LogEvent>) -> Self {
         Self {
             ais_emission_on: RwLock::new(false),
             gps_on: RwLock::new(false),
@@ -21,7 +22,12 @@ impl SystemState {
             ais_notifier: Arc::new(Notify::new()),
             gps_notifier: Arc::new(Notify::new()),
             navigation_notifier: Arc::new(Notify::new()),
+            logs_cli_tx: logs_cli_tx,
         }
+    }
+
+    fn logs_cli_tx(&self) -> Sender<LogEvent> {
+        self.logs_cli_tx.clone()
     }
 
     pub fn ais_emitting(&self) -> bool {
@@ -41,7 +47,8 @@ impl SystemState {
         if *guard {
             *guard = false;
         }
-        system_log("Emission AIS en cours.".yellow());
+        self.logs_cli_tx()
+            .send(LogEvent::System("Emission AIS en cours.".yellow()));
     }
 
     pub fn start_ais_emission(&self) -> () {
@@ -49,7 +56,8 @@ impl SystemState {
         if !*guard {
             *guard = true;
         }
-        system_log("Emission AIS interrompue.".yellow());
+        self.logs_cli_tx()
+            .send(LogEvent::System("Emission AIS interrompue.".yellow()));
     }
 
     pub fn stop_gps(&self) -> () {
@@ -57,7 +65,7 @@ impl SystemState {
         if *guard {
             *guard = false;
         }
-        system_log("GPS démarré.".yellow());
+        self.logs_cli_tx().send(LogEvent::System("GPS démarré.".yellow()));
     }
 
     pub fn start_gps(&self) -> () {
@@ -65,7 +73,7 @@ impl SystemState {
         if !*guard {
             *guard = true;
         }
-        system_log("GPS éteint.".yellow());
+        self.logs_cli_tx().send(LogEvent::System("GPS éteint.".yellow()));
     }
 
     pub fn start_navigation(&self) -> () {
@@ -73,7 +81,7 @@ impl SystemState {
         if *guard {
             *guard = false;
         }
-        system_log("Navigation en cours.".yellow());
+        self.logs_cli_tx().send(LogEvent::System("Navigation en cours.".yellow()));
     }
 
     pub fn stop_navigation(&self) -> () {
@@ -81,6 +89,7 @@ impl SystemState {
         if !*guard {
             *guard = true;
         }
-        system_log("Navigation interrompue.".yellow());
+        self.logs_cli_tx()
+            .send(LogEvent::System("Navigation interrompue.".yellow()));
     }
 }

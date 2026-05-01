@@ -1,31 +1,51 @@
 use colored::{ColoredString, Colorize};
-use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
+use dialoguer::{Input, Select, theme::ColorfulTheme};
 use shared::config::Config;
 use std::{
     fs,
-    io::{Error, Write},
+    io::Write,
     net::{IpAddr, Ipv4Addr},
-    process::{self, Command, ExitStatus, Stdio},
+    process::{Command, Stdio},
     str::FromStr,
 };
 use sudo::RunningAs;
 
 const VHOSTS_SETUP_SCRIPT: &str = include_str!("../setup_vhosts.sh");
 
+fn clear_terminal() -> () {
+    Command::new("clear")
+        .status()
+        .expect("\nImpossible de clear le terminal.\n");
+}
+
+fn display_banner() -> () {
+    let banner: &str = "
+    ____  __      __       ____                             __  ___           _ __  _              
+   / __ \\/ /___ _/ /____  / __/___  _________ ___  ___     /  |/  /___ ______(_) /_(_)___ ___  ___ 
+  / /_/ / / __ `/ __/ _ \\/ /_/ __ \\/ ___/ __ `__ \\/ _ \\   / /|_/ / __ `/ ___/ / __/ / __ `__ \\/ _ \\
+ / ____/ / /_/ / /_/  __/ __/ /_/ / /  / / / / / /  __/  / /  / / /_/ / /  / / /_/ / / / / / /  __/
+/_/   /_/\\__,_/\\__/\\___/_/  \\____/_/  /_/ /_/ /_/\\___/  /_/  /_/\\__,_/_/  /_/\\__/_/_/ /_/ /_/\\___/                                                                                    
+";
+
+    let msg: ColoredString = format!("{banner}\n\n##################################################################################################\n\nVersion 1.0.0\nEcole Nationale Supérieure des Mines de Nancy\nCampus ARTEM et de Saint-Dié-des-Vosges\nUniversité de Lorraine\n2026\n\n##################################################################################################\n\nRéalisé par:\n- Alexandre Brisset (communication VHF, modélisation, fabrication)\n- Matieu Gauthier (modélisation, fabrication)\n- Sasha Guérin--Loison (ensemble de la codebase)\n- Saad Ouadrassi (microcontrôleurs, algorithme de déplacement)\n- Bosco Perrin (conception et fabrication des bateaux)\n- Yasmine ? (conception et fabrication des bateaux)\n\n##################################################################################################\n\nEncadré par:\n- Guillaume Bonfante\n\n##################################################################################################\n\n").yellow();
+
+    println!("{msg}");
+}
+
 fn setup_vhosts() -> () {
     let mut child = Command::new("bash")
-        .arg("-s") // Lit le script depuis stdin
+        .arg("-s")
         .stdin(Stdio::piped())
-        .stdout(Stdio::inherit()) // Affiche les sorties du script dans ton terminal
+        .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
         .unwrap();
 
     let mut stdin = child.stdin.take().expect("Échec ouverture stdin");
-    stdin.write_all(VHOSTS_SETUP_SCRIPT.as_bytes());
-    drop(stdin); // Important : ferme le pipe pour que bash commence l'exécution
+    let _ = stdin.write_all(VHOSTS_SETUP_SCRIPT.as_bytes());
+    drop(stdin);
 
-    child.wait();
+    let _ = child.wait();
 }
 
 fn build_config() -> () {
@@ -79,13 +99,29 @@ fn build_config() -> () {
 }
 
 fn main() {
-    ctrlc::set_handler(move || {}).expect("Erreur lors de la définition du gestionnaire Ctrl+C");
+    ctrlc::set_handler(move || {
+        clear_terminal();
+        display_banner();
+    })
+    .expect("Erreur lors de la définition du gestionnaire Ctrl+C");
 
     if sudo::check() == RunningAs::Root {
         println!("Ce simulateur doit être lancé avec sudo.");
 
         sudo::escalate_if_needed().expect("Erreur lors de l'élévation de privilèges.");
     }
+
+    let _ = [
+        "ais_logs.log",
+        "system_logs.log",
+        "computer_logs.log",
+        "gps_logs.log",
+        "satcom_logs.log",
+    ]
+    .iter()
+    .for_each(|logs_filename| {
+        let _ = fs::remove_file(logs_filename);
+    });
 
     let functionalities: [&str; 8] = [
         "Déployer la capitainerie (simulation ou montage réel)",
@@ -98,21 +134,8 @@ fn main() {
         "Quitter",
     ];
 
-    let banner: &str = "
-    ____  __      __       ____                             __  ___           _ __  _              
-   / __ \\/ /___ _/ /____  / __/___  _________ ___  ___     /  |/  /___ ______(_) /_(_)___ ___  ___ 
-  / /_/ / / __ `/ __/ _ \\/ /_/ __ \\/ ___/ __ `__ \\/ _ \\   / /|_/ / __ `/ ___/ / __/ / __ `__ \\/ _ \\
- / ____/ / /_/ / /_/  __/ __/ /_/ / /  / / / / / /  __/  / /  / / /_/ / /  / / /_/ / / / / / /  __/
-/_/   /_/\\__,_/\\__/\\___/_/  \\____/_/  /_/ /_/ /_/\\___/  /_/  /_/\\__,_/_/  /_/\\__/_/_/ /_/ /_/\\___/                                                                                    
-";
-
-    let msg: ColoredString = format!("{banner}\n\n##################################################################################################\n\nVersion 1.0.0\nEcole Nationale Supérieure des Mines de Nancy\nCampus ARTEM et de Saint-Dié-des-Vosges\nUniversité de Lorraine\n2026\n\n##################################################################################################\n\nRéalisé par:\n- Sasha Guérin--Loison (code)\n- Alexandre Brisset (communication VHF, modélisation, fabrication)\n- Saad Ouadrassi (code et algorithme de déplacement)\n- Matieu Gauthier (modélisation, fabrication)\n- Bosco Perrin (conception et fabrication des bateaux)\n- Yasmine ? (conception et fabrication des bateaux)\n\n##################################################################################################\n\nEncadré par:\n- Guillaume Bonfante\n\n##################################################################################################\n\n").yellow();
-
-    Command::new("clear")
-        .status()
-        .expect("\nImpossible de clear le terminal.\n");
-
-    println!("{msg}");
+    clear_terminal();
+    display_banner();
 
     if Config::load().is_none() {
         println!("Fichier de configuration non trouvé. Lancement du formulaire de création.\n");
@@ -139,10 +162,10 @@ fn main() {
 
                     Command::new("./harbourmaster")
                         .status()
-                        .expect("Le lancement de la capitainerie a échoué");
+                        .expect("\nLe lancement de la capitainerie a échoué\n");
                 } else {
                     eprintln!(
-                        "Impossible de trouver l'exécutable harbourmaster. Demandez-le à Sasha."
+                        "\nImpossible de trouver l'exécutable harbourmaster. Demandez-le à Sasha.\n"
                     )
                 }
             }
@@ -155,12 +178,15 @@ fn main() {
                             .args(["ip", "netns", "exec", "server", "./server"])
                             .status()
                             .expect("Le lancement du serveur a échoué");
+
+                        clear_terminal();
+                        display_banner();
                     } else {
-                        eprintln!("Impossible de trouver l'exécutable server. Demandez-le à Sasha.")
+                        eprintln!("\nImpossible de trouver l'exécutable server. Demandez-le à Sasha.\n")
                     }
                 } else {
                     eprintln!(
-                        "La configuration simulation n'a pas été effectuée ! Veuillez y procéder."
+                        "\nLa configuration simulation n'a pas été effectuée ! Veuillez y procéder.\n"
                     )
                 }
             }
@@ -173,12 +199,15 @@ fn main() {
                             .args(["ip", "netns", "exec", "boat", "./boat"])
                             .status()
                             .expect("Le lancement du bateau a échoué");
+
+                        clear_terminal();
+                        display_banner();
                     } else {
-                        eprintln!("Impossible de trouver l'exécutable boat. Demandez-le à Sasha.")
+                        eprintln!("\nImpossible de trouver l'exécutable boat. Demandez-le à Sasha.\n")
                     }
                 } else {
                     eprintln!(
-                        "La configuration simulation n'a pas été effectuée ! Veuillez y procéder."
+                        "\nLa configuration simulation n'a pas été effectuée ! Veuillez y procéder.\n"
                     )
                 }
             }
@@ -191,11 +220,11 @@ fn main() {
                             .status()
                             .expect("Le lancement du serveur a échoué");
                     } else {
-                        eprintln!("Impossible de trouver l'exécutable server. Demandez-le à Sasha.")
+                        eprintln!("\nImpossible de trouver l'exécutable server. Demandez-le à Sasha.\n")
                     }
                 } else {
                     eprintln!(
-                        "La configuration maquette réelle n'a pas été effectuée ! Veuillez y procéder."
+                        "\nLa configuration maquette réelle n'a pas été effectuée ! Veuillez y procéder.\n"
                     )
                 }
             }
@@ -207,12 +236,15 @@ fn main() {
                         Command::new("./boat")
                             .status()
                             .expect("Le lancement du bateau a échoué");
+
+                        clear_terminal();
+                        display_banner();
                     } else {
-                        eprintln!("Impossible de trouver l'exécutable boat. Demandez-le à Sasha.")
+                        eprintln!("\nImpossible de trouver l'exécutable boat. Demandez-le à Sasha.\n")
                     }
                 } else {
                     eprintln!(
-                        "La configuration maquette réelle n'a pas été effectuée ! Veuillez y procéder."
+                        "\nLa configuration maquette réelle n'a pas été effectuée ! Veuillez y procéder.\n"
                     )
                 }
             }
@@ -228,9 +260,9 @@ fn main() {
                     .unwrap()
                     == 1
                 {
-                    fs::remove_file("./harbourmaster_database.db");
+                    let _ = fs::remove_file("./harbourmaster_database.db");
 
-                    println!("DB de la capitainerie supprimée avec succès.");
+                    println!("\nDB de la capitainerie supprimée avec succès.\n");
                 }
             }
             _ => {

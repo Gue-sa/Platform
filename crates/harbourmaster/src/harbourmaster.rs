@@ -42,7 +42,7 @@ impl Harbourmaster {
             (*config.harbourmaster_gps_logs_filename().clone()).to_string(),
             (*config.harbourmaster_satcom_logs_filename().clone()).to_string(),
             (*config.harbourmaster_computer_logs_filename().clone()).to_string(),
-            "Logs Armateur (interface web : localhost:3000)",
+            "Logs Armateur (interface web : localhost:8080)",
         );
 
         let (

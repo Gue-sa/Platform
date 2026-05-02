@@ -12,5 +12,12 @@ RUN apt-get update && \
         libudev-dev
 
 RUN apt-get install -y --no-install-recommends \
-        libopencv-dev \
-        libopencv-contrib-dev
+        libopencv-core-dev \
+        libopencv-imgproc-dev \
+        libopencv-videoio-dev \
+        libopencv-highgui-dev
+
+RUN apt-get download libopencv-dev && \
+    dpkg --force-all -i libopencv-dev_*.deb && \
+    rm libopencv-dev_*.deb && \
+    sed -i 's/^Libs:.*/Libs: -L${libdir} -lopencv_highgui -lopencv_videoio -lopencv_imgproc -lopencv_core/' /usr/lib/x86_64-linux-gnu/pkgconfig/opencv4.pc

@@ -16,14 +16,10 @@ RUN dpkg --add-architecture arm64 && \
 RUN apt-get install -y --no-install-recommends \
         libopencv-core-dev:arm64 \
         libopencv-imgproc-dev:arm64 \
-        libopencv-imgcodecs-dev:arm64 \
-        libopencv-video-dev:arm64 \
         libopencv-videoio-dev:arm64 \
-        libopencv-highgui-dev:arm64 \
-        libopencv-objdetect-dev:arm64 \
-        libopencv-calib3d-dev:arm64 \
-        libopencv-features2d-dev:arm64
+        libopencv-highgui-dev:arm64
 
 RUN apt-get download libopencv-dev:arm64 && \
     dpkg --force-all -i libopencv-dev_*.deb && \
-    rm libopencv-dev_*.deb
+    rm libopencv-dev_*.deb && \
+    sed -i 's/^Libs:.*/Libs: -L${libdir} -lopencv_highgui -lopencv_videoio -lopencv_imgproc -lopencv_core/' /usr/lib/aarch64-linux-gnu/pkgconfig/opencv4.pc

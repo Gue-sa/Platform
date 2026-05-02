@@ -1,12 +1,10 @@
 use colored::Colorize;
 use opencv::{
     core::{self, Moments, Point_, Scalar, Vector},
-    highgui,
     imgproc::{
-        CHAIN_APPROX_SIMPLE, COLOR_BGR2HSV, FONT_HERSHEY_SIMPLEX, LINE_8, MORPH_CLOSE, MORPH_RECT,
-        RETR_EXTERNAL, approx_poly_dp, arc_length, bounding_rect, contour_area, cvt_color,
-        find_contours, get_structuring_element, is_contour_convex, moments, morphology_ex,
-        put_text, rectangle,
+        CHAIN_APPROX_SIMPLE, FONT_HERSHEY_SIMPLEX, LINE_8, MORPH_CLOSE, MORPH_RECT, RETR_EXTERNAL,
+        approx_poly_dp, arc_length, bounding_rect, contour_area, find_contours,
+        get_structuring_element, is_contour_convex, moments, morphology_ex, put_text, rectangle,
     },
     prelude::*,
     videoio::{

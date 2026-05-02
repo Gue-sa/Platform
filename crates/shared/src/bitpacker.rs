@@ -17,13 +17,14 @@ impl Index<usize> for BitPacker {
     type Output = u8;
 
     fn index(&self, idx: usize) -> &Self::Output {
-        let byte_idx: usize = self.bits.len() - 1 - idx.div_euclid(8);
-        let bit_idx: usize = (idx % 8) as usize;
+        let byte_idx: usize = self.bits.len() - 1 - (idx >> 3);
+        let bit_idx: usize = idx & 7;
 
-        let bytes: u8 = self.bits[byte_idx].clone();
-        let bit: u8 = bytes >> bit_idx & 1;
-
-        if bit == 1 { &1 } else { &0 }
+        if (self.bits[byte_idx] >> bit_idx) & 1 == 1 {
+            &1
+        } else {
+            &0
+        }
     }
 }
 
@@ -32,26 +33,22 @@ impl Add for BitPacker {
 
     fn add(self, rhs: Self) -> Self::Output {
         let bits_len: usize = self.bits_len + rhs.bits_len;
-        let bytes_len = bits_len.div_ceil(8);
-
+        let bytes_len: usize = bits_len.div_ceil(8);
         let mut bits: Vec<u8> = vec![0u8; bytes_len];
 
-        for i in 0..rhs.bits_len {
-            let byte_idx: usize = bytes_len - 1 - i.div_euclid(8);
-            let bit_idx: usize = i % 8;
-
-            if rhs[i] == 1 {
-                bits[byte_idx] |= 1 << bit_idx;
+        let mut write = |idx: usize, bit: u8| {
+            if bit == 1 {
+                let byte_idx = bytes_len - 1 - (idx >> 3);
+                bits[byte_idx] |= 1 << (idx & 7);
             }
+        };
+
+        for i in 0..rhs.bits_len {
+            write(i, rhs[i]);
         }
 
         for i in 0..self.bits_len {
-            let byte_idx: usize = bytes_len - 1 - (i + rhs.bits_len).div_euclid(8);
-            let bit_idx: usize = (i + rhs.bits_len) % 8;
-
-            if self[i] == 1 {
-                bits[byte_idx] |= 1 << bit_idx;
-            }
+            write(i + rhs.bits_len, self.get_bit_unchecked(i));
         }
 
         BitPacker::from_slice(&bits, Some(bits_len))
@@ -59,16 +56,24 @@ impl Add for BitPacker {
 }
 
 impl BitPacker {
+    #[inline]
+    fn get_bit_unchecked(&self, idx: usize) -> u8 {
+        let byte_idx: usize = self.bits.len() - 1 - (idx >> 3);
+        (self.bits[byte_idx] >> (idx & 7)) & 1
+    }
+
     fn write_bit(&mut self, idx: usize, val: u8) -> BitPackerResult<()> {
         if idx >= self.bits_len {
             return Err(BitPackerError::IndexOutOfBounds);
         }
 
-        let byte_idx: usize = self.bits.len() - 1 - idx.div_euclid(8) as usize;
-        let bit_idx: usize = (idx % 8) as usize;
+        let byte_idx: usize = self.bits.len() - 1 - (idx >> 3);
+        let bit_idx: usize = idx & 7;
 
-        if (self[idx] == 1 && val == 0) || (self[idx] == 0 && val == 1) {
-            self.bits[byte_idx] ^= 1 << bit_idx;
+        if val == 1 {
+            self.bits[byte_idx] |= 1 << bit_idx;
+        } else {
+            self.bits[byte_idx] &= !(1 << bit_idx);
         }
 
         Ok(())
@@ -79,89 +84,72 @@ impl BitPacker {
         val: T2,
         start_idx: Option<usize>,
     ) -> BitPackerResult<()> {
-        if val != T2::zero() {
-            let start_idx: usize = start_idx.unwrap_or(0);
-            let end_idx: usize =
-                start_idx + std::mem::size_of::<T2>() * 8 - val.leading_zeros() as usize - 1;
-
-            for i in start_idx..=end_idx {
-                let bit: T2 = (val >> (i - start_idx)) & T2::one();
-
-                if bit == T2::one() {
-                    self.write_bit(i, 1)?;
-                }
-            }
+        if val == T2::zero() {
+            return Ok(());
         }
 
+        let start: usize = start_idx.unwrap_or(0);
+        let bits_to_write: usize = std::mem::size_of::<T2>() * 8 - val.leading_zeros() as usize;
+
+        for i in 0..bits_to_write {
+            if ((val >> i) & T2::one()) == T2::one() {
+                self.write_bit(start + i, 1)?;
+            }
+        }
         Ok(())
     }
 
     pub fn from_int<T: PrimInt>(val: T, bits_len: Option<usize>) -> Self {
         let bits_len: usize =
-            bits_len.unwrap_or(std::mem::size_of::<T>() * 8 - val.leading_zeros() as usize);
-        let bytes_len: usize = bits_len.div_ceil(8);
-
-        let mut bitpacker: BitPacker = Self {
-            bits: vec![0u8; bytes_len],
-            bits_len: bits_len,
+            bits_len.unwrap_or_else(|| std::mem::size_of::<T>() * 8 - val.leading_zeros() as usize);
+        let mut bitpacker = Self {
+            bits: vec![0u8; bits_len.div_ceil(8)],
+            bits_len,
         };
-
-        bitpacker.write_bits::<T>(val, None);
-
+        let _ = bitpacker.write_bits(val, None);
         bitpacker
     }
 
     pub fn from_str(val: &str, bits_len: Option<usize>) -> Self {
         let bits_len: usize = bits_len.unwrap_or(6 * val.len());
-        let bytes_len: usize = bits_len.div_ceil(8);
-
-        let mut bitpacker: BitPacker = Self {
-            bits: vec![0u8; bytes_len],
-            bits_len: bits_len,
+        let mut bitpacker = Self {
+            bits: vec![0u8; bits_len.div_ceil(8)],
+            bits_len,
         };
 
-        for (i, c) in val.to_ascii_uppercase().chars().enumerate() {
-            let ord: u8 = ord6(c);
-            bitpacker.write_bits::<u8>(ord, Some(i * 6));
+        for (i, c) in val.chars().enumerate() {
+            let ord: u8 = ord6(c.to_ascii_uppercase());
+            let _ = bitpacker.write_bits(ord, Some(i * 6));
         }
-
         bitpacker
     }
 
     pub fn from_slice(bits: &[u8], bits_len: Option<usize>) -> Self {
         Self {
-            bits: Vec::from(bits),
-            bits_len: bits_len.unwrap_or(bits.len()),
+            bits: bits.to_vec(),
+            bits_len: bits_len.unwrap_or(bits.len() * 8),
         }
     }
 
     pub fn slice(&self, start_idx: Option<usize>, end_idx: Option<usize>) -> BitPackerResult<Self> {
-        let start_i: usize = start_idx.unwrap_or(0);
-        let end_i: usize = end_idx.unwrap_or(self.bits_len - 1);
+        let start: usize = start_idx.unwrap_or(0);
+        let end: usize = end_idx.unwrap_or(self.bits_len.saturating_sub(1));
 
-        if start_i >= self.bits_len || end_i >= self.bits_len {
+        if start >= self.bits_len || end >= self.bits_len {
             return Err(BitPackerError::IndexOutOfBounds);
         }
 
-        let bits_len: usize = end_i - start_i + 1;
-        let bytes_len: usize = bits_len.div_ceil(8);
-
+        let slice_len: usize = end - start + 1;
+        let bytes_len: usize = slice_len.div_ceil(8);
         let mut bits: Vec<u8> = vec![0u8; bytes_len];
 
-        for slice_i in 0..bits_len {
-            let original_i: usize = slice_i + start_i;
-
-            let slice_byte_idx: usize = bytes_len - 1 - slice_i.div_euclid(8);
-            let slice_bit_idx: usize = slice_i % 8;
-
-            if self[original_i] == 1 {
-                bits[slice_byte_idx] |= 1 << slice_bit_idx;
+        for i in 0..slice_len {
+            if self.get_bit_unchecked(start + i) == 1 {
+                bits[bytes_len - 1 - (i >> 3)] |= 1 << (i & 7);
             }
         }
 
-        let bitpacker: BitPacker = BitPacker::from_slice(&bits, Some(bits_len));
-
-        Ok(bitpacker)
+        Ok(BitPacker::from_slice(&bits, Some(slice_len)))
     }
 
     pub fn extract_int<T: PrimInt>(
@@ -169,23 +157,19 @@ impl BitPacker {
         start_idx: Option<usize>,
         end_idx: Option<usize>,
     ) -> BitPackerResult<T> {
-        let start_idx: usize = start_idx.unwrap_or(0);
-        let end_idx: usize = end_idx.unwrap_or(self.bits_len - 1);
+        let start: usize = start_idx.unwrap_or(0);
+        let end: usize = end_idx.unwrap_or(self.bits_len.saturating_sub(1));
 
-        if start_idx >= self.bits_len || end_idx >= self.bits_len {
+        if start >= self.bits_len || end >= self.bits_len {
             return Err(BitPackerError::IndexOutOfBounds);
         }
 
-        let mut val: T = T::zero();
-
-        let int_slice: BitPacker = self.slice(Some(start_idx), Some(end_idx))?;
-
-        for i in 0..int_slice.bits_len {
-            if int_slice[i] == 1 {
+        let mut val = T::zero();
+        for i in 0..=(end - start) {
+            if self.get_bit_unchecked(start + i) == 1 {
                 val = val | (T::one() << i);
             }
         }
-
         Ok(val)
     }
 
@@ -194,32 +178,30 @@ impl BitPacker {
         start_idx: Option<usize>,
         end_idx: Option<usize>,
     ) -> BitPackerResult<String> {
-        let start_idx: usize = start_idx.unwrap_or(0);
-        let end_idx: usize = end_idx.unwrap_or(self.bits_len - 1);
+        let start: usize = start_idx.unwrap_or(0);
+        let end: usize = end_idx.unwrap_or(self.bits_len.saturating_sub(1));
 
-        if start_idx >= self.bits_len || end_idx >= self.bits_len {
+        if start >= self.bits_len || end >= self.bits_len {
             return Err(BitPackerError::IndexOutOfBounds);
         }
 
-        let bits_len: usize = end_idx - start_idx + 1;
-        let bits_len: usize = bits_len - bits_len % 6;
+        let len: usize = end - start + 1;
+        let num_chars: usize = len / 6;
 
-        let str_slice: BitPacker = self.slice(Some(start_idx), Some(end_idx))?;
+        let mut extracted_str: String = String::with_capacity(num_chars);
 
-        let mut extracted_str: String = String::new();
+        for char_idx in 0..num_chars {
+            let mut chr_ord: u8 = 0;
+            let char_start = start + char_idx * 6;
 
-        let mut chr_ord: u8 = 0;
-
-        for i in 0..bits_len {
-            if str_slice[i] == 1 {
-                chr_ord |= 1 << i % 6;
+            for bit_idx in 0..6 {
+                if self.get_bit_unchecked(char_start + bit_idx) == 1 {
+                    chr_ord |= 1 << bit_idx;
+                }
             }
 
-            if i % 6 == 5 {
-                if chr_ord != 0 {
-                    extracted_str += &char6(chr_ord).to_string();
-                    chr_ord = 0;
-                }
+            if chr_ord != 0 {
+                extracted_str.push(char6(chr_ord));
             }
         }
 
@@ -227,16 +209,14 @@ impl BitPacker {
     }
 
     pub fn to_bin_str(&self) -> String {
-        let mut bin_str: String = String::new();
-
-        for i in 0..self.bits_len {
-            if self[i] == 1 {
-                bin_str = "1".to_string() + &bin_str;
+        let mut bin_str = String::with_capacity(self.bits_len);
+        for i in (0..self.bits_len).rev() {
+            bin_str.push(if self.get_bit_unchecked(i) == 1 {
+                '1'
             } else {
-                bin_str = "0".to_string() + &bin_str;
-            }
+                '0'
+            });
         }
-
         bin_str
     }
 }

@@ -2,7 +2,7 @@ use crate::common::constants::{SIX_BITS_ASCII_ALPHABET, SLOTS_PER_MINUTE};
 use chrono::{DateTime, Local, Timelike};
 
 pub fn char6(ord: u8) -> char {
-    SIX_BITS_ASCII_ALPHABET[usize::from(ord - 1)] as char
+    SIX_BITS_ASCII_ALPHABET[(ord - 1) as usize] as char
 }
 
 pub fn ord6(chr: char) -> u8 {

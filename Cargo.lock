@@ -3207,6 +3207,7 @@ dependencies = [
  "futures",
  "getset",
  "num-traits",
+ "opencv",
  "serde",
  "shared",
  "sudo",

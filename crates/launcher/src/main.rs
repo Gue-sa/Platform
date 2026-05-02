@@ -2,7 +2,16 @@ use colored::{ColoredString, Colorize};
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 use futures::future::join_all;
 use num_traits::PrimInt;
-use shared::config::Config;
+use opencv::{
+    core::LogLevel,
+    highgui::{self, WINDOW_AUTOSIZE, WINDOW_GUI_NORMAL, WND_PROP_TOPMOST},
+    prelude::*,
+    videoio::{
+        self, CAP_PROP_BUFFERSIZE, CAP_PROP_FOURCC, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH,
+        VideoCapture, VideoWriter,
+    },
+};
+use shared::{common::utils::get_current_dt, config::Config};
 use std::{
     fmt::{Binary, Display},
     fs::{self, File, exists},
@@ -11,6 +20,8 @@ use std::{
     path::Path,
     process::{Command, Stdio},
     str::FromStr,
+    thread,
+    time::Duration,
 };
 use sudo::RunningAs;
 
@@ -77,13 +88,21 @@ fn display_banner() -> () {
     let has_harbourmaster: bool = matches!(fs::exists("harbourmaster"), Ok(true));
     let has_boat: bool = matches!(fs::exists("boat"), Ok(true));
 
-    let server_status: &str = if has_server { "Présent ✔" } else { "Absent ✗" };
+    let server_status: &str = if has_server {
+        "Présent ✔"
+    } else {
+        "Absent ✗"
+    };
     let harbourmaster_status: &str = if has_harbourmaster {
         "Présent ✔"
     } else {
         "Absent ✗"
     };
-    let boat_status: &str = if has_boat { "Présent ✔" } else { "Absent ✗" };
+    let boat_status: &str = if has_boat {
+        "Présent ✔"
+    } else {
+        "Absent ✗"
+    };
 
     let banner_msg: ColoredString = format!("{BANNER_TITLE}\n\n##################################################################################################\n\nVersion 1.0.0\nEcole Nationale Supérieure des Mines de Nancy\nCampus ARTEM et de Saint-Dié-des-Vosges\nUniversité de Lorraine\n2026\n\n##################################################################################################\n\nRéalisé par:\n- Alexandre Brisset (communication VHF, modélisation, fabrication)\n- Matieu Gauthier (modélisation, fabrication)\n- Sasha Guérin--Loison (ensemble de la codebase)\n- Saad Ouadrassi (microcontrôleurs, algorithme de déplacement)\n- Bosco Perrin (conception et fabrication des bateaux)\n- Yasmine ? (conception et fabrication des bateaux)\n\n##################################################################################################\n\nEncadré par:\n- Guillaume Bonfante\n\n##################################################################################################\n\nStatut des exécutables:\n- Serveur: {server_status}\n- Capitainerie: {harbourmaster_status}\n- Bateau: {boat_status}\n\n##################################################################################################\n\n").yellow();
 
@@ -210,7 +229,7 @@ fn build_config() -> () {
 
     let is_sim: bool = bool_input(
         "Voulez-vous créer une simulation locale (sur une seule machine) ou mettre en place la maquette réelle ?",
-        Some("Simulation (recquiert sudo pour setup les vhosts + simulation à 1 bateau max)"),
+        Some("Simulation"),
         Some("Maquette"),
     );
 
@@ -228,15 +247,105 @@ fn build_config() -> () {
         config.set_harbourmaster_ip(harbourmaster_ip);
     }
 
+    if bool_input(
+        "Souhaitez-vous configurer la caméra utilisée pour la simulation GPS dès maintenant ? Cette étape est nécessaire si vous souhaitez simuler la capitainerie avec GPS.",
+        None,
+        None,
+    ) {
+        config.set_gps_cam_idx(probe_cam_idx());
+    }
+
     config.write();
 
     println!("\nConfiguration effectuée avec succès !\n")
 }
 
+fn probe_cam_idx() -> Option<u8> {
+    opencv::core::set_log_level(LogLevel::LOG_LEVEL_FATAL).unwrap();
+
+    let mut indices: Vec<u8> = Vec::<u8>::new();
+    let mut caps: Vec<VideoCapture> = Vec::<VideoCapture>::new();
+
+    for i in 0..=10 {
+        if let Ok(mut cap) = videoio::VideoCapture::new(i, videoio::CAP_V4L2) {
+            let fourcc: i32 = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
+
+            if cap.set(CAP_PROP_FOURCC, fourcc as f64).is_ok()
+                && cap.set(CAP_PROP_BUFFERSIZE, 1.).is_ok()
+                && cap.set(CAP_PROP_FRAME_WIDTH, 1920.).is_ok()
+                && cap.set(CAP_PROP_FRAME_HEIGHT, 1080.).is_ok()
+            {
+                if let Ok(opened) = videoio::VideoCapture::is_opened(&cap)
+                    && opened
+                {
+                    indices.push(i as u8);
+                    caps.push(cap);
+                }
+            }
+        }
+    }
+
+    match indices.len() {
+        0 => None,
+        1 => Some(indices[0]),
+        _ => {
+            println!(
+                "\nATTENTION : Multiples caméras détectées. Chaque flux sera ouvert afin de les départager. Début dans 5 secondes...\n"
+            );
+
+            thread::sleep(Duration::from_secs(5));
+
+            let mut frame: Mat = Mat::default();
+            let mut flipped_frame: Mat = Mat::default();
+
+            for i in 0..caps.len() {
+                let cap: &mut VideoCapture = &mut caps[i];
+
+                let win_name = &format!("Flux de la cam {}", indices[i]);
+
+                highgui::named_window(win_name, WINDOW_AUTOSIZE | WINDOW_GUI_NORMAL).unwrap();
+                highgui::set_window_property(win_name, WND_PROP_TOPMOST, 1.0).unwrap();
+
+                let tic = get_current_dt();
+
+                loop {
+                    cap.read(&mut frame).unwrap();
+
+                    if frame.empty() {
+                        highgui::destroy_all_windows().unwrap();
+
+                        break;
+                    }
+
+                    opencv::core::flip(&frame, &mut flipped_frame, 1).unwrap();
+
+                    highgui::imshow(win_name, &flipped_frame).unwrap();
+
+                    let tac = get_current_dt();
+
+                    if (tac - tic).num_seconds() >= 5 {
+                        highgui::destroy_all_windows().unwrap();
+
+                        break;
+                    } else {
+                        let _ = highgui::wait_key(1);
+                    }
+                }
+
+                if bool_input("Ce flux vous convenait-il ?", None, None) {
+                    return Some(indices[i]);
+                }
+            }
+
+            None
+        }
+    }
+}
+
 fn change_settings() -> () {
     let config: Config = Config::load().unwrap();
 
-    let settings: [&str; 12] = [
+    let settings: [&str; 13] = [
         &format!(
             "Activer / désactiver le mode simulation (valeur actuelle = {}, défaut = Désactivé)",
             if *config.is_simulation() {
@@ -304,6 +413,14 @@ fn change_settings() -> () {
         &format!(
             "Modifier le délai de rafraichissement du CLI logs (valeur actuelle = {}ms, défaut = 100ms)",
             *config.cli_refresh_delay()
+        ),
+        &format!(
+            "Modifier l'indice de la caméra à utiliser pour le GPS (valeur actuelle = {}, défaut = Indéfini)",
+            if config.gps_cam_idx().is_some() {
+                config.gps_cam_idx().unwrap().to_string()
+            } else {
+                "Indéfini".to_string()
+            }
         ),
         "Retour",
     ];
@@ -446,6 +563,11 @@ fn change_settings() -> () {
 
                 config.set_cli_refresh_delay(d);
             }
+            11 => {
+                let cam_idx: Option<u8> = probe_cam_idx();
+
+                config.set_gps_cam_idx(cam_idx);
+            }
             _ => {
                 break;
             }
@@ -537,6 +659,27 @@ async fn main() {
                             "\nAttention, la configuration pour simulation n'a pas été effectuée. Le programme va se lancer, mais ne fonctionnera pas en simulation locale.\n"
                         )
                     }
+
+                    if Config::load().unwrap().gps_cam_idx().is_none()
+                        && *Config::load().unwrap().gps_detection() == true
+                    {
+                        if bool_input(
+                            "\nLa configuration de la caméra n'a pas été effectuée alors que le positionnement GPS est activé. Voulez-vous l'effectuer ?\n",
+                            None,
+                            None,
+                        ) {
+                            let mut config: Config = Config::load().unwrap();
+
+                            config.set_gps_cam_idx(probe_cam_idx());
+
+                            config.write();
+                        } else {
+                            println!("\nRetour au launcher.\n");
+
+                            continue;
+                        }
+                    }
+
                     println!("\nLancement de la capitainerie...\n");
 
                     Command::new("./harbourmaster")
@@ -557,6 +700,26 @@ async fn main() {
                         && matches!(fs::exists("harbourmaster"), Ok(true))
                         && matches!(fs::exists("boat"), Ok(true))
                     {
+                        if Config::load().unwrap().gps_cam_idx().is_none()
+                            && *Config::load().unwrap().gps_detection() == true
+                        {
+                            if bool_input(
+                                "\nLa configuration de la caméra n'a pas été effectuée alors que le positionnement GPS est activé. Voulez-vous l'effectuer ?\n",
+                                None,
+                                None,
+                            ) {
+                                let mut config: Config = Config::load().unwrap();
+
+                                config.set_gps_cam_idx(probe_cam_idx());
+
+                                config.write();
+                            } else {
+                                println!("\nRetour au launcher.\n");
+
+                                continue;
+                            }
+                        }
+
                         run_sim().await;
 
                         println!("\nSimulation terminée avec succès.\n")
@@ -685,7 +848,7 @@ async fn main() {
                 change_settings();
             }
             _ => {
-                break;
+                std::process::exit(0);
             }
         }
     }

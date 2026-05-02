@@ -14,7 +14,7 @@ use opencv::{
         CAP_V4L2, VideoCapture, VideoWriter,
     },
 };
-use shared::{bitpacker::BitPacker, common::types::LogEvent};
+use shared::{bitpacker::BitPacker, common::types::LogEvent, config::Config};
 use std::sync::{
     Arc,
     atomic::{AtomicU32, Ordering},
@@ -76,15 +76,19 @@ impl HarbourmasterGps {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement du satellite GPS...".yellow()));
 
-        let mut cam = VideoCapture::new(0, CAP_V4L2).unwrap();
+        let mut cam: VideoCapture = VideoCapture::new(
+            Config::load().unwrap().gps_cam_idx().unwrap() as i32,
+            CAP_V4L2,
+        )
+        .unwrap();
 
-        let fourcc = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
+        let fourcc: i32 = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
         cam.set(CAP_PROP_FOURCC, fourcc as f64).unwrap();
 
         cam.set(CAP_PROP_FRAME_WIDTH, 1920.).unwrap();
         cam.set(CAP_PROP_FRAME_HEIGHT, 1080.).unwrap();
 
-        cam.set(CAP_PROP_BUFFERSIZE, 1.);
+        cam.set(CAP_PROP_BUFFERSIZE, 1.).unwrap();
 
         //cam.set(videoio::CAP_PROP_AUTO_EXPOSURE, 1.);
         //cam.set(CAP_PROP_EXPOSURE, -3.).unwrap();
@@ -117,13 +121,27 @@ impl HarbourmasterGps {
             core::flip(&frame, &mut flipped_frame, 1).unwrap();
 
             #[cfg(feature = "arch-based")]
-            cvt_color(&flipped_frame, &mut hsv,COLOR_BGR2HSV, 0, core::AlgorithmHint::ALGO_HINT_DEFAULT).unwrap();
+            cvt_color(
+                &flipped_frame,
+                &mut hsv,
+                COLOR_BGR2HSV,
+                0,
+                core::AlgorithmHint::ALGO_HINT_DEFAULT,
+            )
+            .unwrap();
 
             #[cfg(feature = "rasp-based")]
-            cvt_color(&flipped_frame, &mut hsv,COLOR_BGR2HSV, 0, core::AlgorithmHint::ALGO_HINT_DEFAULT).unwrap();
+            cvt_color(
+                &flipped_frame,
+                &mut hsv,
+                COLOR_BGR2HSV,
+                0,
+                core::AlgorithmHint::ALGO_HINT_DEFAULT,
+            )
+            .unwrap();
 
             #[cfg(feature = "debian-based")]
-            cvt_color(&flipped_frame, &mut hsv,COLOR_BGR2HSV, 0).unwrap();
+            cvt_color(&flipped_frame, &mut hsv, COLOR_BGR2HSV, 0).unwrap();
 
             // --- SEUILLAGE DU ROUGE ---
             // On baisse la saturation minimale (S=70 -> 50) pour capter le rouge "lavé" par la lumière de l'écran
@@ -134,7 +152,7 @@ impl HarbourmasterGps {
                 &mut mask1,
             )
             .unwrap();
-        
+
             core::in_range(
                 &hsv,
                 &Scalar::new(170.0, 160.0, 100.0, 0.0),

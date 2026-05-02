@@ -22,6 +22,7 @@ pub struct Config {
 
     gps_detection: bool,
     gps_refresh_delay: u64,
+    gps_cam_idx: Option<u8>,
 
     max_cli_logs_history_length: usize,
     cli_refresh_delay: u64,
@@ -55,6 +56,7 @@ impl Default for Config {
 
             gps_detection: true,
             gps_refresh_delay: 5,
+            gps_cam_idx: None,
 
             max_cli_logs_history_length: 1000,
             cli_refresh_delay: 100,

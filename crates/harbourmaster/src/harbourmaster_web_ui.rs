@@ -24,7 +24,7 @@ pub struct HarbourmasterWebUi {
 impl HarbourmasterWebUi {
     pub async fn new() -> Self {
         let app: Router = Router::new().fallback(get(HarbourmasterWebUi::serve_ui));
-        let addr: SocketAddr = SocketAddr::from(([0, 0, 0, 0], 8080));
+        let addr: SocketAddr = SocketAddr::from(([0, 0, 0, 0], 3000));
         let listener: TcpListener = TcpListener::bind(addr).await.unwrap();
 
         Self {

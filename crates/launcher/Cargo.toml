@@ -10,6 +10,7 @@ dialoguer = "0.12.0"
 futures = "0.3.32"
 getset = "0.1.6"
 num-traits = "0.2.19"
+opencv = "0.98.2"
 serde = { version = "1.0.228", features = ["derive"]}
 shared = { path = "../shared" }
 sudo = "0.6.0"

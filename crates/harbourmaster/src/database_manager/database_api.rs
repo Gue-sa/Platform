@@ -65,6 +65,7 @@ impl DatabaseApi {
 
         tokio::spawn(async move {
             let api: Router = Router::new()
+                .route("/", get(Self::welcome))
                 .route("/get_voyage_orders", get(Self::get_voyage_orders))
                 .route(
                     "/get_voyage_order_versions",
@@ -81,6 +82,10 @@ impl DatabaseApi {
 
             axum::serve(listener, api).await.unwrap();
         })
+    }
+
+    async fn welcome() -> String {
+        "Bonjour et bienvenue sur l'API armateur ! Voici la liste des commandes actuellement implémentées:\n- /get_voyage_orders\n- /get_voyage_orders_versions\n- /get_voyage_boats_list\n- /get_voyage_destinations\n- /add_voyage_order".to_string()
     }
 
     async fn get_voyage_orders(

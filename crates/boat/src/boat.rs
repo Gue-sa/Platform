@@ -42,6 +42,7 @@ impl Boat {
             (*config.boat_gps_logs_filename().clone()).to_string(),
             (*config.boat_satcom_logs_filename().clone()).to_string(),
             (*config.boat_computer_logs_filename().clone()).to_string(),
+            "Logs Bateau",
         );
 
         let (

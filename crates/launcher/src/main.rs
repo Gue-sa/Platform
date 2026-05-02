@@ -1,11 +1,12 @@
 use colored::{ColoredString, Colorize};
 use dialoguer::{Input, Select, theme::ColorfulTheme};
+use futures::future::join_all;
 use num_traits::PrimInt;
 use shared::config::Config;
 use std::{
     fmt::{Binary, Display},
     fs::{self, File, exists},
-    io::{Error, Write},
+    io::Write,
     net::{IpAddr, Ipv4Addr},
     path::Path,
     process::{Command, Stdio},
@@ -14,8 +15,9 @@ use std::{
 use sudo::RunningAs;
 
 const VHOSTS_SETUP_SCRIPT: &str = include_str!("../setup_vhosts.sh");
-const FUNCTIONALITIES: [&str; 10] = [
+const FUNCTIONALITIES: [&str; 11] = [
     "Déployer la capitainerie (simulation ou montage réel)",
+    "Lancer une simulation complète",
     "Déployer le serveur (simulation)",
     "Déployer un bateau (simulation)",
     "Déployer le serveur (montage réel)",
@@ -35,6 +37,35 @@ const BANNER_TITLE: &str = "
 /_/   /_/\\__,_/\\__/\\___/_/  \\____/_/  /_/ /_/ /_/\\___/  /_/  /_/\\__,_/_/  /_/\\__/_/_/ /_/ /_/\\___/                                                                                    
 ";
 
+fn find_term_config() -> Option<(&'static str, &'static [&'static str])> {
+    let terms: [(&str, &[&str]); 11] = [
+        ("konsole", &["-e"]),                     // KDE
+        ("gnome-terminal", &["--wait", "--"]),    // GNOME
+        ("xfce4-terminal", &["--detatch", "-e"]), // XFCE
+        ("alacritty", &["-e"]),                   // Arch/Hyprland
+        ("kitty", &["--"]),                       // Arch
+        ("qterminal", &["-e"]),                   // LXQt
+        ("foot", &["-e"]),                        // Wayland
+        ("tilix", &["-e"]),                       // Tiling
+        ("terminator", &["-x"]),                  // Multi-grille
+        ("x-terminal-emulator", &["-e"]),         // Debian/Ubuntu
+        ("xterm", &["-e"]),                       // Fallback
+    ];
+
+    for (cmd, arg) in terms {
+        if Command::new("which")
+            .arg(cmd)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            return Some((cmd, arg));
+        }
+    }
+
+    None
+}
+
 fn clear_terminal() -> () {
     Command::new("clear")
         .status()
@@ -42,7 +73,19 @@ fn clear_terminal() -> () {
 }
 
 fn display_banner() -> () {
-    let banner_msg: ColoredString = format!("{BANNER_TITLE}\n\n##################################################################################################\n\nVersion 1.0.0\nEcole Nationale Supérieure des Mines de Nancy\nCampus ARTEM et de Saint-Dié-des-Vosges\nUniversité de Lorraine\n2026\n\n##################################################################################################\n\nRéalisé par:\n- Alexandre Brisset (communication VHF, modélisation, fabrication)\n- Matieu Gauthier (modélisation, fabrication)\n- Sasha Guérin--Loison (ensemble de la codebase)\n- Saad Ouadrassi (microcontrôleurs, algorithme de déplacement)\n- Bosco Perrin (conception et fabrication des bateaux)\n- Yasmine ? (conception et fabrication des bateaux)\n\n##################################################################################################\n\nEncadré par:\n- Guillaume Bonfante\n\n##################################################################################################\n\n").yellow();
+    let has_server: bool = matches!(fs::exists("server"), Ok(true));
+    let has_harbourmaster: bool = matches!(fs::exists("harbourmaster"), Ok(true));
+    let has_boat: bool = matches!(fs::exists("boat"), Ok(true));
+
+    let server_status: &str = if has_server { "Présent ✔" } else { "Absent ✗" };
+    let harbourmaster_status: &str = if has_harbourmaster {
+        "Présent ✔"
+    } else {
+        "Absent ✗"
+    };
+    let boat_status: &str = if has_boat { "Présent ✔" } else { "Absent ✗" };
+
+    let banner_msg: ColoredString = format!("{BANNER_TITLE}\n\n##################################################################################################\n\nVersion 1.0.0\nEcole Nationale Supérieure des Mines de Nancy\nCampus ARTEM et de Saint-Dié-des-Vosges\nUniversité de Lorraine\n2026\n\n##################################################################################################\n\nRéalisé par:\n- Alexandre Brisset (communication VHF, modélisation, fabrication)\n- Matieu Gauthier (modélisation, fabrication)\n- Sasha Guérin--Loison (ensemble de la codebase)\n- Saad Ouadrassi (microcontrôleurs, algorithme de déplacement)\n- Bosco Perrin (conception et fabrication des bateaux)\n- Yasmine ? (conception et fabrication des bateaux)\n\n##################################################################################################\n\nEncadré par:\n- Guillaume Bonfante\n\n##################################################################################################\n\nStatut des exécutables:\n- Serveur: {server_status}\n- Capitainerie: {harbourmaster_status}\n- Bateau: {boat_status}\n\n##################################################################################################\n\n").yellow();
 
     println!("{banner_msg}");
 }
@@ -420,7 +463,44 @@ fn change_settings() -> () {
     }
 }
 
-fn main() {
+async fn run_sim() {
+    println!(
+        "\nLancement de la simulation complète. Vous pourrez de nouveau interagir avec cette fenêtre une fois les 3 terminaux générés fermés.\n"
+    );
+
+    let term_config_result: Option<(&str, &[&str])> = find_term_config();
+
+    let (term_bin, term_args) = match term_config_result {
+        Some(config) => config,
+        None => {
+            eprintln!("\nImpossible de trouver un terminal adapté.\n");
+            return;
+        }
+    };
+
+    let mut server_cmd = tokio::process::Command::new(term_bin);
+    let mut harbourmaster_cmd = tokio::process::Command::new(term_bin);
+    let mut boat_cmd = tokio::process::Command::new(term_bin);
+
+    server_cmd
+        .args(term_args)
+        .args(["sh", "-c", "sudo ip netns exec server ./server"]);
+    harbourmaster_cmd
+        .args(term_args)
+        .args(["sh", "-c", "./harbourmaster"]);
+    boat_cmd
+        .args(term_args)
+        .args(["sh", "-c", "sudo ip netns exec boat ./boat"]);
+
+    let futures = [server_cmd, harbourmaster_cmd, boat_cmd]
+        .into_iter()
+        .map(|mut task| async move { task.spawn().expect("Échec du spawn").wait().await });
+
+    join_all(futures).await;
+}
+
+#[tokio::main]
+async fn main() {
     clear_terminal();
     display_banner();
 
@@ -430,7 +510,7 @@ fn main() {
     })
     .expect("Erreur lors de la définition du gestionnaire Ctrl+C");
 
-    if sudo::check() == RunningAs::Root {
+    if sudo::check() != RunningAs::Root {
         println!("Ce simulateur doit être lancé avec sudo.");
 
         sudo::escalate_if_needed().expect("Erreur lors de l'élévation de privilèges.");
@@ -451,13 +531,12 @@ fn main() {
 
         match choice {
             0 => {
-                if fs::exists("harbourmaster").is_ok() {
+                if matches!(fs::exists("harbourmaster"), Ok(true)) {
                     if !*Config::load().unwrap().is_simulation() {
                         println!(
                             "\nAttention, la configuration pour simulation n'a pas été effectuée. Le programme va se lancer, mais ne fonctionnera pas en simulation locale.\n"
                         )
                     }
-
                     println!("\nLancement de la capitainerie...\n");
 
                     Command::new("./harbourmaster")
@@ -474,7 +553,25 @@ fn main() {
             }
             1 => {
                 if *Config::load().unwrap().is_simulation() {
-                    if fs::exists("server").is_ok() {
+                    if matches!(fs::exists("server"), Ok(true))
+                        && matches!(fs::exists("harbourmaster"), Ok(true))
+                        && matches!(fs::exists("boat"), Ok(true))
+                    {
+                        run_sim().await;
+
+                        println!("\nSimulation terminée avec succès.\n")
+                    } else {
+                        eprintln!("\nExécutable(s) manquant(s). Demandez-le(s) à Sasha.\n")
+                    }
+                } else {
+                    eprintln!(
+                        "\nLa configuration simulation n'a pas été effectuée ! Veuillez y procéder.\n"
+                    )
+                }
+            }
+            2 => {
+                if *Config::load().unwrap().is_simulation() {
+                    if matches!(fs::exists("server"), Ok(true)) {
                         println!("\nLancement du serveur...\n");
 
                         Command::new("sudo")
@@ -495,9 +592,9 @@ fn main() {
                     )
                 }
             }
-            2 => {
+            3 => {
                 if *Config::load().unwrap().is_simulation() {
-                    if fs::exists("boat").is_ok() {
+                    if matches!(fs::exists("boat"), Ok(true)) {
                         println!("\nLancement du bateau...\n");
 
                         Command::new("sudo")
@@ -518,9 +615,9 @@ fn main() {
                     )
                 }
             }
-            3 => {
+            4 => {
                 if !*Config::load().unwrap().is_simulation() {
-                    if fs::exists("server").is_ok() {
+                    if matches!(fs::exists("server"), Ok(true)) {
                         println!("\nLancement du serveur...\n");
 
                         Command::new("./server")
@@ -537,9 +634,9 @@ fn main() {
                     )
                 }
             }
-            4 => {
+            5 => {
                 if !*Config::load().unwrap().is_simulation() {
-                    if fs::exists("boat").is_ok() {
+                    if matches!(fs::exists("boat"), Ok(true)) {
                         println!("\nLancement du bateau...\n");
 
                         Command::new("./boat")
@@ -559,10 +656,10 @@ fn main() {
                     )
                 }
             }
-            5 => {
+            6 => {
                 build_config();
             }
-            6 => {
+            7 => {
                 if bool_input(
                     "En êtes-vous sûr ? Cette action est irréversible",
                     None,
@@ -573,7 +670,7 @@ fn main() {
                     println!("\nDB de la capitainerie supprimée avec succès.\n");
                 }
             }
-            7 => {
+            8 => {
                 if bool_input(
                     "En êtes-vous sûr ? Cette action est irréversible",
                     None,
@@ -584,7 +681,7 @@ fn main() {
                     println!("\nLogs vidées avec succès.\n");
                 }
             }
-            8 => {
+            9 => {
                 change_settings();
             }
             _ => {

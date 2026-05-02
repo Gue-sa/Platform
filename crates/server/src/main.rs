@@ -34,7 +34,7 @@ async fn main() {
         park();
     } else {
         println!(
-            "Fichier de configuration non trouvé. Veuillez lancer le programme depuis le laucher."
+            "Fichier de configuration non trouvé. Veuillez lancer le programme depuis le launcher."
         )
     }
 }

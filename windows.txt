@@ -1,0 +1,21 @@
+1 - Installer WSL:
+
+        - Ouvrir Powershell en tant qu'administrateur
+
+        - Taper "wsl --install" et appuyer sur entrée
+
+        - Redémarrer l'ordinateur
+
+2 - Une fenêtre de terminal devrait s'ouvrir. Suivre les instructions affichées.
+
+3 - Mettre à jour le système ainsi crée avec "sudo apt update && sudo apt upgrade -y"
+
+4 - Installer les dépendances nécessaires avec "sudo apt install -y libopencv-dev libsqlite3-dev libudev-dev"
+
+5 - Mettre les fichiers dans le dossier du bureau de WSL (voir internet pour emplacement précis)
+
+6 - Avec la commande cd, se mettre dans le dossier du bureau dans le terminal
+
+7 - Lancer la simulation avec ./launcher
+
+Notes : pour lancer l'ensemble du projet, il faut choisir le mode simulation au moment de la configuration initiale (après 1er lancement du launcher, c'est automatique), ouvrir 3 fois le launcher dans 3 fenêtres différentes, et lancer dans cet order : le serveur en mode simulation, la capitainerie, et le bateau.

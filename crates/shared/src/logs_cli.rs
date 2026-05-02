@@ -21,7 +21,7 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Line, Text},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 use std::{
@@ -70,6 +70,7 @@ pub struct LogsCli {
     gps_logs_filename: String,
     satcom_logs_filename: String,
     computer_logs_filename: String,
+    title: String,
 }
 
 impl LogsCli {
@@ -80,6 +81,7 @@ impl LogsCli {
         gps_logs_filename: String,
         satcom_logs_filename: String,
         computer_logs_filename: String,
+        title: &str,
     ) -> Self {
         Self {
             system_logs: Vec::new(),
@@ -91,12 +93,13 @@ impl LogsCli {
             auto_scroll: [true; 5],
             areas: [Rect::default(); 5],
             focused: SelectedBox::Ais,
-            rx,
-            sys_logs_filename,
-            ais_logs_filename,
-            gps_logs_filename,
-            satcom_logs_filename,
-            computer_logs_filename,
+            rx: rx,
+            sys_logs_filename: sys_logs_filename,
+            ais_logs_filename: ais_logs_filename,
+            gps_logs_filename: gps_logs_filename,
+            satcom_logs_filename: satcom_logs_filename,
+            computer_logs_filename: computer_logs_filename,
+            title: title.to_string(),
         }
     }
 
@@ -254,7 +257,7 @@ impl LogsCli {
 
         if let Ok(tui_text) = log_str.into_text() {
             logs_vec.extend(tui_text.lines);
-            logs_vec.push(Line::default()); // Saut de ligne
+            logs_vec.push(Line::default());
         }
 
         let max_logs_history_length: usize = *Config::load().unwrap().max_cli_logs_history_length();
@@ -330,12 +333,35 @@ impl LogsCli {
     }
 
     fn ui(&mut self, f: &mut ratatui::Frame) {
-        let main: std::rc::Rc<[Rect]> = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(0)])
             .split(f.area());
 
-        let right: std::rc::Rc<[Rect]> = Layout::default()
+        let header_title: String = format!(" {} ", self.title.to_uppercase());
+        let header_widget: Paragraph<'_> = Paragraph::new(Line::from(vec![Span::styled(
+            header_title,
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )]))
+        .alignment(ratatui::layout::Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(ratatui::widgets::BorderType::Double)
+                .border_style(Style::default().fg(Color::Cyan)),
+        );
+
+        f.render_widget(header_widget, chunks[0]);
+
+        let main = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(chunks[1]);
+
+        let right = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Ratio(1, 4); 4])
             .split(main[1]);
@@ -346,7 +372,7 @@ impl LogsCli {
         self.areas[3] = right[2];
         self.areas[4] = right[3];
 
-        let logs_lens = [
+        let logs_lens: [usize; 5] = [
             Self::get_visual_line_count(&self.ais_logs, self.areas[0].width.saturating_sub(2)),
             Self::get_visual_line_count(&self.system_logs, self.areas[1].width.saturating_sub(2)),
             Self::get_visual_line_count(&self.computer_logs, self.areas[2].width.saturating_sub(2)),

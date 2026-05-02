@@ -2,7 +2,8 @@ use crate::{
     database_manager::{database_api::DatabaseApi, manager::DatabaseManager},
     fms::Fms,
     harbourmaster_ais::HarbourmasterAisRunner,
-    harbourmaster_gps::HarbourmasterGps, harbourmaster_web_ui::{self, HarbourmasterWebUi},
+    harbourmaster_gps::HarbourmasterGps,
+    harbourmaster_web_ui::{self, HarbourmasterWebUi},
 };
 use shared::{
     antenna::Antenna,
@@ -41,6 +42,7 @@ impl Harbourmaster {
             (*config.harbourmaster_gps_logs_filename().clone()).to_string(),
             (*config.harbourmaster_satcom_logs_filename().clone()).to_string(),
             (*config.harbourmaster_computer_logs_filename().clone()).to_string(),
+            "Logs Armateur (interface web : localhost:3000)",
         );
 
         let (

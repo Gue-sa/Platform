@@ -134,6 +134,7 @@ impl HarbourmasterGps {
                 &mut mask1,
             )
             .unwrap();
+        
             core::in_range(
                 &hsv,
                 &Scalar::new(170.0, 160.0, 100.0, 0.0),

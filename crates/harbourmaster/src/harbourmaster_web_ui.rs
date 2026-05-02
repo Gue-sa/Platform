@@ -66,10 +66,6 @@ impl HarbourmasterWebUi {
     }
 
     pub async fn start(self) -> JoinHandle<()> {
-        if let Err(e) = open::that("http://localhost:3000") {
-            eprintln!("Impossible d'ouvrir le navigateur web : {}", e);
-        }
-
         tokio::spawn(async move {
             axum::serve(self.listener, self.app).await.unwrap();
         })

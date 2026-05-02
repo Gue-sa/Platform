@@ -12,3 +12,5 @@ harbourmaster_database.db
 .VSCodeCounter
 
 /crates/harbourmaster/.env
+
+./windows.txt

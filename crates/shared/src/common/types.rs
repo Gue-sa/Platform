@@ -1,9 +1,5 @@
-use std::{io::Error, time::SystemTimeError};
-
+use crate::bitpacker::BitPacker;
 use colored::ColoredString;
-use tokio::sync::mpsc::error::SendError;
-
-use crate::{bitpacker::BitPacker, satcom_message::SatComMessage};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AisPacket {
@@ -25,7 +21,7 @@ pub enum Channel {
     C87B,
     C88B,
     GPS,
-    SATCOM,
+    SatCom,
     Any,
 }
 
@@ -465,4 +461,38 @@ pub enum LogEvent {
     Gps(ColoredString),
     Satcom(ColoredString),
     Computer(ColoredString),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AisField {
+    Mmsi,
+    NavigationalStatus,
+    RateOfTurn,
+    SpeedOverGround,
+    PositionAccuracy,
+    Longitude,
+    Latitude,
+    CourseOverGround,
+    TrueHeading,
+    TimeStamp,
+    SpecialManeuvreIndicator,
+    RaimFlag,
+    AisVersion,
+    ImoNumber,
+    TypeOfShipAndCargoType,
+    A,
+    B,
+    C,
+    D,
+    TypeOfEpfDevice,
+    EtaMonth,
+    EtaDay,
+    EtaHour,
+    EtaMinute,
+    MaximumPresentStaticDraught,
+    Dte,
+    Spare,
+    CallSign,
+    Name,
+    Destination,
 }

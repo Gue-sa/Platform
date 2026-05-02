@@ -1,6 +1,9 @@
 use crate::{
     bitpacker::BitPacker,
-    common::errors::{BoatInfoError, BoatInfoResult},
+    common::{
+        errors::{BoatInfoError, BoatInfoResult},
+        types::AisField,
+    },
 };
 use getset::{Getters, Setters};
 use serde::Serialize;
@@ -261,125 +264,125 @@ impl BoatInfo {
         Ok(())
     }
 
-    pub fn to_bits(&self, field: &str, msg_type: u8) -> BoatInfoResult<BitPacker> {
+    pub fn to_bits(&self, field: AisField, msg_type: u8) -> BoatInfoResult<BitPacker> {
         match field {
-            "mmsi" => Ok(BitPacker::from_int::<u32>(
+            AisField::Mmsi => Ok(BitPacker::from_int::<u32>(
                 self.get_static_data()?.mmsi,
                 Some(30),
             )),
-            "navigational_status" => Ok(BitPacker::from_int::<u8>(
+            AisField::NavigationalStatus => Ok(BitPacker::from_int::<u8>(
                 self.get_navigation_data()?.navigational_status,
                 Some(4),
             )),
-            "rate_of_turn" => Ok(BitPacker::from_int::<i8>(
+            AisField::RateOfTurn => Ok(BitPacker::from_int::<i8>(
                 self.get_navigation_data()?.rate_of_turn,
                 Some(8),
             )),
-            "speed_over_ground" => Ok(BitPacker::from_int::<u16>(
+            AisField::SpeedOverGround => Ok(BitPacker::from_int::<u16>(
                 self.get_navigation_data()?.speed_over_ground,
                 Some(10),
             )),
-            "position_accuracy" => Ok(BitPacker::from_int::<u8>(
+            AisField::PositionAccuracy => Ok(BitPacker::from_int::<u8>(
                 self.get_static_data()?.position_accuracy,
                 Some(1),
             )),
-            "longitude" => Ok(BitPacker::from_int::<u32>(
+            AisField::Longitude => Ok(BitPacker::from_int::<u32>(
                 self.get_navigation_data()?.longitude,
                 Some(28),
             )),
-            "latitude" => Ok(BitPacker::from_int::<u32>(
+            AisField::Latitude => Ok(BitPacker::from_int::<u32>(
                 self.get_navigation_data()?.latitude,
                 Some(27),
             )),
-            "course_over_ground" => Ok(BitPacker::from_int::<u16>(
+            AisField::CourseOverGround => Ok(BitPacker::from_int::<u16>(
                 self.get_navigation_data()?.course_over_ground,
                 Some(12),
             )),
-            "true_heading" => Ok(BitPacker::from_int::<u16>(
+            AisField::TrueHeading => Ok(BitPacker::from_int::<u16>(
                 self.get_navigation_data()?.true_heading,
                 Some(9),
             )),
-            "time_stamp" => Ok(BitPacker::from_int::<u8>(
+            AisField::TimeStamp => Ok(BitPacker::from_int::<u8>(
                 self.get_navigation_data()?.time_stamp,
                 Some(6),
             )),
-            "special_maneuvre_indicator" => Ok(BitPacker::from_int::<u8>(
+            AisField::SpecialManeuvreIndicator => Ok(BitPacker::from_int::<u8>(
                 self.get_navigation_data()?.special_maneuvre_indicator,
                 Some(2),
             )),
-            "raim_flag" => Ok(BitPacker::from_int::<u8>(
+            AisField::RaimFlag => Ok(BitPacker::from_int::<u8>(
                 self.get_voyage_data()?.raim_flag,
                 Some(1),
             )),
-            "ais_version" => Ok(BitPacker::from_int::<u8>(
+            AisField::AisVersion => Ok(BitPacker::from_int::<u8>(
                 self.get_static_data()?.ais_version,
                 Some(2),
             )),
-            "imo_number" => Ok(BitPacker::from_int::<u32>(
+            AisField::ImoNumber => Ok(BitPacker::from_int::<u32>(
                 self.get_static_data()?.imo_number,
                 Some(30),
             )),
-            "type_of_ship_and_cargo_type" => Ok(BitPacker::from_int::<u8>(
+            AisField::TypeOfShipAndCargoType => Ok(BitPacker::from_int::<u8>(
                 self.get_static_data()?.type_of_ship_and_cargo_type,
                 Some(8),
             )),
-            "b" => Ok(BitPacker::from_int::<u16>(
+            AisField::B => Ok(BitPacker::from_int::<u16>(
                 self.get_static_data()?.b,
                 Some(9),
             )),
-            "a" => Ok(BitPacker::from_int::<u16>(
+            AisField::A => Ok(BitPacker::from_int::<u16>(
                 self.get_static_data()?.a,
                 Some(9),
             )),
-            "c" => Ok(BitPacker::from_int::<u8>(
+            AisField::C => Ok(BitPacker::from_int::<u8>(
                 self.get_static_data()?.c,
                 Some(6),
             )),
-            "d" => Ok(BitPacker::from_int::<u8>(
+            AisField::D => Ok(BitPacker::from_int::<u8>(
                 self.get_static_data()?.d,
                 Some(6),
             )),
-            "type_of_epf_device" => Ok(BitPacker::from_int::<u8>(
+            AisField::TypeOfEpfDevice => Ok(BitPacker::from_int::<u8>(
                 self.get_static_data()?.type_of_epf_device,
                 Some(4),
             )),
-            "eta_month" => Ok(BitPacker::from_int::<u8>(
+            AisField::EtaMonth => Ok(BitPacker::from_int::<u8>(
                 self.get_voyage_data()?.eta_month,
                 Some(4),
             )),
-            "eta_day" => Ok(BitPacker::from_int::<u8>(
+            AisField::EtaDay => Ok(BitPacker::from_int::<u8>(
                 self.get_voyage_data()?.eta_day,
                 Some(5),
             )),
-            "eta_hour" => Ok(BitPacker::from_int::<u8>(
+            AisField::EtaHour => Ok(BitPacker::from_int::<u8>(
                 self.get_voyage_data()?.eta_hour,
                 Some(5),
             )),
-            "eta_minute" => Ok(BitPacker::from_int::<u8>(
+            AisField::EtaMinute => Ok(BitPacker::from_int::<u8>(
                 self.get_voyage_data()?.eta_minute,
                 Some(6),
             )),
-            "maximum_present_static_draught" => Ok(BitPacker::from_int::<u8>(
+            AisField::MaximumPresentStaticDraught => Ok(BitPacker::from_int::<u8>(
                 self.get_voyage_data()?.maximum_present_static_draught,
                 Some(8),
             )),
-            "dte" => Ok(BitPacker::from_int::<u8>(
+            AisField::Dte => Ok(BitPacker::from_int::<u8>(
                 self.get_voyage_data()?.dte,
                 Some(1),
             )),
-            "spare" => Ok(BitPacker::from_int::<u8>(
+            AisField::Spare => Ok(BitPacker::from_int::<u8>(
                 self.get_static_data()?.spare,
                 Some(if msg_type == 5 { 1 } else { 3 }),
             )),
-            "call_sign" => Ok(BitPacker::from_str(
+            AisField::CallSign => Ok(BitPacker::from_str(
                 &self.get_static_data()?.call_sign,
                 Some(42),
             )),
-            "name" => Ok(BitPacker::from_str(
+            AisField::Name => Ok(BitPacker::from_str(
                 &self.get_static_data()?.name,
                 Some(120),
             )),
-            "destination" => Ok(BitPacker::from_str(
+            AisField::Destination => Ok(BitPacker::from_str(
                 &self.get_voyage_data()?.destination,
                 Some(120),
             )),

@@ -20,7 +20,7 @@ async fn main() {
         let freq_gps: RadioFrequency =
             RadioFrequency::init(Channel::GPS, GPS_FROM_SERVER_PORT, GPS_TO_SERVER_PORT).await;
         let freq_satcom: RadioFrequency = RadioFrequency::init(
-            Channel::SATCOM,
+            Channel::SatCom,
             SATCOM_FROM_SERVER_PORT,
             SATCOM_TO_SERVER_PORT,
         )

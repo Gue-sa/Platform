@@ -79,7 +79,7 @@ impl Antenna {
                             Channel::GPS => {
                                 self.gps_tx.clone().unwrap().send(msg).await?;
                             },
-                            Channel::SATCOM => {
+                            Channel::SatCom => {
                                 self.satcom_tx.clone().unwrap().send(msg).await?;
                             },
                             Channel::Any => todo!()

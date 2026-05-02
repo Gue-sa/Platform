@@ -3,6 +3,8 @@ use std::{
     time::Duration,
 };
 
+use crate::common::types::AisField;
+
 pub const SIX_BITS_ASCII_ALPHABET: &[u8; 64] =
     b"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?";
 
@@ -31,42 +33,42 @@ pub const SATCOM_FROM_SERVER_PORT: u16 = 9898;
 
 pub const HARBOURMASTER_MMSI: u32 = 0b111111111111111111111111111111;
 
-pub const MSG123_FIELDS: [&str; 13] = [
-    "mmsi",
-    "navigational_status",
-    "rate_of_turn",
-    "speed_over_ground",
-    "position_accuracy",
-    "longitude",
-    "latitude",
-    "course_over_ground",
-    "true_heading",
-    "time_stamp",
-    "special_maneuvre_indicator",
-    "spare",
-    "raim_flag",
+pub const MSG123_FIELDS: [AisField; 13] = [
+    AisField::Mmsi,
+    AisField::NavigationalStatus,
+    AisField::RateOfTurn,
+    AisField::SpeedOverGround,
+    AisField::PositionAccuracy,
+    AisField::Longitude,
+    AisField::Latitude,
+    AisField::CourseOverGround,
+    AisField::TrueHeading,
+    AisField::TimeStamp,
+    AisField::SpecialManeuvreIndicator,
+    AisField::Spare,
+    AisField::RaimFlag,
 ];
 
-pub const MSG5_FIELDS: [&str; 19] = [
-    "mmsi",
-    "ais_version",
-    "imo_number",
-    "call_sign",
-    "name",
-    "type_of_ship_and_cargo_type",
-    "a",
-    "b",
-    "c",
-    "d",
-    "type_of_epf_device",
-    "eta_minute",
-    "eta_hour",
-    "eta_day",
-    "eta_month",
-    "maximum_present_static_draught",
-    "destination",
-    "dte",
-    "spare",
+pub const MSG5_FIELDS: [AisField; 19] = [
+    AisField::Mmsi,
+    AisField::AisVersion,
+    AisField::ImoNumber,
+    AisField::CallSign,
+    AisField::Name,
+    AisField::TypeOfShipAndCargoType,
+    AisField::A,
+    AisField::B,
+    AisField::C,
+    AisField::D,
+    AisField::TypeOfEpfDevice,
+    AisField::EtaMinute,
+    AisField::EtaHour,
+    AisField::EtaDay,
+    AisField::EtaMonth,
+    AisField::MaximumPresentStaticDraught,
+    AisField::Destination,
+    AisField::Dte,
+    AisField::Spare,
 ];
 
 pub const FMS_UPDATE_SECS_INTERVAL: u64 = 30;

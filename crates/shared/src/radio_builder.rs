@@ -86,7 +86,7 @@ pub async fn build_radio(
         c_satcom_rx,
         SATCOM_TO_SERVER_PORT,
         SATCOM_FROM_SERVER_PORT,
-        Channel::SATCOM,
+        Channel::SatCom,
     )
     .await?;
 

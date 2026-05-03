@@ -62,11 +62,18 @@ export interface BoatNavigationData {
     rate_of_turn: number;
     true_heading: number;
 }
-
 export interface BoatInfoResult {
     static_data: BoatStaticData;
     voyage_data: BoatVoyageData;
     navigation_data: BoatNavigationData;
+}
+
+export interface Statistics {
+    boats_nbr: number;
+    active_boats_nbr: number;
+    unresponding_boats_nbr: number;
+    orders_nbr: number;
+    free_orders_nbr: number;
 }
 
 export type VoyageResult = [
@@ -80,3 +87,5 @@ export type DestinationsResult = DestinationResult[];
 export type VersionResult = [VoyageVersionResult, DestinationResult][];
 
 export type BoatInfoRegistry = [number, BoatInfoResult][];
+
+export type StatisticsResult = Statistics;

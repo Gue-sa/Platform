@@ -1,6 +1,9 @@
 use colored::Colorize;
 use opencv::{
-    core::{self, AlgorithmHint::ALGO_HINT_DEFAULT, Scalar, Vector},
+    core::{
+        AlgorithmHint::ALGO_HINT_DEFAULT, BORDER_CONSTANT, Point, Point_, Rect_, Scalar, Size,
+        Vector, add, flip, in_range, no_array,
+    },
     imgproc::{
         CHAIN_APPROX_SIMPLE, COLOR_BGR2HSV, FONT_HERSHEY_SIMPLEX, LINE_8, MORPH_CLOSE, MORPH_RECT,
         RETR_EXTERNAL, approx_poly_dp, arc_length, bounding_rect, contour_area, cvt_color,
@@ -102,14 +105,12 @@ impl HarbourmasterGps {
 
         let mut mask = Mat::default();
 
-        let mut contours: core::Vector<core::Vector<core::Point_<i32>>> =
-            core::Vector::<core::Vector<core::Point>>::new();
+        let mut contours: Vector<Vector<Point_<i32>>> = Vector::<Vector<Point>>::new();
 
         let kernel: Mat =
-            get_structuring_element(MORPH_RECT, core::Size::new(5, 5), core::Point::new(-1, -1))
-                .unwrap();
+            get_structuring_element(MORPH_RECT, Size::new(5, 5), Point::new(-1, -1)).unwrap();
 
-        let mut approx = Vector::<core::Point>::new();
+        let mut approx = Vector::<Point>::new();
 
         loop {
             cam.read(&mut frame).unwrap();
@@ -117,7 +118,7 @@ impl HarbourmasterGps {
                 break;
             }
 
-            core::flip(&frame, &mut flipped_frame, 1).unwrap();
+            flip(&frame, &mut flipped_frame, 1).unwrap();
 
             #[cfg(any(
                 feature = "arch-based",
@@ -140,9 +141,7 @@ impl HarbourmasterGps {
             #[cfg(feature = "debian-based")]
             cvt_color(&flipped_frame, &mut hsv, COLOR_BGR2HSV, 0).unwrap();
 
-            // --- SEUILLAGE DU ROUGE ---
-            // On baisse la saturation minimale (S=70 -> 50) pour capter le rouge "lavé" par la lumière de l'écran
-            core::in_range(
+            in_range(
                 &hsv,
                 &Scalar::new(0.0, 160.0, 100.0, 0.0),
                 &Scalar::new(10.0, 255.0, 255.0, 0.0),
@@ -150,7 +149,7 @@ impl HarbourmasterGps {
             )
             .unwrap();
 
-            core::in_range(
+            in_range(
                 &hsv,
                 &Scalar::new(170.0, 160.0, 100.0, 0.0),
                 &Scalar::new(180.0, 255.0, 255.0, 0.0),
@@ -158,18 +157,16 @@ impl HarbourmasterGps {
             )
             .unwrap();
 
-            core::add(&mask1, &mask2, &mut mask, &core::no_array(), -1).unwrap();
-            //core::add(&mask1, &mask2, &mut combined_mask, &core::no_array(), -1).unwrap();
+            add(&mask1, &mask2, &mut mask, &no_array(), -1).unwrap();
 
-            // Nettoyage morphologique pour boucher les trous dus aux reflets
             morphology_ex(
                 &mask,
                 &mut processed_mask,
                 MORPH_CLOSE,
                 &kernel,
-                core::Point::new(-1, -1),
+                Point::new(-1, -1),
                 1,
-                core::BORDER_CONSTANT,
+                BORDER_CONSTANT,
                 Scalar::default(),
             )
             .unwrap();
@@ -179,7 +176,7 @@ impl HarbourmasterGps {
                 &mut contours,
                 RETR_EXTERNAL,
                 CHAIN_APPROX_SIMPLE,
-                core::Point::new(0, 0),
+                Point::new(0, 0),
             )
             .unwrap();
 
@@ -190,9 +187,8 @@ impl HarbourmasterGps {
 
                     approx_poly_dp(&contour, &mut approx, 0.02 * perimeter, true).unwrap();
 
-                    // Détection de RECTANGLE (4 sommets + convexe)
                     if approx.len() == 4 && is_contour_convex(&approx).unwrap() {
-                        let rect: core::Rect_<i32> = bounding_rect(&approx).unwrap();
+                        let rect: Rect_<i32> = bounding_rect(&approx).unwrap();
 
                         let moments = moments(&contour, false).unwrap();
                         let mut center_x = 0;
@@ -223,7 +219,7 @@ impl HarbourmasterGps {
                         put_text(
                             &mut flipped_frame,
                             &format!("ID: {}x{}", rect.width, rect.height),
-                            core::Point::new(rect.x, rect.y - 5),
+                            Point::new(rect.x, rect.y - 5),
                             FONT_HERSHEY_SIMPLEX,
                             0.5,
                             Scalar::new(0.0, 255.0, 0.0, 0.0),

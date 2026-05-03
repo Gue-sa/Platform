@@ -1,4 +1,5 @@
 use crate::{
+    ais_message::AisMessage,
     boat_info::BoatInfo,
     common::errors::{BoatsRegistryError, BoatsRegistryResult},
 };
@@ -45,6 +46,14 @@ impl BoatsInfoRegistry {
         }
     }
 
+    pub fn update_from_ais_msg(&self, msg: &AisMessage) -> BoatsRegistryResult<BoatInfo> {
+        let mut boat_info = self.get(*msg.boat_info().get_static_data()?.mmsi())?;
+
+        boat_info.update_from_ais_msg(msg)?;
+
+        self.update(boat_info)
+    }
+
     pub fn unregister(&mut self, mmsi: u32) -> BoatsRegistryResult<BoatInfo> {
         if self.is_registered(&mmsi) {
             Ok(self.registry.remove(&mmsi).map(|(_, boat)| boat).unwrap())
@@ -55,6 +64,15 @@ impl BoatsInfoRegistry {
 
     pub fn length(&self) -> usize {
         self.registry.len()
+    }
+
+    pub fn count_active_boats(&self) -> usize {
+        self.registry
+            .iter()
+            .filter(|r| {
+                *r.value().get_voyage_data().unwrap().destination() != "@@@@@@@@@@@@@@@@@@@@"
+            })
+            .count()
     }
 
     pub fn export(&self) -> Box<[(u32, BoatInfo)]> {

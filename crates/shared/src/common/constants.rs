@@ -71,11 +71,7 @@ pub const MSG5_FIELDS: [AisField; 19] = [
     AisField::Spare,
 ];
 
-pub const FMS_UPDATE_SECS_INTERVAL: u64 = 30;
-
-pub const HARBOURMASTER_UPDATE_SECS_INTERVAL: u64 = 30;
-
-pub const BOAT_GPS_UPDATE_INTERVAL: Duration = Duration::from_secs(5);
+pub const FMS_UPDATE_SECS_INTERVAL: u64 = 1;
 
 pub const HARBOURMASTER_IPADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
 pub const SERVER_IPADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));

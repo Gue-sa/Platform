@@ -32,6 +32,115 @@ pub enum CSType {
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
+pub enum BoatStatus {
+    Active,
+    Free,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum AisMessageType {
+    Msg1,
+    Msg2,
+    Msg3,
+    Msg4,
+    Msg5,
+    Msg6,
+    Msg7,
+    Msg8,
+    Msg9,
+    Msg10,
+    Msg11,
+    Msg12,
+    Msg13,
+    Msg14,
+    Msg15,
+    Msg16,
+    Msg17,
+    Msg18,
+    Msg19,
+    Msg20,
+    Msg21,
+    Msg22,
+    Msg23,
+    Msg24,
+    Msg25,
+    Msg26,
+    Msg27,
+    Unkown,
+}
+
+impl Into<AisMessageType> for u8 {
+    fn into(self) -> AisMessageType {
+        match self {
+            1 => AisMessageType::Msg1,
+            2 => AisMessageType::Msg2,
+            3 => AisMessageType::Msg3,
+            4 => AisMessageType::Msg4,
+            5 => AisMessageType::Msg5,
+            6 => AisMessageType::Msg6,
+            7 => AisMessageType::Msg7,
+            8 => AisMessageType::Msg8,
+            9 => AisMessageType::Msg9,
+            10 => AisMessageType::Msg10,
+            11 => AisMessageType::Msg11,
+            12 => AisMessageType::Msg12,
+            13 => AisMessageType::Msg13,
+            14 => AisMessageType::Msg14,
+            15 => AisMessageType::Msg15,
+            16 => AisMessageType::Msg16,
+            17 => AisMessageType::Msg17,
+            18 => AisMessageType::Msg18,
+            19 => AisMessageType::Msg19,
+            20 => AisMessageType::Msg20,
+            21 => AisMessageType::Msg21,
+            22 => AisMessageType::Msg22,
+            23 => AisMessageType::Msg23,
+            24 => AisMessageType::Msg24,
+            25 => AisMessageType::Msg25,
+            26 => AisMessageType::Msg26,
+            27 => AisMessageType::Msg27,
+            _ => AisMessageType::Unkown,
+        }
+    }
+}
+
+impl Into<u8> for AisMessageType {
+    fn into(self) -> u8 {
+        match self {
+            AisMessageType::Msg1 => 1,
+            AisMessageType::Msg2 => 2,
+            AisMessageType::Msg3 => 3,
+            AisMessageType::Msg4 => 4,
+            AisMessageType::Msg5 => 5,
+            AisMessageType::Msg6 => 6,
+            AisMessageType::Msg7 => 7,
+            AisMessageType::Msg8 => 8,
+            AisMessageType::Msg9 => 9,
+            AisMessageType::Msg10 => 10,
+            AisMessageType::Msg11 => 11,
+            AisMessageType::Msg12 => 12,
+            AisMessageType::Msg13 => 13,
+            AisMessageType::Msg14 => 14,
+            AisMessageType::Msg15 => 15,
+            AisMessageType::Msg16 => 16,
+            AisMessageType::Msg17 => 17,
+            AisMessageType::Msg18 => 18,
+            AisMessageType::Msg19 => 19,
+            AisMessageType::Msg20 => 20,
+            AisMessageType::Msg21 => 21,
+            AisMessageType::Msg22 => 22,
+            AisMessageType::Msg23 => 23,
+            AisMessageType::Msg24 => 24,
+            AisMessageType::Msg25 => 25,
+            AisMessageType::Msg26 => 26,
+            AisMessageType::Msg27 => 27,
+            AisMessageType::Unkown => 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum VoyageStatus {
     Unassigned,
     UnderRevision,

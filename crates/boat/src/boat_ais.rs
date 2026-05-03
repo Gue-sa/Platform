@@ -192,7 +192,7 @@ impl BoatAisRunner {
 
         if boat_mmsi != self_mmsi && IMPLEMENTED_MSGS.binary_search(msg.message_type()).is_ok() {
             if self.state.boats_registry.is_registered(&boat_mmsi) {
-                self.state.boats_registry.update(msg.boat_info())?;
+                self.state.boats_registry.update_from_ais_msg(&msg)?;
             } else {
                 self.state.boats_registry.register(msg.boat_info())?;
             }
@@ -264,13 +264,6 @@ impl BoatAisRunner {
             let slot_distance = SlotsMap::si_offset(None, slot_idx);
 
             if slot_distance > last_si_distance {
-                println!(
-                    "{} {} {}",
-                    SlotsMap::current_si(Channel::C87B),
-                    slot_idx,
-                    slot_distance
-                );
-
                 return Err(ClockError::SlotOvershoot);
             } else {
                 last_si_distance = slot_distance;
@@ -645,7 +638,6 @@ impl BoatAisRunner {
             match self.sotdma_first_frame().await {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("Erreur : {:?}", e);
                     return Err(AisError::SotdmaInitFailed);
                 }
             }

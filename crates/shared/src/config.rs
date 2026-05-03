@@ -78,7 +78,7 @@ impl Default for Config {
 
 impl Config {
     pub fn init(is_sim: bool, serv_ip: IpAddr, harbourmaster_ip: IpAddr) -> Self {
-        let mut config: Config = Self::default();
+        let mut config = Self::default();
 
         config.set_is_simulation(is_sim);
         config.set_server_ip(serv_ip);

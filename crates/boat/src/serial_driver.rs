@@ -1,6 +1,5 @@
 use serialport::{SerialPortType, available_ports};
 use std::{thread, time::Duration};
-use tokio::sync::mpsc::{Receiver, Sender};
 
 pub struct SerialDriver {
     //rx: Receiver<String>,
@@ -15,7 +14,7 @@ impl SerialDriver {
         }
     }
 
-    pub async fn start(mut self) -> () {
+    pub async fn start(self) -> () {
         let ports: Vec<serialport::SerialPortInfo> = available_ports().unwrap();
 
         let port_name = ports
@@ -61,7 +60,7 @@ impl SerialDriver {
         });
 
         /*
-        let mut buffer: Vec<u8> = vec![0; 32];
+        let mut buffer = vec![0; 32];
         if let Ok(bytes_read) = port.read(buffer.as_mut_slice()) {
             println!("Reçu : {:?}", &buffer[..bytes_read]);
         }

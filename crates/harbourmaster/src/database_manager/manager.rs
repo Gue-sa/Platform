@@ -8,7 +8,6 @@ use crate::database_manager::{
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use diesel::prelude::*;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-use dotenvy::dotenv;
 use shared::{
     common::{
         errors::{DatabaseManagerError, DatabaseManagerResult},
@@ -31,12 +30,13 @@ impl DatabaseManager {
         path.pop();
         path.push("harbourmaster_database.db");
 
-        let db_url: String = path.to_str().expect("Chemin invalide").to_string();
+        let db_url = path.to_str().expect("Chemin invalide").to_string();
 
-        let mut connection: SqliteConnection = SqliteConnection::establish(&db_url)
+        let mut connection = SqliteConnection::establish(&db_url)
             .unwrap_or_else(|_| panic!("Error connecting to {}", db_url));
 
-        connection.run_pending_migrations(MIGRATIONS)
+        connection
+            .run_pending_migrations(MIGRATIONS)
             .map_err(|e| DatabaseManagerError::QueryError(diesel::result::Error::NotFound))?;
 
         Ok(Self {
@@ -72,7 +72,7 @@ impl DatabaseManager {
         cargo_type: i32,
         speed_profile: i32,
     ) -> DatabaseManagerResult<()> {
-        let eta: NaiveDateTime = NaiveDateTime::new(
+        let eta = NaiveDateTime::new(
             NaiveDate::from_ymd_opt(0, eta_month as u32, eta_day as u32)
                 .ok_or(DatabaseManagerError::InvalidNaiveDate)?,
             NaiveTime::from_hms_opt(eta_hour as u32, eta_min as u32, 0)
@@ -108,13 +108,13 @@ impl DatabaseManager {
         cargo_type: i32,
         speed_profile: i32,
     ) -> DatabaseManagerResult<VoyageOrder> {
-        let order_id: i32 = diesel::insert_into(VOYAGE_ORDERS::table)
+        let order_id = diesel::insert_into(VOYAGE_ORDERS::table)
             .default_values()
             .returning(VOYAGE_ORDERS::id)
             .get_result::<i32>(&mut self.connection)
             .map_err(|e: diesel::result::Error| DatabaseManagerError::InsertionError(e))?;
 
-        let dest_name: String = DESTINATIONS::table
+        let dest_name = DESTINATIONS::table
             .filter(DESTINATIONS::id.eq(dest_id))
             .select(DESTINATIONS::name)
             .first::<String>(&mut self.connection)
@@ -132,14 +132,14 @@ impl DatabaseManager {
             speed_profile,
         )?;
 
-        let destination_info: DestinationQueryResult = DESTINATIONS::table
+        let destination_info = DESTINATIONS::table
             .filter(DESTINATIONS::name.eq(dest_name.clone()))
             .select(DestinationQueryResult::as_returning())
             .first::<DestinationQueryResult>(&mut self.connection)
             .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
 
-        let header: VoyageOrderHeader = VoyageOrderHeader::from_data(order_id as u16, 0);
-        let body: VoyageOrderBody = VoyageOrderBody::from_data(
+        let header = VoyageOrderHeader::from_data(order_id as u16, 0);
+        let body = VoyageOrderBody::from_data(
             dest_name,
             (
                 destination_info.longitude as u16,
@@ -270,7 +270,7 @@ impl DatabaseManager {
         &mut self,
         voyage_order_id: i32,
     ) -> DatabaseManagerResult<usize> {
-        let count: i64 = ORDER_VERSIONS::table
+        let count = ORDER_VERSIONS::table
             .filter(ORDER_VERSIONS::order_id.eq(voyage_order_id))
             .count()
             .get_result::<i64>(&mut self.connection)
@@ -283,14 +283,14 @@ impl DatabaseManager {
         &mut self,
         order_id: i32,
     ) -> DatabaseManagerResult<Option<VoyageOrderVersionQueryResult>> {
-        let current_version: i32 = VOYAGE_ORDERS::table
+        let current_version = VOYAGE_ORDERS::table
             .filter(VOYAGE_ORDERS::id.eq(order_id))
             .select(VOYAGE_ORDERS::current_version_number)
             .first::<i32>(&mut self.connection)
             .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
 
         if self.has_version(order_id, current_version + 1)? {
-            let rev_ver: VoyageOrderVersionQueryResult = ORDER_VERSIONS::table
+            let rev_ver = ORDER_VERSIONS::table
                 .filter(
                     ORDER_VERSIONS::order_id
                         .eq(order_id)
@@ -311,7 +311,7 @@ impl DatabaseManager {
         voyage_order_id: i32,
         version: i32,
     ) -> DatabaseManagerResult<bool> {
-        let count: i64 = ORDER_VERSIONS::table
+        let count = ORDER_VERSIONS::table
             .filter(
                 ORDER_VERSIONS::order_id
                     .eq(voyage_order_id)
@@ -329,7 +329,7 @@ impl DatabaseManager {
         voyage_order_id: i32,
         version: i32,
     ) -> DatabaseManagerResult<bool> {
-        let current_version: i32 = VOYAGE_ORDERS::table
+        let current_version = VOYAGE_ORDERS::table
             .filter(VOYAGE_ORDERS::id.eq(voyage_order_id))
             .select(VOYAGE_ORDERS::current_version_number)
             .get_result::<i32>(&mut self.connection)

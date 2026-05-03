@@ -70,9 +70,9 @@ impl HarbourmasterAisRunner {
     }
 
     fn handle_transmission(&self, msg: BitPacker, channel: Channel) -> AisResult<AisMessage> {
-        let t_si: u16 = SlotsMap::current_si(channel);
-        let msg: AisMessage = AisMessage::from_bits(msg)?;
-        let boat_mmsi: u32 = *msg.boat_info().get_static_data()?.mmsi();
+        let t_si = SlotsMap::current_si(channel);
+        let msg = AisMessage::from_bits(msg)?;
+        let boat_mmsi = *msg.boat_info().get_static_data()?.mmsi();
 
         if boat_mmsi != HARBOURMASTER_MMSI
             && IMPLEMENTED_MSGS.binary_search(msg.message_type()).is_ok()
@@ -83,9 +83,9 @@ impl HarbourmasterAisRunner {
                 self.state.boats_registry.register(msg.boat_info())?;
             }
 
-            let slots_map: &SlotsMap = self.state.slots_map();
-            let t_si_owner: Option<u32> = slots_map.slot_owner(t_si)?;
-            let t_si_timeout: Option<u8> = slots_map.slot_timeout(t_si)?;
+            let slots_map = self.state.slots_map();
+            let t_si_owner = slots_map.slot_owner(t_si)?;
+            let t_si_timeout = slots_map.slot_timeout(t_si)?;
 
             if t_si_owner.is_none() || t_si_owner == Some(boat_mmsi) {
                 if t_si_timeout.is_some() {
@@ -95,7 +95,7 @@ impl HarbourmasterAisRunner {
                 }
 
                 if [1, 2].binary_search(msg.message_type()).is_ok() {
-                    let com_state_timeout: u8 = *msg.communication_state()?.slot_timeout()?;
+                    let com_state_timeout = *msg.communication_state()?.slot_timeout()?;
 
                     if t_si_owner.is_none() && com_state_timeout > 0 {
                         slots_map.book_slot(t_si, boat_mmsi, Some(com_state_timeout), None)?;
@@ -106,14 +106,14 @@ impl HarbourmasterAisRunner {
                     }
 
                     if com_state_timeout == 0 {
-                        let cs_offset: u16 = *msg.communication_state()?.slot_offset()?;
-                        let rsv_s: u16 = SlotsMap::offseted_si(t_si, cs_offset);
+                        let cs_offset = *msg.communication_state()?.slot_offset()?;
+                        let rsv_s = SlotsMap::offseted_si(t_si, cs_offset);
 
                         slots_map.book_slot(rsv_s, boat_mmsi, Some(com_state_timeout), None)?;
                         slots_map.release_slot(t_si)?;
                     }
                 } else if *msg.message_type() == 3 {
-                    let com_state_keep_flag: bool = *msg.communication_state()?.keep_flag()?;
+                    let com_state_keep_flag = *msg.communication_state()?.keep_flag()?;
                     let com_state_slot_increment: u16 =
                         *msg.communication_state()?.slot_increment()?;
 
@@ -198,7 +198,7 @@ impl HarbourmasterAisRunner {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement de l'AIS...".yellow()));
 
-        let listeners_runner_arc: Arc<HarbourmasterAisRunner> = Arc::new(self);
+        let listeners_runner_arc = Arc::new(self);
         let slots_map_cleanup_runner_arc: Arc<HarbourmasterAisRunner> =
             listeners_runner_arc.clone();
 

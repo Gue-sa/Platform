@@ -63,10 +63,9 @@ impl RadioFrequency {
     }
 
     async fn handle_gps_response(&self, msg: BitPacker) -> RadioFrequencyResult<()> {
-        let client: IpAddr =
-            IpAddr::V4(Ipv4Addr::from_bits(msg.extract_int::<u32>(None, Some(31))?));
+        let client = IpAddr::V4(Ipv4Addr::from_bits(msg.extract_int::<u32>(None, Some(31))?));
 
-        let data: BitPacker = msg.slice(Some(32), None)?;
+        let data = msg.slice(Some(32), None)?;
 
         self.socket
             .send_to(data.bits(), SocketAddr::new(client, GPS_FROM_SERVER_PORT))
@@ -82,7 +81,7 @@ impl RadioFrequency {
 
             loop {
                 if let Ok((size, source)) = self.socket.recv_from(&mut buf).await {
-                    let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8));
+                    let msg = BitPacker::from_slice(&buf[..size], Some(size * 8));
 
                     println!("{}: {}\n", source, msg.to_bin_str());
 

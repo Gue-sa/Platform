@@ -123,7 +123,7 @@ impl LogsCli {
     pub fn run(mut self) -> Result<JoinHandle<()>, io::Error> {
         let mut out = stdout();
 
-        let mut refresh_interval: Interval = interval(Duration::from_millis(
+        let mut refresh_interval = interval(Duration::from_millis(
             *Config::load().unwrap().cli_refresh_delay(),
         ));
 
@@ -214,20 +214,20 @@ impl LogsCli {
         let current_dt: chrono::DateTime<Local> = get_current_dt();
         let slots: [u16; 2] = dt_to_slots_idx(Some(current_dt));
 
-        let clean_msg: String = msg
+        let clean_msg = msg
             .to_string()
             .chars()
             .filter(|c: &char| {
                 !c.is_control() || *c == '\x1b' || *c == '\n' || *c == '\r' || *c == '\t'
             })
-            .collect();
+            .collect::<String>();
 
         if let Ok(mut file) = OpenOptions::new()
             .create(true)
             .append(true)
             .open(log_filename)
         {
-            let file_log_msg: String = format!(
+            let file_log_msg = format!(
                 "({}, {}), {}/{}/{} {}h:{}mn:{}s:\n{}\n",
                 slots[0],
                 slots[1],
@@ -242,7 +242,7 @@ impl LogsCli {
             let _ = writeln!(file, "{}", file_log_msg);
         }
 
-        let log_str: String = format!(
+        let log_str = format!(
             "({}, {}), {}/{}/{} {}h:{}mn:{}s:\n{}",
             slots[0],
             slots[1],
@@ -260,10 +260,10 @@ impl LogsCli {
             logs_vec.push(Line::default());
         }
 
-        let max_logs_history_length: usize = *Config::load().unwrap().max_cli_logs_history_length();
+        let max_logs_history_length = *Config::load().unwrap().max_cli_logs_history_length();
 
         if logs_vec.len() > max_logs_history_length {
-            let excess: usize = logs_vec.len() - max_logs_history_length;
+            let excess = logs_vec.len() - max_logs_history_length;
             logs_vec.drain(0..excess);
         }
     }
@@ -296,12 +296,12 @@ impl LogsCli {
         let area_width = self.areas[scroll_idx].width.saturating_sub(2);
         let line_count = Self::get_visual_line_count(logs, area_width);
 
-        let area_height: usize = self.areas[scroll_idx].height.saturating_sub(2) as usize;
-        let max_scroll: i16 = (line_count as i16)
+        let area_height = self.areas[scroll_idx].height.saturating_sub(2) as usize;
+        let max_scroll = (line_count as i16)
             .saturating_sub(area_height as i16)
             .max(0);
 
-        let new_scroll: i16 = (self.scrolls[scroll_idx] as i16 + delta).clamp(0, max_scroll);
+        let new_scroll = (self.scrolls[scroll_idx] as i16 + delta).clamp(0, max_scroll);
         self.scrolls[scroll_idx] = new_scroll as u16;
 
         self.auto_scroll[scroll_idx] = new_scroll == max_scroll;
@@ -338,7 +338,7 @@ impl LogsCli {
             .constraints([Constraint::Length(3), Constraint::Min(0)])
             .split(f.area());
 
-        let header_title: String = format!(" {} ", self.title.to_uppercase());
+        let header_title = format!(" {} ", self.title.to_uppercase());
         let header_widget: Paragraph<'_> = Paragraph::new(Line::from(vec![Span::styled(
             header_title,
             Style::default()
@@ -444,14 +444,14 @@ impl LogsCli {
         color: Color,
         id: SelectedBox,
     ) {
-        let is_focused: bool = self.focused == id;
+        let is_focused = self.focused == id;
 
-        let title: String = if is_focused {
+        let title = if is_focused {
             format!("{} [SCROLL]", title)
         } else {
             title.to_string()
         };
-        let border: Style = if is_focused {
+        let border = if is_focused {
             Style::default()
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD)

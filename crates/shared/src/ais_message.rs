@@ -149,7 +149,7 @@ impl CommunicationState {
     }
 
     pub fn parse(com_state_bitpacker: BitPacker, msg_type: u8) -> CommunicationStateResult<Self> {
-        let mut com_state: Self = Self {
+        let mut com_state = Self {
             communication_state_type: if SOTDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
                 CSType::SOTDMA
             } else {
@@ -169,8 +169,8 @@ impl CommunicationState {
 
         match msg_type {
             1 | 2 => {
-                let slot_timeout: u8 = com_state_bitpacker.extract_int::<u8>(Some(2), Some(4))?;
-                let sub_msg: BitPacker = com_state_bitpacker.slice(Some(5), None)?;
+                let slot_timeout = com_state_bitpacker.extract_int::<u8>(Some(2), Some(4))?;
+                let sub_msg = com_state_bitpacker.slice(Some(5), None)?;
 
                 com_state.slot_timeout = Some(slot_timeout);
 
@@ -255,9 +255,9 @@ impl AisMessage {
     pub fn parse(
         msg: BitPacker,
     ) -> AisMessageResult<(u8, BitPacker, Option<CommunicationState>, u16, BoatInfo)> {
-        let msg_type: u8 = msg.extract_int::<u8>(Some(40), Some(45))?;
+        let msg_type = msg.extract_int::<u8>(Some(40), Some(45))?;
 
-        let mut static_data: StaticData = StaticData::new(
+        let mut static_data = StaticData::new(
             None, None, None, None, None, None, None, None, None, None, None, None,
         );
 
@@ -269,12 +269,12 @@ impl AisMessage {
 
         match msg_type {
             1 | 2 | 3 => {
-                let payload: BitPacker = msg.slice(Some(40), Some(207))?;
-                let data: BitPacker = payload.slice(Some(8), Some(148))?;
+                let payload = msg.slice(Some(40), Some(207))?;
+                let data = payload.slice(Some(8), Some(148))?;
                 let communication_state: CommunicationState =
                     CommunicationState::parse(payload.slice(Some(149), Some(167))?, msg_type)?;
-                let msg_crc: u16 = msg.extract_int::<u16>(Some(208), Some(223))?;
-                let computed_crc: u16 = AisMessage::compute_crc(payload.bits()).unwrap();
+                let msg_crc = msg.extract_int::<u16>(Some(208), Some(223))?;
+                let computed_crc = AisMessage::compute_crc(payload.bits()).unwrap();
 
                 if msg_crc == computed_crc {
                     static_data.set_mmsi(data.extract_int::<u32>(None, Some(29))?);
@@ -313,10 +313,10 @@ impl AisMessage {
                 }
             }
             5 => {
-                let payload: BitPacker = msg.slice(Some(40), Some(463))?;
-                let data: BitPacker = payload.slice(Some(8), None)?;
-                let msg_crc: u16 = msg.slice(Some(464), Some(479))?.extract_int(None, None)?;
-                let computed_crc: u16 = AisMessage::compute_crc(&payload.bits()).unwrap();
+                let payload = msg.slice(Some(40), Some(463))?;
+                let data = payload.slice(Some(8), None)?;
+                let msg_crc = msg.slice(Some(464), Some(479))?.extract_int(None, None)?;
+                let computed_crc = AisMessage::compute_crc(&payload.bits()).unwrap();
 
                 if msg_crc == computed_crc {
                     static_data.set_mmsi(data.extract_int::<u32>(None, Some(29))?);
@@ -379,8 +379,8 @@ impl AisMessage {
         message_type: u8,
         communication_state: Option<CommunicationState>,
     ) -> AisMessageResult<Self> {
-        let data: BitPacker = AisMessage::build_data_bytes(&boat_info, message_type)?;
-        let crc: u16 = AisMessage::compute_crc(
+        let data = AisMessage::build_data_bytes(&boat_info, message_type)?;
+        let crc = AisMessage::compute_crc(
             AisMessage::build_payload(message_type, data.clone(), communication_state.clone())?
                 .bits(),
         )
@@ -402,7 +402,7 @@ impl AisMessage {
     }
 
     fn build_data_bytes(boat_info: &BoatInfo, msg_type: u8) -> AisMessageResult<BitPacker> {
-        let mut data_vec: BitPacker = BitPacker::from_int(0, Some(0));
+        let mut data_vec = BitPacker::from_int(0, Some(0));
 
         match msg_type {
             1 | 2 | 3 => {
@@ -439,14 +439,14 @@ impl AisMessage {
     }
 
     pub fn build(&self) -> AisMessageResult<BitPacker> {
-        let payload: BitPacker = AisMessage::build_payload(
+        let payload = AisMessage::build_payload(
             self.message_type,
             AisMessage::build_data_bytes(&self.boat_info, self.message_type)?,
             self.communication_state.clone(),
         )?;
         let crc: BitPacker =
             BitPacker::from_int::<u16>(AisMessage::compute_crc(payload.bits()).unwrap(), Some(16));
-        let msg: BitPacker = self.buffer.clone()
+        let msg = self.buffer.clone()
             + self.end_flag.clone()
             + crc
             + payload

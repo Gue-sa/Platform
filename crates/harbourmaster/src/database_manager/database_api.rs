@@ -64,7 +64,7 @@ impl DatabaseApi {
             .send(LogEvent::System("Lancement de l'API armateur...".yellow()));
 
         tokio::spawn(async move {
-            let api: Router = Router::new()
+            let api = Router::new()
                 .route("/", get(Self::welcome))
                 .route("/get_voyage_orders", get(Self::get_voyage_orders))
                 .route(
@@ -78,7 +78,7 @@ impl DatabaseApi {
                 .with_state(self.state.clone())
                 .layer(CorsLayer::permissive());
 
-            let listener: TcpListener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
+            let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
 
             axum::serve(listener, api).await.unwrap();
         })

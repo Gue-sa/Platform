@@ -1,6 +1,9 @@
 use crate::{
     bitpacker::BitPacker,
-    common::{errors::{AntennaError, AntennaResult}, types::{AisPacket, Channel}},
+    common::{
+        errors::{AntennaError, AntennaResult},
+        types::{AisPacket, Channel},
+    },
     config::Config,
 };
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -31,7 +34,7 @@ impl Antenna {
         rec_port: u16,
         chn: Channel,
     ) -> AntennaResult<Self> {
-        let sock: UdpSocket = UdpSocket::bind(SocketAddr::new(
+        let sock = UdpSocket::bind(SocketAddr::new(
             IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
             rec_port,
         ))
@@ -69,7 +72,7 @@ impl Antenna {
             tokio::select! {
                 result = self.socket.recv_from(&mut buf) => {
                     let (size, _source) = result.map_err(|_| AntennaError::ReceptionError)?;
-                    let msg: BitPacker = BitPacker::from_slice(&buf[..size], Some(size * 8));
+                    let msg = BitPacker::from_slice(&buf[..size], Some(size * 8));
 
                     if msg.bits() != BitPacker::from_str("hello", None).bits() {
                         match self.channel {

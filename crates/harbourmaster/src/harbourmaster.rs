@@ -3,7 +3,7 @@ use crate::{
     fms::Fms,
     harbourmaster_ais::HarbourmasterAisRunner,
     harbourmaster_gps::HarbourmasterGps,
-    harbourmaster_web_ui::{self, HarbourmasterWebUi},
+    harbourmaster_web_ui::HarbourmasterWebUi,
 };
 use shared::{
     antenna::Antenna,
@@ -32,10 +32,10 @@ pub struct Harbourmaster {
 
 impl Harbourmaster {
     pub async fn init() -> HarbourmasterResult<Self> {
-        let config: Config = Config::load().unwrap();
+        let config = Config::load().unwrap();
 
         let (cli_tx, cli_rx) = channel::<LogEvent>();
-        let cli: LogsCli = LogsCli::new(
+        let cli = LogsCli::new(
             cli_rx,
             (*config.harbourmaster_sys_logs_filename().clone()).to_string(),
             (*config.harbourmaster_ais_logs_filename().clone()).to_string(),
@@ -68,8 +68,8 @@ impl Harbourmaster {
 
         let ais: HarbourmasterAisRunner =
             HarbourmasterAisRunner::init(ais_rx, boats_reg.clone(), cli_tx.clone());
-        let gps: HarbourmasterGps = HarbourmasterGps::init(gps_rx, c_gps_tx, cli_tx.clone()).await;
-        let fms: Fms = Fms::init(
+        let gps = HarbourmasterGps::init(gps_rx, c_gps_tx, cli_tx.clone()).await;
+        let fms = Fms::init(
             boats_reg,
             db_manager,
             fms_rx,
@@ -93,7 +93,7 @@ impl Harbourmaster {
     }
 
     pub async fn start(self) -> HarbourmasterResult<()> {
-        let config: Config = Config::load().unwrap();
+        let config = Config::load().unwrap();
 
         let _c87b_antenna_handle: JoinHandle<()> = self.c87b_antenna.start().await?;
         let _c88b_antenna_handle: JoinHandle<()> = self.c88b_antenna.start().await?;

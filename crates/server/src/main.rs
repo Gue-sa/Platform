@@ -1,11 +1,15 @@
 use crate::radio_frequency::RadioFrequency;
-use shared::{common::{
-    constants::{
-        C87B_FROM_SERVER_PORT, C87B_TO_SERVER_PORT, C88B_FROM_SERVER_PORT, C88B_TO_SERVER_PORT,
-        GPS_FROM_SERVER_PORT, GPS_TO_SERVER_PORT, SATCOM_FROM_SERVER_PORT, SATCOM_TO_SERVER_PORT,
+use shared::{
+    common::{
+        constants::{
+            C87B_FROM_SERVER_PORT, C87B_TO_SERVER_PORT, C88B_FROM_SERVER_PORT, C88B_TO_SERVER_PORT,
+            GPS_FROM_SERVER_PORT, GPS_TO_SERVER_PORT, SATCOM_FROM_SERVER_PORT,
+            SATCOM_TO_SERVER_PORT,
+        },
+        types::Channel,
     },
-    types::Channel,
-}, config::Config};
+    config::Config,
+};
 use std::thread::park;
 
 mod radio_frequency;
@@ -13,13 +17,13 @@ mod radio_frequency;
 #[tokio::main]
 async fn main() {
     if Config::load().is_some() {
-        let freq_c87b: RadioFrequency =
+        let freq_c87b =
             RadioFrequency::init(Channel::C87B, C87B_FROM_SERVER_PORT, C87B_TO_SERVER_PORT).await;
-        let freq_c88b: RadioFrequency =
+        let freq_c88b =
             RadioFrequency::init(Channel::C88B, C88B_FROM_SERVER_PORT, C88B_TO_SERVER_PORT).await;
-        let freq_gps: RadioFrequency =
+        let freq_gps =
             RadioFrequency::init(Channel::GPS, GPS_FROM_SERVER_PORT, GPS_TO_SERVER_PORT).await;
-        let freq_satcom: RadioFrequency = RadioFrequency::init(
+        let freq_satcom = RadioFrequency::init(
             Channel::SatCom,
             SATCOM_FROM_SERVER_PORT,
             SATCOM_TO_SERVER_PORT,

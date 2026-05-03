@@ -1,6 +1,6 @@
 use crate::{
     board_computer::BoardComputer, boat_ais::BoatAisRunner, boat_gps::BoatGps,
-    systemstate::SystemState, ui::Ui, voyage::Voyage,
+    systemstate::SystemState, ui::Ui,
 };
 use shared::{
     antenna::Antenna,
@@ -30,12 +30,12 @@ pub struct Boat {
 
 impl Boat {
     pub async fn init() -> BoatResult<Self> {
-        let config: Config = Config::load().unwrap();
+        let config = Config::load().unwrap();
 
-        let boat_info: Arc<BoatInfo> = Arc::new(BoatInfo::new(None, None, None));
+        let boat_info = Arc::new(BoatInfo::new(None, None, None));
 
         let (cli_tx, cli_rx) = channel::<LogEvent>();
-        let cli: LogsCli = LogsCli::new(
+        let cli = LogsCli::new(
             cli_rx,
             (*config.boat_sys_logs_filename().clone()).to_string(),
             (*config.boat_ais_logs_filename().clone()).to_string(),
@@ -61,12 +61,12 @@ impl Boat {
             boats_reg,
         ) = build_radio(cli_tx.clone(), *boat_info.get_static_data()?.mmsi()).await?;
 
-        let system_state: Arc<SystemState> = Arc::new(SystemState::new(cli_tx.clone()));
-        let voyage: Option<Voyage> = None;
+        let system_state = Arc::new(SystemState::new(cli_tx.clone()));
+        let voyage = None;
 
-        let ui: Ui = Ui::init(boat_info.clone());
+        let ui = Ui::init(boat_info.clone());
 
-        let ais: BoatAisRunner = BoatAisRunner::init(
+        let ais = BoatAisRunner::init(
             ais_rx,
             c87b_tx,
             c88b_tx,
@@ -76,7 +76,7 @@ impl Boat {
             cli_tx.clone(),
         )
         .unwrap();
-        let gps: BoatGps = BoatGps::init(
+        let gps = BoatGps::init(
             Arc::clone(&boat_info),
             gps_rx,
             c_gps_tx,
@@ -108,7 +108,7 @@ impl Boat {
     }
 
     pub async fn start(self) -> BoatResult<()> {
-        let config: Config = Config::load().unwrap();
+        let config = Config::load().unwrap();
 
         let _c87b_antenna_handle: JoinHandle<()> = self.c87b_antenna.start().await?;
         let _c88b_antenna_handle: JoinHandle<()> = self.c88b_antenna.start().await?;

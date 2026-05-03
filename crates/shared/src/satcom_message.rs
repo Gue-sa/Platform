@@ -48,7 +48,7 @@ impl SatComMessage {
     }
 
     pub fn parse(msg: BitPacker) -> SatComMessageResult<Self> {
-        let mut order_body_review: Option<VoyageOrderBody> = None;
+        let mut order_body_review = None;
 
         if *msg.bits_len() > 112 {
             order_body_review = Some(VoyageOrderBody::from_bitpacker(
@@ -66,12 +66,12 @@ impl SatComMessage {
     }
 
     pub fn to_bitpacker(&self) -> BitPacker {
-        let order_body_review_bitpacker: BitPacker = if self.order_body_review.is_some() {
+        let order_body_review_bitpacker = if self.order_body_review.is_some() {
             self.order_body_review.as_ref().unwrap().to_bitpacker()
         } else {
             BitPacker::from_int(0, Some(0))
         };
-        let u8_message_type: u8 = self.message_type.clone().into();
+        let u8_message_type = self.message_type.clone() as u8;
 
         order_body_review_bitpacker
             + BitPacker::from_int(u8_message_type, Some(8))

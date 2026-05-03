@@ -16,7 +16,7 @@ mod voyage;
 #[tokio::main]
 async fn main() {
     if Config::load().is_some() {
-        let boat: Boat = Boat::init()
+        let boat = Boat::init()
             .await
             .expect("L'initialisation du bateau a échoué");
 

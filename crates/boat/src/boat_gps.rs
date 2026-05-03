@@ -5,7 +5,7 @@ use std::{net::Ipv4Addr, sync::Arc, time::Duration, u32};
 use tokio::{
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
-    time::{Interval, interval},
+    time::interval,
 };
 
 pub struct BoatGps {
@@ -41,7 +41,7 @@ impl BoatGps {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement du GPS...".yellow()));
 
-        let mut interval: Interval = interval(Duration::from_secs(
+        let mut interval = interval(Duration::from_secs(
             *Config::load().unwrap().gps_refresh_delay(),
         ));
 

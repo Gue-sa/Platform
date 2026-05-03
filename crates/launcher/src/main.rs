@@ -1,4 +1,4 @@
-use colored::{ColoredString, Colorize};
+use colored::Colorize;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 use futures::future::join_all;
 use num_traits::PrimInt;
@@ -8,7 +8,7 @@ use opencv::{
     prelude::*,
     videoio::{
         self, CAP_PROP_BUFFERSIZE, CAP_PROP_FOURCC, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH,
-        VideoCapture, VideoWriter,
+        CAP_V4L2, VideoCapture, VideoWriter,
     },
 };
 use shared::{common::utils::get_current_dt, config::Config};
@@ -84,27 +84,27 @@ fn clear_terminal() -> () {
 }
 
 fn display_banner() -> () {
-    let has_server: bool = matches!(fs::exists("server"), Ok(true));
-    let has_harbourmaster: bool = matches!(fs::exists("harbourmaster"), Ok(true));
-    let has_boat: bool = matches!(fs::exists("boat"), Ok(true));
+    let has_server = matches!(fs::exists("server"), Ok(true));
+    let has_harbourmaster = matches!(fs::exists("harbourmaster"), Ok(true));
+    let has_boat = matches!(fs::exists("boat"), Ok(true));
 
-    let server_status: &str = if has_server {
+    let server_status = if has_server {
         "Présent ✔"
     } else {
         "Absent ✗"
     };
-    let harbourmaster_status: &str = if has_harbourmaster {
+    let harbourmaster_status = if has_harbourmaster {
         "Présent ✔"
     } else {
         "Absent ✗"
     };
-    let boat_status: &str = if has_boat {
+    let boat_status = if has_boat {
         "Présent ✔"
     } else {
         "Absent ✗"
     };
 
-    let banner_msg: ColoredString = format!("{BANNER_TITLE}\n\n##################################################################################################\n\nVersion 1.0.0\nEcole Nationale Supérieure des Mines de Nancy\nCampus ARTEM et de Saint-Dié-des-Vosges\nUniversité de Lorraine\n2026\n\n##################################################################################################\n\nRéalisé par:\n- Alexandre Brisset (communication VHF, modélisation, fabrication)\n- Matieu Gauthier (modélisation, fabrication)\n- Sasha Guérin--Loison (ensemble de la codebase)\n- Saad Ouadrassi (microcontrôleurs, algorithme de déplacement)\n- Bosco Perrin (conception et fabrication des bateaux)\n- Yasmine ? (conception et fabrication des bateaux)\n\n##################################################################################################\n\nEncadré par:\n- Guillaume Bonfante\n\n##################################################################################################\n\nStatut des exécutables:\n- Serveur: {server_status}\n- Capitainerie: {harbourmaster_status}\n- Bateau: {boat_status}\n\n##################################################################################################\n\n").yellow();
+    let banner_msg = format!("{BANNER_TITLE}\n\n##################################################################################################\n\nVersion 1.0.0\nEcole Nationale Supérieure des Mines de Nancy\nCampus ARTEM et de Saint-Dié-des-Vosges\nUniversité de Lorraine\n2026\n\n##################################################################################################\n\nRéalisé par:\n- Alexandre Brisset (communication VHF, modélisation, fabrication)\n- Matieu Gauthier (modélisation, fabrication)\n- Sasha Guérin--Loison (ensemble de la codebase)\n- Saad Ouadrassi (microcontrôleurs, algorithme de déplacement)\n- Bosco Perrin (conception et fabrication des bateaux)\n- Yasmine ? (conception et fabrication des bateaux)\n\n##################################################################################################\n\nEncadré par:\n- Guillaume Bonfante\n\n##################################################################################################\n\nStatut des exécutables:\n- Serveur: {server_status}\n- Capitainerie: {harbourmaster_status}\n- Bateau: {boat_status}\n\n##################################################################################################\n\n").yellow();
 
     println!("{banner_msg}");
 }
@@ -126,7 +126,7 @@ fn setup_vhosts() -> () {
 }
 
 fn are_logfiles_setup() -> bool {
-    let config: Config = Config::default();
+    let config = Config::default();
 
     for filename in config.log_files_names().iter() {
         if matches!(exists(filename), Ok(false)) {
@@ -138,14 +138,14 @@ fn are_logfiles_setup() -> bool {
 }
 
 fn setup_logfiles() -> () {
-    let config: Config = Config::default();
+    let config = Config::default();
 
     let _ = config.log_files_names().iter().for_each(|logs_filename| {
         let _ = fs::remove_file(logs_filename);
     });
 
     let _ = config.log_files_names().iter().for_each(|logs_filename| {
-        let path: &Path = Path::new(logs_filename);
+        let path = Path::new(logs_filename);
 
         if let Some(parent_dir) = path.parent() {
             fs::create_dir_all(parent_dir);
@@ -160,7 +160,7 @@ where
     T: PrimInt + Binary + FromStr + Clone + ToString,
     <T as FromStr>::Err: Display,
 {
-    let sup: T = sup.unwrap_or(T::max_value());
+    let sup = sup.unwrap_or(T::max_value());
 
     Input::<T>::new()
         .with_prompt(format!("\n{}", prompt))
@@ -176,7 +176,7 @@ where
 }
 
 fn ipaddr_input(prompt: &str) -> IpAddr {
-    let ip: String = Input::new()
+    let ip = Input::new()
         .with_prompt(format!("\n{}", prompt))
         .validate_with(|val: &String| -> Result<(), &str> {
             if val.parse::<IpAddr>().is_ok() {
@@ -201,8 +201,8 @@ fn select_input(prompt: &str, items: &[&str]) -> usize {
 }
 
 fn tert_input(prompt: &str, pos: Option<&str>, neg: Option<&str>) -> usize {
-    let pos: &str = pos.unwrap_or("Oui");
-    let neg: &str = neg.unwrap_or("Non");
+    let pos = pos.unwrap_or("Oui");
+    let neg = neg.unwrap_or("Non");
 
     let choices: [&str; 3] = [pos, neg, "Retour"];
 
@@ -210,8 +210,8 @@ fn tert_input(prompt: &str, pos: Option<&str>, neg: Option<&str>) -> usize {
 }
 
 fn bool_input(prompt: &str, pos: Option<&str>, neg: Option<&str>) -> bool {
-    let pos: &str = pos.unwrap_or("Oui");
-    let neg: &str = neg.unwrap_or("Non");
+    let pos = pos.unwrap_or("Oui");
+    let neg = neg.unwrap_or("Non");
 
     let choices: [&str; 2] = [pos, neg];
 
@@ -225,9 +225,9 @@ fn bool_input(prompt: &str, pos: Option<&str>, neg: Option<&str>) -> bool {
 }
 
 fn build_config() -> () {
-    let mut config: Config = Config::default();
+    let mut config = Config::default();
 
-    let is_sim: bool = bool_input(
+    let is_sim = bool_input(
         "Voulez-vous créer une simulation locale (sur une seule machine) ou mettre en place la maquette réelle ?",
         Some("Simulation"),
         Some("Maquette"),
@@ -240,8 +240,8 @@ fn build_config() -> () {
 
         setup_vhosts();
     } else {
-        let server_ip: IpAddr = ipaddr_input("Veuillez entrer l'IPv4 du serveur");
-        let harbourmaster_ip: IpAddr = ipaddr_input("Veuillez entrer l'IPv4 de la capitainerie");
+        let server_ip = ipaddr_input("Veuillez entrer l'IPv4 du serveur");
+        let harbourmaster_ip = ipaddr_input("Veuillez entrer l'IPv4 de la capitainerie");
 
         config.set_server_ip(server_ip);
         config.set_harbourmaster_ip(harbourmaster_ip);
@@ -263,19 +263,19 @@ fn build_config() -> () {
 fn probe_cam_idx() -> Option<u8> {
     opencv::core::set_log_level(LogLevel::LOG_LEVEL_FATAL).unwrap();
 
-    let mut indices: Vec<u8> = Vec::<u8>::new();
-    let mut caps: Vec<VideoCapture> = Vec::<VideoCapture>::new();
+    let mut indices = Vec::new();
+    let mut caps = Vec::new();
 
     for i in 0..=10 {
-        if let Ok(mut cap) = videoio::VideoCapture::new(i, videoio::CAP_V4L2) {
-            let fourcc: i32 = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
+        if let Ok(mut cap) = VideoCapture::new(i, CAP_V4L2) {
+            let fourcc = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
 
             if cap.set(CAP_PROP_FOURCC, fourcc as f64).is_ok()
                 && cap.set(CAP_PROP_BUFFERSIZE, 1.).is_ok()
                 && cap.set(CAP_PROP_FRAME_WIDTH, 1920.).is_ok()
                 && cap.set(CAP_PROP_FRAME_HEIGHT, 1080.).is_ok()
             {
-                if let Ok(opened) = videoio::VideoCapture::is_opened(&cap)
+                if let Ok(opened) = VideoCapture::is_opened(&cap)
                     && opened
                 {
                     indices.push(i as u8);
@@ -295,11 +295,11 @@ fn probe_cam_idx() -> Option<u8> {
 
             thread::sleep(Duration::from_secs(5));
 
-            let mut frame: Mat = Mat::default();
-            let mut flipped_frame: Mat = Mat::default();
+            let mut frame = Mat::default();
+            let mut flipped_frame = Mat::default();
 
             for i in 0..caps.len() {
-                let cap: &mut VideoCapture = &mut caps[i];
+                let cap = &mut caps[i];
 
                 let win_name = &format!("Flux de la cam {}", indices[i]);
 
@@ -343,7 +343,7 @@ fn probe_cam_idx() -> Option<u8> {
 }
 
 fn change_settings() -> () {
-    let config: Config = Config::load().unwrap();
+    let config = Config::load().unwrap();
 
     let settings: [&str; 13] = [
         &format!(
@@ -426,13 +426,13 @@ fn change_settings() -> () {
     ];
 
     loop {
-        let mut config: Config = Config::load().unwrap();
+        let mut config = Config::load().unwrap();
 
-        let param: usize = select_input("Veuillez choisir le paramètre à modifier", &settings);
+        let param = select_input("Veuillez choisir le paramètre à modifier", &settings);
 
         match param {
             0 => {
-                let choice: usize = tert_input(
+                let choice = tert_input(
                     "Veuillez choisir une option",
                     Some("Activer"),
                     Some("Désactiver"),
@@ -450,7 +450,7 @@ fn change_settings() -> () {
                 }
             }
             1 => {
-                let ip: IpAddr = ipaddr_input("Veuillez entrer la nouvelle IPv4 du serveur");
+                let ip = ipaddr_input("Veuillez entrer la nouvelle IPv4 du serveur");
 
                 config.set_server_ip(ip);
             }
@@ -461,7 +461,7 @@ fn change_settings() -> () {
                 config.set_harbourmaster_ip(ip);
             }
             3 => {
-                let choice: usize = tert_input(
+                let choice = tert_input(
                     "Veuillez choisir une option",
                     Some("Activer"),
                     Some("Désactiver"),
@@ -478,7 +478,7 @@ fn change_settings() -> () {
                 }
             }
             4 => {
-                let choice: usize = tert_input(
+                let choice = tert_input(
                     "Veuillez choisir une option",
                     Some("Activer"),
                     Some("Désactiver"),
@@ -495,7 +495,7 @@ fn change_settings() -> () {
                 }
             }
             5 => {
-                let choice: usize = tert_input(
+                let choice = tert_input(
                     "Veuillez choisir une option",
                     Some("Activer"),
                     Some("Désactiver"),
@@ -512,7 +512,7 @@ fn change_settings() -> () {
                 }
             }
             6 => {
-                let choice: usize = tert_input(
+                let choice = tert_input(
                     "Veuillez choisir une option",
                     Some("Activer"),
                     Some("Désactiver"),
@@ -529,7 +529,7 @@ fn change_settings() -> () {
                 }
             }
             7 => {
-                let choice: usize = tert_input(
+                let choice = tert_input(
                     "Veuillez choisir une option",
                     Some("Activer"),
                     Some("Désactiver"),
@@ -564,7 +564,7 @@ fn change_settings() -> () {
                 config.set_cli_refresh_delay(d);
             }
             11 => {
-                let cam_idx: Option<u8> = probe_cam_idx();
+                let cam_idx = probe_cam_idx();
 
                 config.set_gps_cam_idx(cam_idx);
             }
@@ -649,7 +649,7 @@ async fn main() {
     }
 
     loop {
-        let choice: usize = select_input("Veuillez choisir l'action à effectuer", &FUNCTIONALITIES);
+        let choice = select_input("Veuillez choisir l'action à effectuer", &FUNCTIONALITIES);
 
         match choice {
             0 => {
@@ -668,7 +668,7 @@ async fn main() {
                             None,
                             None,
                         ) {
-                            let mut config: Config = Config::load().unwrap();
+                            let mut config = Config::load().unwrap();
 
                             config.set_gps_cam_idx(probe_cam_idx());
 
@@ -708,7 +708,7 @@ async fn main() {
                                 None,
                                 None,
                             ) {
-                                let mut config: Config = Config::load().unwrap();
+                                let mut config = Config::load().unwrap();
 
                                 config.set_gps_cam_idx(probe_cam_idx());
 

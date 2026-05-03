@@ -46,12 +46,12 @@ impl SatCom {
 
                         if *parsed_msg.source() != self.mmsi {
                             self.logs_cli_tx().send(LogEvent::Satcom(format!(
-                                "Message SatCom reçu : {:?}", msg.bits()
+                                "Message SatCom reçu : {}", msg.to_bin_str()
                             ).green()));
                         }
                     } else {
                         self.logs_cli_tx().send(LogEvent::Satcom(format!(
-                            "Message SatCom malformé reçu et ignoré : {:?}", msg.bits()
+                            "Message SatCom malformé reçu et ignoré : {}", msg.to_bin_str()
                         ).red()));
                     }
                 },
@@ -59,7 +59,7 @@ impl SatCom {
                     self.antenna_tx.send(msg.to_bitpacker()).await;
 
                     self.logs_cli_tx().send(LogEvent::Satcom(format!(
-                        "Message SatCom envoyé : {:?}", msg.to_bitpacker().bits()
+                        "Message SatCom envoyé : {}", msg.to_bitpacker().to_bin_str()
                     ).green()));
                 }
             }

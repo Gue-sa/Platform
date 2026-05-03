@@ -254,13 +254,13 @@ impl HarbourmasterGps {
                     self.set_coordinates(pos_arr[1], pos_arr[0]);
                 },
                 Some(msg) = rx.recv() => {
-                    self.logs_cli_tx().send(LogEvent::Gps(format!("Demande de positionnement GPS reçue : {:?}", msg.bits()).green()));
+                    self.logs_cli_tx().send(LogEvent::Gps(format!("Demande de positionnement GPS reçue : {}", msg.to_bin_str()).green()));
 
                     let res = BitPacker::from_int(self.latitude.load(Ordering::Relaxed), Some(32)) + BitPacker::from_int(self.longitude.load(Ordering::Relaxed), Some(32)) + msg;
 
                     self.antenna_tx.send(res.clone()).await;
 
-                    self.logs_cli_tx().send(LogEvent::Gps(format!("Position GPS envoyée : {:?}", res.bits()).green()));
+                    self.logs_cli_tx().send(LogEvent::Gps(format!("Position GPS envoyée : {}", res.to_bin_str()).green()));
                 }
             }
         }

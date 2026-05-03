@@ -4,7 +4,7 @@ Attention, ce projet est destiné à tourner sur Linux. Windows n'est pas suppor
 
 Comment lancer le projet ?
 
-- Compiler pour son architecture / OS.
+- Compiler pour son architecture / OS (ne pas oublier de préciser une feature parmi celles-ci pour la spécifier : arch-based, rasp-based ou debian-based).
 - Lancer le launcher.
 - Lancer les différents composants.
 - Si la capitainerie est lancée, l'interface armateur est disponible à l'url suivante : http://localhost:3000. L'API l'est à : http://localhost:8000

@@ -184,7 +184,7 @@ impl BoatAisRunner {
         }
     }
 
-    fn handle_transmission(&self, msg: BitPacker, channel: Channel) -> AisResult<AisMessage> {
+    fn handle_transmission(&self, msg: &BitPacker, channel: Channel) -> AisResult<AisMessage> {
         let t_si = SlotsMap::current_si(channel);
         let msg = AisMessage::from_bits(msg)?;
         let boat_mmsi = *msg.boat_info().get_static_data()?.mmsi();
@@ -384,7 +384,7 @@ impl BoatAisRunner {
         };
 
         let msg =
-            AisMessage::from_info(self.state.boat_info().as_ref().clone(), msg_type, com_state)?;
+            AisMessage::from_info(self.state.boat_info().as_ref(), msg_type, com_state)?;
 
         ant_tx.send(msg.build()?).await?;
 
@@ -520,8 +520,8 @@ impl BoatAisRunner {
 
     async fn sotdma_continuous(self: Arc<Self>) -> AisResult<()> {
         // Ici, on arrive avec les NS / NTS du message qu'on va envoyer juste après et qu'on doit encore construire
-        let nts = self.state.nts().clone();
-        let ns = self.state.ns().clone();
+        let nts = self.state.nts();
+        let ns = self.state.ns();
 
         let next_ns = self.upcoming_ns();
 
@@ -678,7 +678,7 @@ impl BoatAisRunner {
 
             if let Some(pck) = pck_opt {
                 match pck.channel {
-                    Channel::C87B => match self.handle_transmission(pck.message, Channel::C87B) {
+                    Channel::C87B => match self.handle_transmission(&pck.message, Channel::C87B) {
                         Ok(msg) => {
                             self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(
@@ -698,7 +698,7 @@ impl BoatAisRunner {
                             }
                         },
                     },
-                    Channel::C88B => match self.handle_transmission(pck.message, Channel::C88B) {
+                    Channel::C88B => match self.handle_transmission(&pck.message, Channel::C88B) {
                         Ok(msg) => {
                             self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(

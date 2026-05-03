@@ -43,7 +43,7 @@ pub struct DatabaseApiSharedState {
 }
 
 pub struct DatabaseApi {
-    state: Arc<DatabaseApiSharedState>,
+    state_arc: Arc<DatabaseApiSharedState>,
 }
 
 impl DatabaseApiSharedState {
@@ -59,7 +59,7 @@ impl DatabaseApi {
         cli_tx: Sender<LogEvent>,
     ) -> Self {
         Self {
-            state: Arc::new(DatabaseApiSharedState {
+            state_arc: Arc::new(DatabaseApiSharedState {
                 database_manager: database_manager,
                 boats_registry: boats_reg,
                 logs_cli_tx: cli_tx,
@@ -68,7 +68,7 @@ impl DatabaseApi {
     }
 
     pub async fn start(self) -> JoinHandle<()> {
-        self.state
+        self.state_arc
             .logs_cli_tx()
             .send(LogEvent::System("Lancement de l'API armateur...".yellow()));
 
@@ -84,7 +84,7 @@ impl DatabaseApi {
                 .route("/get_destinations", get(Self::get_destinations))
                 .route("/get_statistics", get(Self::get_statistics))
                 .route("/add_voyage_order", post(Self::create_voyage_order))
-                .with_state(self.state.clone())
+                .with_state(self.state_arc.clone())
                 .layer(CorsLayer::permissive());
 
             let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();

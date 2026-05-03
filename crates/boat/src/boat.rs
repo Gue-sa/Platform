@@ -32,16 +32,16 @@ impl Boat {
     pub async fn init() -> BoatResult<Self> {
         let config = Config::load().unwrap();
 
-        let boat_info = Arc::new(BoatInfo::new(None, None, None));
+        let boat_info_arc = Arc::new(BoatInfo::new(None, None, None));
 
         let (cli_tx, cli_rx) = channel::<LogEvent>();
         let cli = LogsCli::new(
             cli_rx,
-            (*config.boat_sys_logs_filename().clone()).to_string(),
-            (*config.boat_ais_logs_filename().clone()).to_string(),
-            (*config.boat_gps_logs_filename().clone()).to_string(),
-            (*config.boat_satcom_logs_filename().clone()).to_string(),
-            (*config.boat_computer_logs_filename().clone()).to_string(),
+            config.boat_sys_logs_filename(),
+            config.boat_ais_logs_filename(),
+            config.boat_gps_logs_filename(),
+            config.boat_satcom_logs_filename(),
+            config.boat_computer_logs_filename(),
             "Logs Bateau",
         );
 
@@ -58,34 +58,34 @@ impl Boat {
             ant3,
             ant4,
             satcom,
-            boats_reg,
-        ) = build_radio(cli_tx.clone(), *boat_info.get_static_data()?.mmsi()).await?;
+            boats_reg_arc,
+        ) = build_radio(cli_tx.clone(), *boat_info_arc.get_static_data()?.mmsi()).await?;
 
-        let system_state = Arc::new(SystemState::new(cli_tx.clone()));
+        let system_state_arc = Arc::new(SystemState::new(cli_tx.clone()));
         let voyage = None;
 
-        let ui = Ui::init(boat_info.clone());
+        let ui = Ui::init(boat_info_arc.clone());
 
         let ais = BoatAisRunner::init(
             ais_rx,
             c87b_tx,
             c88b_tx,
-            Arc::clone(&boat_info),
-            boats_reg.clone(),
-            system_state.clone(),
+            Arc::clone(&boat_info_arc),
+            boats_reg_arc.clone(),
+            system_state_arc.clone(),
             cli_tx.clone(),
         )
         .unwrap();
         let gps = BoatGps::init(
-            Arc::clone(&boat_info),
+            Arc::clone(&boat_info_arc),
             gps_rx,
             c_gps_tx,
-            system_state.clone(),
+            system_state_arc.clone(),
             cli_tx.clone(),
         );
         let board_computer = BoardComputer::init(
-            boat_info.clone(),
-            boats_reg,
+            boat_info_arc.clone(),
+            boats_reg_arc,
             voyage,
             board_computer_rx,
             sender_satcom_tx,
@@ -93,7 +93,7 @@ impl Boat {
         );
 
         Ok(Self {
-            system_state: system_state,
+            system_state: system_state_arc,
             c87b_antenna: ant1,
             c88b_antenna: ant2,
             gps_antenna: ant3,

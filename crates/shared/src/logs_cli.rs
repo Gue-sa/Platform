@@ -76,11 +76,11 @@ pub struct LogsCli {
 impl LogsCli {
     pub fn new(
         rx: Receiver<LogEvent>,
-        sys_logs_filename: String,
-        ais_logs_filename: String,
-        gps_logs_filename: String,
-        satcom_logs_filename: String,
-        computer_logs_filename: String,
+        sys_logs_filename: &str,
+        ais_logs_filename: &str,
+        gps_logs_filename: &str,
+        satcom_logs_filename: &str,
+        computer_logs_filename: &str,
         title: &str,
     ) -> Self {
         Self {
@@ -94,11 +94,11 @@ impl LogsCli {
             areas: [Rect::default(); 5],
             focused: SelectedBox::Ais,
             rx: rx,
-            sys_logs_filename: sys_logs_filename,
-            ais_logs_filename: ais_logs_filename,
-            gps_logs_filename: gps_logs_filename,
-            satcom_logs_filename: satcom_logs_filename,
-            computer_logs_filename: computer_logs_filename,
+            sys_logs_filename: sys_logs_filename.to_string(),
+            ais_logs_filename: ais_logs_filename.to_string(),
+            gps_logs_filename: gps_logs_filename.to_string(),
+            satcom_logs_filename: satcom_logs_filename.to_string(),
+            computer_logs_filename: computer_logs_filename.to_string(),
             title: title.to_string(),
         }
     }

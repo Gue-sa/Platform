@@ -52,7 +52,7 @@ impl Antenna {
         })
     }
 
-    pub async fn emit(&self, msg: BitPacker) -> AntennaResult<()> {
+    pub async fn emit(&self, msg: &BitPacker) -> AntennaResult<()> {
         let _ = self
             .socket
             .send_to(
@@ -77,7 +77,7 @@ impl Antenna {
                     if msg.bits() != BitPacker::from_str("hello", None).bits() {
                         match self.channel {
                             Channel::C87B | Channel::C88B => {
-                                self.ais_tx.clone().unwrap().send(AisPacket::from(msg, self.channel)).await?;
+                                self.ais_tx.clone().unwrap().send(AisPacket::from(&msg, self.channel)).await?;
                             },
                             Channel::GPS => {
                                 self.gps_tx.clone().unwrap().send(msg).await?;
@@ -90,14 +90,14 @@ impl Antenna {
                     }
                 },
                 Some(msg) = self.ant_rx.recv() => {
-                    self.emit(msg).await?;
+                    self.emit(&msg).await?;
                 }
             }
         }
     }
 
     pub async fn start(mut self) -> AntennaResult<JoinHandle<()>> {
-        self.emit(BitPacker::from_str("hello", None)).await?;
+        self.emit(&BitPacker::from_str("hello", None)).await?;
 
         Ok(tokio::spawn(async move {
             self.run_listener().await;

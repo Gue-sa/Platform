@@ -121,7 +121,7 @@ impl DatabaseManager {
             .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
 
         self.add_voyage_order_version(
-            order_id.clone(),
+            order_id,
             0,
             dest_id,
             eta_month,
@@ -133,14 +133,14 @@ impl DatabaseManager {
         )?;
 
         let destination_info = DESTINATIONS::table
-            .filter(DESTINATIONS::name.eq(dest_name.clone()))
+            .filter(DESTINATIONS::name.eq(&dest_name))
             .select(DestinationQueryResult::as_returning())
             .first::<DestinationQueryResult>(&mut self.connection)
             .map_err(|e: diesel::result::Error| DatabaseManagerError::QueryError(e))?;
 
         let header = VoyageOrderHeader::from_data(order_id as u16, 0);
         let body = VoyageOrderBody::from_data(
-            dest_name,
+            &dest_name,
             (
                 destination_info.longitude as u16,
                 destination_info.latitude as u16,
@@ -153,13 +153,13 @@ impl DatabaseManager {
             speed_profile as u8,
         );
 
-        Ok(VoyageOrder::from_components(header, body))
+        Ok(VoyageOrder::from_components(&header, &body))
     }
 
     pub fn get_destinations(
         &mut self,
         id: Option<i32>,
-        name: Option<String>,
+        name: Option<&str>,
         lon: Option<i32>,
         lat: Option<i32>,
     ) -> DatabaseManagerResult<Box<[DestinationQueryResult]>> {

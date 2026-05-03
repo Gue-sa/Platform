@@ -14,3 +14,5 @@ harbourmaster_database.db
 /crates/harbourmaster/.env
 
 windows.txt
+
+/tools

@@ -268,7 +268,7 @@ impl SlotsMap {
         chn: Channel,
     ) -> SlotsMapResult<Box<[u16]>> {
         let len = len.unwrap_or(1);
-        let ref_si = ref_si.unwrap_or(SlotsMap::current_si(chn.clone()));
+        let ref_si = ref_si.unwrap_or(SlotsMap::current_si(chn));
         let end_si = SlotsMap::offseted_si(ref_si, len);
         let ssi_count = slots_count.unwrap_or(1);
 

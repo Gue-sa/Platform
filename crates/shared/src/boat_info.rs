@@ -66,8 +66,8 @@ impl StaticData {
     pub fn new(
         mmsi: Option<u32>,
         imo_nbr: Option<u32>,
-        call_sign: Option<String>,
-        name: Option<String>,
+        call_sign: Option<&str>,
+        name: Option<&str>,
         type_of_ship_and_cargo_type: Option<u8>,
         pos_accuracy: Option<u8>,
         ais_version: Option<u8>,
@@ -80,8 +80,8 @@ impl StaticData {
         Self {
             mmsi: mmsi.unwrap_or(0),
             imo_number: imo_nbr.unwrap_or(0),
-            call_sign: call_sign.unwrap_or("@@@@@@@".to_string()),
-            name: name.unwrap_or("@@@@@@@@@@@@@@@@@@@@".to_string()),
+            call_sign: call_sign.unwrap_or("@@@@@@@").to_string(),
+            name: name.unwrap_or("@@@@@@@@@@@@@@@@@@@@").to_string(),
             type_of_ship_and_cargo_type: type_of_ship_and_cargo_type.unwrap_or(0),
             position_accuracy: pos_accuracy.unwrap_or(0),
             ais_version: ais_version.unwrap_or(0),
@@ -97,7 +97,7 @@ impl StaticData {
 
 impl VoyageData {
     pub fn new(
-        dest: Option<String>,
+        dest: Option<&str>,
         eta_month: Option<u8>,
         eta_day: Option<u8>,
         eta_hour: Option<u8>,
@@ -107,7 +107,7 @@ impl VoyageData {
         raim_flag: Option<u8>,
     ) -> Self {
         Self {
-            destination: dest.unwrap_or("@@@@@@@@@@@@@@@@@@@@".to_string()),
+            destination: dest.unwrap_or("@@@@@@@@@@@@@@@@@@@@").to_string(),
             eta_month: eta_month.unwrap_or(0),
             eta_day: eta_day.unwrap_or(0),
             eta_hour: eta_hour.unwrap_or(24),
@@ -255,7 +255,7 @@ impl BoatInfo {
 
     pub fn update_voyage_data(
         &self,
-        dest: Option<String>,
+        dest: Option<&str>,
         eta_month: Option<u8>,
         eta_day: Option<u8>,
         eta_hour: Option<u8>,
@@ -263,7 +263,7 @@ impl BoatInfo {
     ) -> BoatInfoResult<()> {
         let mut guard: RwLockWriteGuard<'_, VoyageData> = self.get_writeable_voyage_data()?;
 
-        guard.destination = dest.unwrap_or("@@@@@@@@@@@@@@@@@@@@".to_string());
+        guard.destination = dest.unwrap_or("@@@@@@@@@@@@@@@@@@@@").to_string();
         guard.eta_month = eta_month.unwrap_or(0);
         guard.eta_day = eta_day.unwrap_or(0);
         guard.eta_hour = eta_hour.unwrap_or(24);

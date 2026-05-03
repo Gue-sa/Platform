@@ -122,7 +122,7 @@ impl Fms {
                     );
 
                     let order_body = VoyageOrderBody::from_data(
-                        dest.name.to_string(),
+                        &dest.name,
                         (dest.longitude as u16, dest.latitude as u16),
                         ver.eta.month() as u8,
                         ver.eta.day() as u8,
@@ -132,7 +132,7 @@ impl Fms {
                         ver.speed_profile as u8,
                     );
 
-                    VoyageOrder::from_components(order_header, order_body)
+                    VoyageOrder::from_components(&order_header, &order_body)
                 })
                 .collect::<Box<[VoyageOrder]>>();
 
@@ -244,7 +244,7 @@ impl Fms {
         let concerned_boat_info = self.boats_registry.get(*satcom_msg.source())?;
 
         concerned_boat_info.update_voyage_data(
-            Some(concerned_voyage_order.2.name.clone()),
+            Some(&concerned_voyage_order.2.name),
             Some(concerned_voyage_order.1.eta.month() as u8),
             Some(concerned_voyage_order.1.eta.day() as u8),
             Some(concerned_voyage_order.1.eta.hour() as u8),
@@ -446,7 +446,8 @@ impl Fms {
                         && db_order_ver_nbr == msg_ver
                         && db_order.0.executant.is_none()
                     {
-                        self.handle_initial_rev_acceptation(&satcom_msg, db_order).await?;
+                        self.handle_initial_rev_acceptation(&satcom_msg, db_order)
+                            .await?;
                     }
                 }
                 SatComMessageType::RevisionRefusal => {

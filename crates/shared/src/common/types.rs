@@ -8,10 +8,10 @@ pub struct AisPacket {
 }
 
 impl AisPacket {
-    pub fn from(msg: BitPacker, chn: Channel) -> Self {
+    pub fn from(msg: &BitPacker, chn: Channel) -> Self {
         Self {
             channel: chn,
-            message: msg,
+            message: msg.clone(),
         }
     }
 }

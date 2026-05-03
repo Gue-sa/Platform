@@ -37,11 +37,11 @@ impl Harbourmaster {
         let (cli_tx, cli_rx) = channel::<LogEvent>();
         let cli = LogsCli::new(
             cli_rx,
-            (*config.harbourmaster_sys_logs_filename().clone()).to_string(),
-            (*config.harbourmaster_ais_logs_filename().clone()).to_string(),
-            (*config.harbourmaster_gps_logs_filename().clone()).to_string(),
-            (*config.harbourmaster_satcom_logs_filename().clone()).to_string(),
-            (*config.harbourmaster_computer_logs_filename().clone()).to_string(),
+            config.harbourmaster_sys_logs_filename(),
+            config.harbourmaster_ais_logs_filename(),
+            config.harbourmaster_gps_logs_filename(),
+            config.harbourmaster_satcom_logs_filename(),
+            config.harbourmaster_computer_logs_filename(),
             "Logs Armateur (interface web : localhost:3000)",
         );
 
@@ -58,20 +58,23 @@ impl Harbourmaster {
             ant3,
             ant4,
             satcom,
-            boats_reg,
+            boats_reg_arc,
         ) = build_radio(cli_tx.clone(), HARBOURMASTER_MMSI).await?;
 
-        let db_manager: Arc<Mutex<DatabaseManager>> =
+        let db_manager_arc: Arc<Mutex<DatabaseManager>> =
             Arc::new(Mutex::new(DatabaseManager::init()?));
-        let db_api: DatabaseApi =
-            DatabaseApi::init(db_manager.clone(), boats_reg.clone(), cli_tx.clone());
+        let db_api: DatabaseApi = DatabaseApi::init(
+            db_manager_arc.clone(),
+            boats_reg_arc.clone(),
+            cli_tx.clone(),
+        );
 
         let ais: HarbourmasterAisRunner =
-            HarbourmasterAisRunner::init(ais_rx, boats_reg.clone(), cli_tx.clone());
+            HarbourmasterAisRunner::init(ais_rx, boats_reg_arc.clone(), cli_tx.clone());
         let gps = HarbourmasterGps::init(gps_rx, c_gps_tx, cli_tx.clone()).await;
         let fms = Fms::init(
-            boats_reg,
-            db_manager,
+            boats_reg_arc,
+            db_manager_arc,
             fms_rx,
             sender_satcom_tx,
             cli_tx.clone(),

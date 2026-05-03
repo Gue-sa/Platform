@@ -44,7 +44,7 @@ impl RadioFrequency {
         Ok(())
     }
 
-    async fn handle_gps_request(&self, msg: BitPacker) -> RadioFrequencyResult<()> {
+    async fn handle_gps_request(&self, msg: &BitPacker) -> RadioFrequencyResult<()> {
         self.socket
             .send_to(
                 msg.bits(),
@@ -62,7 +62,7 @@ impl RadioFrequency {
         Ok(())
     }
 
-    async fn handle_gps_response(&self, msg: BitPacker) -> RadioFrequencyResult<()> {
+    async fn handle_gps_response(&self, msg: &BitPacker) -> RadioFrequencyResult<()> {
         let client = IpAddr::V4(Ipv4Addr::from_bits(msg.extract_int::<u32>(None, Some(31))?));
 
         let data = msg.slice(Some(32), None)?;
@@ -90,9 +90,9 @@ impl RadioFrequency {
                     if msg.bits() != BitPacker::from_str("hello", None).bits() {
                         if matches!(self.channel, Channel::GPS) {
                             if source.ip() != *Config::load().unwrap().harbourmaster_ip() {
-                                self.handle_gps_request(msg).await;
+                                self.handle_gps_request(&msg).await;
                             } else {
-                                self.handle_gps_response(msg).await;
+                                self.handle_gps_response(&msg).await;
                             }
                         } else {
                             self.relay(&msg.bits()).await;

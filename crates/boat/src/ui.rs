@@ -33,15 +33,15 @@ impl Ui {
                 }
             }
 
-            Rc::new(unwraped_logs).clone().into()
+            Rc::new(unwraped_logs).into()
         } else {
-            Rc::new(VecModel::<SharedString>::default()).clone().into()
+            Rc::new(VecModel::<SharedString>::default()).into()
         }
     }
 
     pub fn init(boat_info: Arc<BoatInfo>) -> Self {
         let ui = AppWindow::new().expect("REASON");
-        let ui_handle: slint::Weak<AppWindow> = ui.as_weak();
+        let ui_handle = ui.as_weak();
 
         Self {
             ui: ui,
@@ -51,8 +51,8 @@ impl Ui {
     }
 
     pub fn start(&self) -> () {
-        let ui_handle_clone: slint::Weak<AppWindow> = self.ui_handle.clone();
-        let boat_info_clone = self.boat_info.clone();
+        let ui_handle_clone = self.ui_handle.clone();
+        let boat_info_arc = self.boat_info.clone();
 
         self.ui.on_close(move || {
             let _ = slint::quit_event_loop();
@@ -65,9 +65,9 @@ impl Ui {
             loop {
                 interval.tick().await;
 
-                let static_data = boat_info_clone.get_static_data().unwrap();
-                let voyage_data = boat_info_clone.get_voyage_data().unwrap();
-                let nav_data = boat_info_clone.get_navigation_data().unwrap();
+                let static_data = boat_info_arc.get_static_data().unwrap();
+                let voyage_data = boat_info_arc.get_voyage_data().unwrap();
+                let nav_data = boat_info_arc.get_navigation_data().unwrap();
 
                 let name = static_data.name().to_string();
                 let mmsi = *static_data.mmsi();

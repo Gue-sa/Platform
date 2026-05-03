@@ -3,19 +3,19 @@ use crate::{
     common::{errors::SatComMessageResult, types::SatComMessageType},
     voyage_order::{VoyageOrder, VoyageOrderBody, VoyageOrderHeader},
 };
-use getset::{CloneGetters, Getters, Setters};
+use getset::{Getters, Setters};
 
-#[derive(Debug, Clone, Getters, Setters, CloneGetters)]
+#[derive(Debug, Clone, Getters, Setters)]
 pub struct SatComMessage {
     #[getset(get = "pub")]
     source: u32,
     #[getset(get = "pub")]
     target: u32,
-    #[getset(get_clone = "pub")]
+    #[getset(get = "pub")]
     order_header: VoyageOrderHeader,
     #[getset(get = "pub")]
     message_type: SatComMessageType,
-    #[getset(get_clone = "pub")]
+    #[getset(get = "pub")]
     order_body_review: Option<VoyageOrderBody>,
 }
 
@@ -23,16 +23,16 @@ impl SatComMessage {
     pub fn new(
         source: u32,
         target: u32,
-        order_header: VoyageOrderHeader,
+        order_header: &VoyageOrderHeader,
         msg_type: SatComMessageType,
-        order_body_review: Option<VoyageOrderBody>,
+        order_body_review: Option<&VoyageOrderBody>,
     ) -> Self {
         Self {
             source: source,
             target: target,
-            order_header: order_header,
+            order_header: order_header.clone(),
             message_type: msg_type,
-            order_body_review,
+            order_body_review: order_body_review.cloned(),
         }
     }
 
@@ -40,26 +40,26 @@ impl SatComMessage {
         if self.order_body_review().is_some() {
             Some(VoyageOrder::from_components(
                 self.order_header(),
-                self.order_body_review().unwrap(),
+                self.order_body_review().as_ref().unwrap(),
             ))
         } else {
             None
         }
     }
 
-    pub fn parse(msg: BitPacker) -> SatComMessageResult<Self> {
+    pub fn parse(msg: &BitPacker) -> SatComMessageResult<Self> {
         let mut order_body_review = None;
 
         if *msg.bits_len() > 112 {
             order_body_review = Some(VoyageOrderBody::from_bitpacker(
-                msg.slice(Some(112), None)?,
+                &msg.slice(Some(112), None)?,
             )?);
         }
 
         Ok(Self {
             source: msg.extract_int::<u32>(None, Some(31))?,
             target: msg.extract_int::<u32>(Some(32), Some(63))?,
-            order_header: VoyageOrderHeader::from_bitpacker(msg.slice(Some(64), Some(103))?)?,
+            order_header: VoyageOrderHeader::from_bitpacker(&msg.slice(Some(64), Some(103))?)?,
             message_type: msg.extract_int::<u8>(Some(104), Some(111))?.into(),
             order_body_review,
         })

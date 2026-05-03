@@ -2,12 +2,12 @@ use serialport::{SerialPortType, available_ports};
 use std::{thread, time::Duration};
 
 pub struct SerialDriver {
-    //rx: Receiver<String>,
-    //tx: Sender<String>,
+    //rx: Receiver<&str>,
+    //tx: Sender<&str>,
 }
 
 impl SerialDriver {
-    pub fn init(/*rx: Receiver<String>, tx: Sender<String>*/) -> Self {
+    pub fn init(/*rx: Receiver<&str>, tx: Sender<&str>*/) -> Self {
         SerialDriver {
             //rx: rx,
             //tx: tx,

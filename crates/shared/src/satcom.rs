@@ -41,7 +41,7 @@ impl SatCom {
         loop {
             tokio::select! {
                 Some(msg) = self.reader_rx.recv() => {
-                    if let Ok(parsed_msg) = SatComMessage::parse(msg.clone()) {
+                    if let Ok(parsed_msg) = SatComMessage::parse(&msg) {
                         self.board_computer_tx.send(parsed_msg.clone()).await;
 
                         if *parsed_msg.source() != self.mmsi {

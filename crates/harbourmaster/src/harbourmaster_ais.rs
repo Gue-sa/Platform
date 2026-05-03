@@ -69,7 +69,7 @@ impl HarbourmasterAisRunner {
         self.logs_cli_tx.clone()
     }
 
-    fn handle_transmission(&self, msg: BitPacker, channel: Channel) -> AisResult<AisMessage> {
+    fn handle_transmission(&self, msg: &BitPacker, channel: Channel) -> AisResult<AisMessage> {
         let t_si = SlotsMap::current_si(channel);
         let msg = AisMessage::from_bits(msg)?;
         let boat_mmsi = *msg.boat_info().get_static_data()?.mmsi();
@@ -148,7 +148,7 @@ impl HarbourmasterAisRunner {
 
             if let Some(pck) = pck_opt {
                 match pck.channel {
-                    Channel::C87B => match self.handle_transmission(pck.message, Channel::C87B) {
+                    Channel::C87B => match self.handle_transmission(&pck.message, Channel::C87B) {
                         Ok(msg) => {
                             self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(
@@ -168,7 +168,7 @@ impl HarbourmasterAisRunner {
                             }
                         },
                     },
-                    Channel::C88B => match self.handle_transmission(pck.message, Channel::C88B) {
+                    Channel::C88B => match self.handle_transmission(&pck.message, Channel::C88B) {
                         Ok(msg) => {
                             self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(

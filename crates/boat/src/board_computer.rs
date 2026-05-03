@@ -31,7 +31,7 @@ impl BoardComputer {
     pub fn init(
         boat_info: Arc<BoatInfo>,
         boats_registry: Arc<BoatsInfoRegistry>,
-        voyage: Option<Voyage>,
+        voyage: Option<&Voyage>,
         rx: Receiver<SatComMessage>,
         satcom_tx: Sender<SatComMessage>,
         logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
@@ -39,7 +39,7 @@ impl BoardComputer {
         Self {
             boat_info: boat_info,
             boats_registry: boats_registry,
-            voyage: voyage,
+            voyage: voyage.cloned(),
             rx: rx,
             satcom_tx: satcom_tx,
             voyage_order_revision: None,
@@ -111,7 +111,7 @@ impl BoardComputer {
         let order_body = order.body();
 
         self.boat_info.update_voyage_data(
-            Some(order_body.destination().to_string()),
+            Some(order_body.destination()),
             Some(*order_body.eta_month()),
             Some(*order_body.eta_day()),
             Some(*order_body.eta_hour()),
@@ -135,8 +135,8 @@ impl BoardComputer {
         &mut self,
         satcom_msg: &SatComMessage,
         msg_type: SatComMessageType,
-        res_order_header: Option<VoyageOrderHeader>,
-        res_order_revision: Option<VoyageOrderBody>,
+        res_order_header: Option<&VoyageOrderHeader>,
+        res_order_revision: Option<&VoyageOrderBody>,
     ) -> BoardComputerResult<()> {
         let message = SatComMessage::new(
             *self.boat_info.get_static_data()?.mmsi(),
@@ -156,9 +156,9 @@ impl BoardComputer {
         new_status: VoyageStatus,
         satcom_msg: &SatComMessage,
         msg_type: SatComMessageType,
-        res_order_header: Option<VoyageOrderHeader>,
-        res_order_rev: Option<VoyageOrderBody>,
-        log_msg: String,
+        res_order_header: Option<&VoyageOrderHeader>,
+        res_order_rev: Option<&VoyageOrderBody>,
+        log_msg: &str,
     ) -> BoardComputerResult<()> {
         self.update_voyage_status(new_status)?;
 
@@ -195,7 +195,7 @@ impl BoardComputer {
                 SatComMessageType::RevisionAcceptation,
                 None,
                 None,
-                format!(
+                &format!(
                     "Ordre de voyage {} accepté.",
                     satcom_msg.order_header().id()
                 ),
@@ -242,7 +242,7 @@ impl BoardComputer {
             SatComMessageType::ExecutingLastAgreedRevision,
             None,
             None,
-            format!(
+            &format!(
                 "Ordre de voyage {} en cours d'exécution.",
                 satcom_msg.order_header().id()
             ),
@@ -265,7 +265,7 @@ impl BoardComputer {
                 SatComMessageType::RevisionAcceptation,
                 None,
                 None,
-                format!(
+                &format!(
                     "Révision de l'ordre de voyage {} acceptée. Nouvelle version : n°{}. Exécution en cours.",
                     satcom_msg.order_header().id(), satcom_msg.order_header().version()
                 )
@@ -282,7 +282,7 @@ impl BoardComputer {
                 SatComMessageType::RevisionRefusal,
                 None,
                 None,
-                format!(
+                &format!(
                     "Révision de l'ordre de voyage {} refusée. Retour à la version n°{}. Exécution en cours.",
                     satcom_msg.order_header().id(), satcom_msg.order_header().version()
                 )
@@ -305,7 +305,7 @@ impl BoardComputer {
             SatComMessageType::Acknowledgement,
             None,
             None,
-            format!(
+            &format!(
                 "Demande de révision de l'ordre de voyage {} reçue. Traitement de la demande.",
                 satcom_msg.order_header().id()
             ),
@@ -320,7 +320,7 @@ impl BoardComputer {
                 SatComMessageType::RevisionAcceptation,
                 None,
                 None,
-                format!(
+                &format!(
                     "Révision de l'ordre de voyage {} acceptée. Nouvelle version : n°{}. Exécution en cours.",
                     satcom_msg.order_header().id(), satcom_msg.order_header().version()
                 )
@@ -340,7 +340,7 @@ impl BoardComputer {
             SatComMessageType::Acknowledgement,
             None,
             None,
-            format!(
+            &format!(
                 "Ordre de voyage {} achevé. Attente d'un nouvel ordre.",
                 satcom_msg.order_header().id()
             ),
@@ -365,12 +365,12 @@ impl BoardComputer {
             let concerns_current_voyage = self
                 .voyage
                 .as_ref()
-                .map_or(false, |v| v.order().header() == satcom_msg.order_header());
+                .map_or(false, |v| *v.order().header() == *satcom_msg.order_header());
 
             let concerns_current_rev = self
                 .voyage_order_revision
                 .as_ref()
-                .map_or(false, |rev| rev.header() == satcom_msg.order_header());
+                .map_or(false, |rev| *rev.header() == *satcom_msg.order_header());
 
             match *satcom_msg.message_type() {
                 SatComMessageType::Offer => {

@@ -30,7 +30,7 @@ pub struct VoyageOrder {
 }
 
 impl VoyageOrderHeader {
-    pub fn from_bitpacker(voyage_order_header_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
+    pub fn from_bitpacker(voyage_order_header_bitpacker: &BitPacker) -> VoyageOrderResult<Self> {
         Ok(Self {
             id: voyage_order_header_bitpacker.extract_int::<u16>(None, Some(15))?,
             version: voyage_order_header_bitpacker.extract_int::<u8>(Some(16), None)?,
@@ -50,7 +50,7 @@ impl VoyageOrderHeader {
 }
 
 impl VoyageOrderBody {
-    pub fn from_bitpacker(voyage_order_body_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
+    pub fn from_bitpacker(voyage_order_body_bitpacker: &BitPacker) -> VoyageOrderResult<Self> {
         Ok(Self {
             destination: voyage_order_body_bitpacker.extract_str(None, Some(119))?,
             destination_position: (
@@ -67,7 +67,7 @@ impl VoyageOrderBody {
     }
 
     pub fn from_data(
-        dest: String,
+        dest: &str,
         dest_pos: (u16, u16),
         eta_month: u8,
         eta_day: u8,
@@ -77,7 +77,7 @@ impl VoyageOrderBody {
         speed_profile: u8,
     ) -> Self {
         Self {
-            destination: dest,
+            destination: dest.to_string(),
             destination_position: dest_pos,
             eta_month: eta_month,
             eta_day: eta_day,
@@ -102,28 +102,28 @@ impl VoyageOrderBody {
 }
 
 impl VoyageOrder {
-    pub fn from_bitpacker(voyage_order_bitpacker: BitPacker) -> VoyageOrderResult<Self> {
+    pub fn from_bitpacker(voyage_order_bitpacker: &BitPacker) -> VoyageOrderResult<Self> {
         Ok(Self {
             header: VoyageOrderHeader::from_bitpacker(
-                voyage_order_bitpacker.slice(None, Some(23))?,
+                &voyage_order_bitpacker.slice(None, Some(23))?,
             )?,
-            body: VoyageOrderBody::from_bitpacker(voyage_order_bitpacker.slice(Some(24), None)?)?,
+            body: VoyageOrderBody::from_bitpacker(&voyage_order_bitpacker.slice(Some(24), None)?)?,
         })
     }
 
-    pub fn from_components(header: VoyageOrderHeader, body: VoyageOrderBody) -> Self {
+    pub fn from_components(header: &VoyageOrderHeader, body: &VoyageOrderBody) -> Self {
         Self {
-            header: header,
-            body: body,
+            header: header.clone(),
+            body: body.clone(),
         }
     }
 
-    pub fn header(&self) -> VoyageOrderHeader {
-        self.header.clone()
+    pub fn header(&self) -> &VoyageOrderHeader {
+        &self.header
     }
 
-    pub fn body(&self) -> VoyageOrderBody {
-        self.body.clone()
+    pub fn body(&self) -> &VoyageOrderBody {
+        &self.body
     }
 
     pub fn to_bitpacker(&self) -> BitPacker {

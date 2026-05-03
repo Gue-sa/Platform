@@ -3,7 +3,7 @@ use crate::{
     bitpacker::BitPacker,
     common::{
         errors::{AisMessageError, BoatInfoError, BoatInfoResult},
-        types::{AisField, BoatStatus},
+        types::{AisField, AisMessageType, BoatStatus},
     },
 };
 use getset::{Getters, Setters};
@@ -282,7 +282,7 @@ impl BoatInfo {
         let msg_nav_data = msg.boat_info().get_navigation_data()?;
 
         match *msg.message_type() {
-            1 | 2 | 3 => {
+            AisMessageType::Msg1 | AisMessageType::Msg2 | AisMessageType::Msg3 => {
                 nav_data_guard.set_navigational_status(*msg_nav_data.navigational_status());
                 nav_data_guard.set_rate_of_turn(*msg_nav_data.rate_of_turn());
                 nav_data_guard.set_speed_over_ground(*msg_nav_data.speed_over_ground());
@@ -298,7 +298,7 @@ impl BoatInfo {
 
                 voyage_data_guard.set_raim_flag(*msg_voyage_data.raim_flag());
             }
-            5 => {
+            AisMessageType::Msg5 => {
                 static_data_guard.set_ais_version(*msg_static_data.ais_version());
                 static_data_guard.set_imo_number(*msg_static_data.imo_number());
                 static_data_guard.set_call_sign(msg_static_data.call_sign().clone());

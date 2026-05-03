@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use crate::common::types::AisField;
+use crate::common::types::{AisField, AisMessageType};
 
 pub const SIX_BITS_ASCII_ALPHABET: &[u8; 64] =
     b"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?";
@@ -11,13 +11,51 @@ pub const SIX_BITS_ASCII_ALPHABET: &[u8; 64] =
 pub const SLOTS_PER_MINUTE: u16 = 2250;
 pub const SLOTS_DURATION: f64 = 60. / SLOTS_PER_MINUTE as f64;
 
-pub const SOTDMA_CS_MSGS: [u8; 7] = [1, 2, 4, 9, 11, 18, 26];
-pub const ITDMA_CS_MSGS: [u8; 4] = [3, 9, 18, 26];
-pub const NO_CS_MSGS: [u8; 19] = [
-    5, 6, 7, 8, 10, 12, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24, 25, 27,
+pub const SOTDMA_CS_MSGS: [AisMessageType; 7] = [
+    AisMessageType::Msg1,
+    AisMessageType::Msg2,
+    AisMessageType::Msg4,
+    AisMessageType::Msg9,
+    AisMessageType::Msg11,
+    AisMessageType::Msg18,
+    AisMessageType::Msg26,
 ];
 
-pub const IMPLEMENTED_MSGS: [u8; 4] = [1, 2, 3, 5];
+pub const ITDMA_CS_MSGS: [AisMessageType; 4] = [
+    AisMessageType::Msg3,
+    AisMessageType::Msg9,
+    AisMessageType::Msg18,
+    AisMessageType::Msg26,
+];
+
+pub const NO_CS_MSGS: [AisMessageType; 19] = [
+    AisMessageType::Msg5,
+    AisMessageType::Msg6,
+    AisMessageType::Msg7,
+    AisMessageType::Msg8,
+    AisMessageType::Msg10,
+    AisMessageType::Msg12,
+    AisMessageType::Msg13,
+    AisMessageType::Msg14,
+    AisMessageType::Msg15,
+    AisMessageType::Msg16,
+    AisMessageType::Msg17,
+    AisMessageType::Msg19,
+    AisMessageType::Msg20,
+    AisMessageType::Msg21,
+    AisMessageType::Msg22,
+    AisMessageType::Msg23,
+    AisMessageType::Msg24,
+    AisMessageType::Msg25,
+    AisMessageType::Msg27,
+];
+
+pub const IMPLEMENTED_MSGS: [AisMessageType; 4] = [
+    AisMessageType::Msg1,
+    AisMessageType::Msg2,
+    AisMessageType::Msg3,
+    AisMessageType::Msg5,
+];
 
 pub const C87B_TO_SERVER_PORT: u16 = 4444;
 pub const C87B_FROM_SERVER_PORT: u16 = 5555;

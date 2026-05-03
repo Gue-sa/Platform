@@ -68,7 +68,7 @@ pub enum CommunicationStateError {
 #[derive(Error, Debug, Clone, PartialEq, Copy)]
 pub enum AisMessageError {
     #[error("Type de message AIS inconnu")]
-    UnknownMessageType,
+    MessageTypeNotImplemented,
     #[error("Timeout SOTDMA inconnu")]
     UnkownSotdmaTimeout,
     #[error("Erreur CRC")]

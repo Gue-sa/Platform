@@ -6,7 +6,7 @@ use shared::{
     common::{
         constants::{HARBOURMASTER_MMSI, IMPLEMENTED_MSGS},
         errors::{AisError, AisResult},
-        types::{AisPacket, Channel, LogEvent},
+        types::{AisMessageType, AisPacket, Channel, LogEvent},
     },
     impl_atomic_access,
     slots_map::SlotsMap,
@@ -94,39 +94,43 @@ impl HarbourmasterAisRunner {
                     slots_map.flag_slot_as_used(t_si)?;
                 }
 
-                if [1, 2].binary_search(msg.message_type()).is_ok() {
-                    let com_state_timeout = *msg.communication_state()?.slot_timeout()?;
+                match msg.message_type() {
+                    AisMessageType::Msg1 | AisMessageType::Msg2 => {
+                        let com_state_timeout = *msg.communication_state()?.slot_timeout()?;
 
-                    if t_si_owner.is_none() && com_state_timeout > 0 {
-                        slots_map.book_slot(t_si, boat_mmsi, Some(com_state_timeout), None)?;
-                    } else if t_si_timeout.is_none() || com_state_timeout > 0 {
-                        slots_map.set_slot_timeout(t_si, Some(com_state_timeout))?;
-                    } else if t_si_timeout == Some(0) || com_state_timeout == 0 {
-                        slots_map.release_slot(t_si)?;
+                        if t_si_owner.is_none() && com_state_timeout > 0 {
+                            slots_map.book_slot(t_si, boat_mmsi, Some(com_state_timeout), None)?;
+                        } else if t_si_timeout.is_none() || com_state_timeout > 0 {
+                            slots_map.set_slot_timeout(t_si, Some(com_state_timeout))?;
+                        } else if t_si_timeout == Some(0) || com_state_timeout == 0 {
+                            slots_map.release_slot(t_si)?;
+                        }
+
+                        if com_state_timeout == 0 {
+                            let cs_offset = *msg.communication_state()?.slot_offset()?;
+                            let rsv_s = SlotsMap::offseted_si(t_si, cs_offset);
+
+                            slots_map.book_slot(rsv_s, boat_mmsi, Some(com_state_timeout), None)?;
+                            slots_map.release_slot(t_si)?;
+                        }
                     }
+                    AisMessageType::Msg3 => {
+                        let com_state_keep_flag = *msg.communication_state()?.keep_flag()?;
+                        let com_state_slot_increment =
+                            *msg.communication_state()?.slot_increment()?;
 
-                    if com_state_timeout == 0 {
-                        let cs_offset = *msg.communication_state()?.slot_offset()?;
-                        let rsv_s = SlotsMap::offseted_si(t_si, cs_offset);
+                        if com_state_keep_flag == false {
+                            slots_map.release_slot(t_si)?;
+                        } else if slots_map.slot_owner(t_si)?.is_none() && com_state_keep_flag {
+                            slots_map.book_slot(t_si, boat_mmsi, None, None)?;
+                        }
 
-                        slots_map.book_slot(rsv_s, boat_mmsi, Some(com_state_timeout), None)?;
-                        slots_map.release_slot(t_si)?;
+                        if com_state_slot_increment > 0 {
+                            let rsv_s = SlotsMap::offseted_si(t_si, com_state_slot_increment);
+                            slots_map.book_slot(rsv_s, boat_mmsi, None, None)?;
+                        }
                     }
-                } else if *msg.message_type() == 3 {
-                    let com_state_keep_flag = *msg.communication_state()?.keep_flag()?;
-                    let com_state_slot_increment: u16 =
-                        *msg.communication_state()?.slot_increment()?;
-
-                    if com_state_keep_flag == false {
-                        slots_map.release_slot(t_si)?;
-                    } else if slots_map.slot_owner(t_si)?.is_none() && com_state_keep_flag {
-                        slots_map.book_slot(t_si, boat_mmsi, None, None)?;
-                    }
-
-                    if com_state_slot_increment > 0 {
-                        let rsv_s = SlotsMap::offseted_si(t_si, com_state_slot_increment);
-                        slots_map.book_slot(rsv_s, boat_mmsi, None, None)?;
-                    }
+                    _ => {}
                 }
             }
         } else {
@@ -153,7 +157,7 @@ impl HarbourmasterAisRunner {
                             self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(
                                     "Message {} reçu du navire {}.",
-                                    msg.message_type(),
+                                    *msg.message_type() as u8,
                                     *msg.boat_info().get_static_data().unwrap().mmsi()
                                 )
                                 .green(),
@@ -173,7 +177,7 @@ impl HarbourmasterAisRunner {
                             self.logs_cli_tx().send(LogEvent::Ais(
                                 format!(
                                     "Message {} reçu du navire {}.",
-                                    msg.message_type(),
+                                    *msg.message_type() as u8,
                                     *msg.boat_info().get_static_data().unwrap().mmsi()
                                 )
                                 .green(),

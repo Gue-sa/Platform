@@ -38,7 +38,7 @@ pub enum BoatStatus {
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq, Copy, PartialOrd, Eq, Ord)]
 pub enum AisMessageType {
     Msg1,
     Msg2,

@@ -6,7 +6,7 @@ use crate::{
         errors::{
             AisMessageError, AisMessageResult, CommunicationStateError, CommunicationStateResult,
         },
-        types::CSType,
+        types::{AisMessageType, CSType},
         utils::*,
     },
 };
@@ -32,7 +32,7 @@ pub struct CommunicationState {
 #[derive(Debug, Getters, Setters, CloneGetters)]
 pub struct AisMessage {
     #[getset(get = "pub")]
-    message_type: u8,
+    message_type: AisMessageType,
     #[getset(get_clone = "pub")]
     boat_info: BoatInfo,
 
@@ -57,7 +57,7 @@ const X25: Crc<u16> = Crc::<u16>::new(&CRC_16_IBM_SDLC);
 
 impl CommunicationState {
     pub fn init(
-        msg_type: u8,
+        msg_type: AisMessageType,
         sync_state: u8,
         slot_timeout: Option<u8>,
         slot_offset: Option<u16>,
@@ -148,7 +148,10 @@ impl CommunicationState {
             .ok_or_else(|| CommunicationStateError::NoItdmaKeepFlag)
     }
 
-    pub fn parse(com_state_bitpacker: &BitPacker, msg_type: u8) -> CommunicationStateResult<Self> {
+    pub fn parse(
+        com_state_bitpacker: &BitPacker,
+        msg_type: AisMessageType,
+    ) -> CommunicationStateResult<Self> {
         let mut com_state = Self {
             communication_state_type: if SOTDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
                 CSType::SOTDMA
@@ -168,7 +171,7 @@ impl CommunicationState {
         };
 
         match msg_type {
-            1 | 2 => {
+            AisMessageType::Msg1 | AisMessageType::Msg2 => {
                 let slot_timeout = com_state_bitpacker.extract_int::<u8>(Some(2), Some(4))?;
                 let sub_msg = com_state_bitpacker.slice(Some(5), None)?;
 
@@ -191,7 +194,7 @@ impl CommunicationState {
                     _ => return Err(CommunicationStateError::UnkownSotdmaTimeout),
                 }
             }
-            3 => {
+            AisMessageType::Msg3 => {
                 com_state.slot_increment =
                     Some(com_state_bitpacker.extract_int::<u16>(Some(2), Some(14))?);
                 com_state.number_of_slots =
@@ -254,8 +257,14 @@ impl AisMessage {
 
     pub fn parse(
         msg: &BitPacker,
-    ) -> AisMessageResult<(u8, BitPacker, Option<CommunicationState>, u16, BoatInfo)> {
-        let msg_type = msg.extract_int::<u8>(Some(40), Some(45))?;
+    ) -> AisMessageResult<(
+        AisMessageType,
+        BitPacker,
+        Option<CommunicationState>,
+        u16,
+        BoatInfo,
+    )> {
+        let msg_type = msg.extract_int::<u8>(Some(40), Some(45))?.into();
 
         let mut static_data = StaticData::new(
             None, None, None, None, None, None, None, None, None, None, None, None,
@@ -268,7 +277,7 @@ impl AisMessage {
             NavigationData::new(None, None, None, None, None, None, None, None, None);
 
         match msg_type {
-            1 | 2 | 3 => {
+            AisMessageType::Msg1 | AisMessageType::Msg2 | AisMessageType::Msg3 => {
                 let payload = msg.slice(Some(40), Some(207))?;
                 let data = payload.slice(Some(8), Some(148))?;
                 let communication_state: CommunicationState =
@@ -312,7 +321,7 @@ impl AisMessage {
                     return Err(AisMessageError::CrcMismatch);
                 }
             }
-            5 => {
+            AisMessageType::Msg5 => {
                 let payload = msg.slice(Some(40), Some(463))?;
                 let data = payload.slice(Some(8), None)?;
                 let msg_crc = msg.slice(Some(464), Some(479))?.extract_int(None, None)?;
@@ -352,7 +361,7 @@ impl AisMessage {
                     Err(AisMessageError::CrcMismatch)
                 }
             }
-            _ => Err(AisMessageError::UnknownMessageType),
+            _ => Err(AisMessageError::MessageTypeNotImplemented),
         }
     }
 
@@ -376,7 +385,7 @@ impl AisMessage {
 
     pub fn from_info(
         boat_info: &BoatInfo,
-        message_type: u8,
+        message_type: AisMessageType,
         communication_state: Option<CommunicationState>,
     ) -> AisMessageResult<Self> {
         let data = AisMessage::build_data_bytes(&boat_info, message_type)?;
@@ -400,18 +409,21 @@ impl AisMessage {
         })
     }
 
-    fn build_data_bytes(boat_info: &BoatInfo, msg_type: u8) -> AisMessageResult<BitPacker> {
+    fn build_data_bytes(
+        boat_info: &BoatInfo,
+        msg_type: AisMessageType,
+    ) -> AisMessageResult<BitPacker> {
         let mut data_vec = BitPacker::from_int(0, Some(0));
 
         match msg_type {
-            1 | 2 | 3 => {
+            AisMessageType::Msg1 | AisMessageType::Msg2 | AisMessageType::Msg3 => {
                 for field in MSG123_FIELDS {
-                    data_vec = boat_info.to_bits(field, msg_type)? + data_vec;
+                    data_vec = boat_info.to_bits(field, msg_type.into())? + data_vec;
                 }
             }
-            5 => {
+            AisMessageType::Msg5 => {
                 for field in MSG5_FIELDS {
-                    data_vec = boat_info.to_bits(field, msg_type)? + data_vec;
+                    data_vec = boat_info.to_bits(field, msg_type.into())? + data_vec;
                 }
             }
             _ => {}
@@ -421,19 +433,19 @@ impl AisMessage {
     }
 
     fn build_payload(
-        msg_type: u8,
+        msg_type: AisMessageType,
         data: &BitPacker,
         communication_state: Option<CommunicationState>,
     ) -> AisMessageResult<BitPacker> {
         if communication_state.is_none() {
             Ok(data.clone()
                 + BitPacker::from_int::<u8>(3, Some(2))
-                + BitPacker::from_int::<u8>(msg_type, Some(6)))
+                + BitPacker::from_int::<u8>(msg_type.into(), Some(6)))
         } else {
             Ok(communication_state.unwrap().build()?
                 + data.clone()
                 + BitPacker::from_int::<u8>(3, Some(2))
-                + BitPacker::from_int::<u8>(msg_type, Some(6)))
+                + BitPacker::from_int::<u8>(msg_type.into(), Some(6)))
         }
     }
 

@@ -239,7 +239,7 @@ impl DatabaseManager {
         };
 
         if let Some(v) = status {
-            query = query.filter(VOYAGE_ORDERS::status.eq(Into::<u8>::into(v) as i32));
+            query = query.filter(VOYAGE_ORDERS::status.eq(v as u8 as i32));
         };
 
         if let Some(v) = executant {
@@ -363,7 +363,7 @@ impl DatabaseManager {
         status: VoyageStatus,
     ) -> DatabaseManagerResult<()> {
         diesel::update(VOYAGE_ORDERS::table.filter(VOYAGE_ORDERS::id.eq(voyage_order_id)))
-            .set(VOYAGE_ORDERS::status.eq(Into::<u8>::into(status) as i32))
+            .set(VOYAGE_ORDERS::status.eq(status as u8 as i32))
             .execute(&mut self.connection)
             .map_err(|e: diesel::result::Error| DatabaseManagerError::UpdateError(e))?;
 

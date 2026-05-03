@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
 };
 use colored::Colorize;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use shared::{boat_info::BoatInfo, boats_registry::BoatsInfoRegistry, common::types::LogEvent};
 use std::sync::{Arc, Mutex, mpsc::Sender};
 use tokio::{net::TcpListener, task::JoinHandle};
@@ -25,6 +25,15 @@ pub struct CreateVoyageOrderPayload {
     destination_id: i32,
     ship_type: u8,
     speed_profile: u8,
+}
+
+#[derive(Serialize, Debug)]
+pub struct StatisticsResult {
+    boats_nbr: usize,
+    active_boats_nbr: usize,
+    unresponding_boats_nbr: usize,
+    orders_nbr: usize,
+    free_orders_nbr: usize,
 }
 
 pub struct DatabaseApiSharedState {
@@ -73,7 +82,7 @@ impl DatabaseApi {
                 )
                 .route("/get_boats_list", get(Self::get_boats_list))
                 .route("/get_destinations", get(Self::get_destinations))
-                //.route("/get_statistics", get(Self::get_statistics))
+                .route("/get_statistics", get(Self::get_statistics))
                 .route("/add_voyage_order", post(Self::create_voyage_order))
                 .with_state(self.state.clone())
                 .layer(CorsLayer::permissive());
@@ -85,7 +94,7 @@ impl DatabaseApi {
     }
 
     async fn welcome() -> String {
-        "Bonjour et bienvenue sur l'API armateur ! Voici la liste des commandes actuellement implémentées:\n- /get_voyage_orders\n- /get_voyage_orders_versions\n- /get_voyage_boats_list\n- /get_voyage_destinations\n- /add_voyage_order".to_string()
+        "Bonjour et bienvenue sur l'API armateur ! Voici la liste des commandes actuellement implémentées:\n- /get_voyage_orders\n- /get_voyage_orders_versions\n- /get_boats_list\n- /get_voyage_destinations\n- /get_statistics\n- /add_voyage_order".to_string()
     }
 
     async fn get_voyage_orders(
@@ -143,6 +152,28 @@ impl DatabaseApi {
             db_manager.get_destinations(None, None, None, None).unwrap();
 
         Json(results)
+    }
+
+    async fn get_statistics(
+        State(shared_state): State<Arc<DatabaseApiSharedState>>,
+    ) -> Json<StatisticsResult> {
+        let mut db_manager: std::sync::MutexGuard<'_, DatabaseManager> =
+            shared_state.database_manager.lock().unwrap();
+
+        let boats_nbr = shared_state.boats_registry.length();
+        let active_boats_nbr = shared_state.boats_registry.count_active_boats();
+        let orders_nbr = db_manager.get_orders_count().unwrap();
+        let free_orders_nbr = db_manager.get_free_orders_count().unwrap();
+
+        let res = StatisticsResult {
+            boats_nbr: boats_nbr,
+            active_boats_nbr: active_boats_nbr,
+            orders_nbr: orders_nbr,
+            free_orders_nbr: free_orders_nbr,
+            unresponding_boats_nbr: 0,
+        };
+
+        Json(res)
     }
 
     async fn create_voyage_order(

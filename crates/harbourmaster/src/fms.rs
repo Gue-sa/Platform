@@ -2,7 +2,7 @@ use crate::database_manager::manager::DatabaseManager;
 use chrono::{Datelike, Timelike};
 use colored::Colorize;
 use shared::{
-    boats_registry::BoatsInfoRegistry,
+    boats_registry::{self, BoatsInfoRegistry},
     common::{
         constants::{FMS_UPDATE_SECS_INTERVAL, HARBOURMASTER_MMSI},
         errors::{FmsError, FmsResult},
@@ -147,8 +147,8 @@ impl Fms {
                         Ok::<Option<u32>, FmsError>(None)
                     }
                 })
-                .filter_map(|res: Result<Option<u32>, _>| res.transpose()) // Transforme Result<Option<T>> en Option<Result<T>>
-                .collect::<Result<Vec<_>, _>>()? // Collecte et propage l'erreur si besoin
+                .filter_map(|res: Result<Option<u32>, _>| res.transpose())
+                .collect::<Result<Vec<_>, _>>()?
                 .into_boxed_slice();
 
             for i in 0..unassigned_orders.len().min(free_boats_mmsis.len()) {
@@ -174,28 +174,8 @@ impl Fms {
         }
     }
 
-    async fn handle_offer_ack(
-        &self,
-        satcom_msg: &SatComMessage,
-        concerned_voyage_order: &(
-            crate::database_manager::models::VoyageOrderQueryResult,
-            crate::database_manager::models::VoyageOrderVersionQueryResult,
-            crate::database_manager::models::DestinationQueryResult,
-        ),
-    ) -> FmsResult<()> {
+    async fn handle_offer_ack(&self, satcom_msg: &SatComMessage) -> FmsResult<()> {
         self.update_associated_order_status(&satcom_msg, VoyageStatus::UnderRevision)?;
-
-        let concerned_boat_info = self.boats_registry.get(*satcom_msg.source())?;
-
-        concerned_boat_info.update_voyage_data(
-            Some(concerned_voyage_order.2.name.clone()),
-            Some(concerned_voyage_order.1.eta.month() as u8),
-            Some(concerned_voyage_order.1.eta.day() as u8),
-            Some(concerned_voyage_order.1.eta.hour() as u8),
-            Some(concerned_voyage_order.1.eta.minute() as u8),
-        )?;
-
-        self.boats_registry.update(concerned_boat_info)?;
 
         self.logs_cli_tx.send(LogEvent::Computer(format!(
             "Offre pour l'ordre de voyage {} reçue par le bateau {}. Attente d'une réponse pour la révision initiale.",
@@ -244,7 +224,15 @@ impl Fms {
         Ok(())
     }
 
-    async fn handle_initial_rev_acceptation(&self, satcom_msg: &SatComMessage) -> FmsResult<()> {
+    async fn handle_initial_rev_acceptation(
+        &self,
+        satcom_msg: &SatComMessage,
+        concerned_voyage_order: &(
+            crate::database_manager::models::VoyageOrderQueryResult,
+            crate::database_manager::models::VoyageOrderVersionQueryResult,
+            crate::database_manager::models::DestinationQueryResult,
+        ),
+    ) -> FmsResult<()> {
         self.database_manager
             .lock()
             .map_err(|_| FmsError::DatabaseManagerPoisoned)?
@@ -252,6 +240,18 @@ impl Fms {
                 *satcom_msg.order_header().id() as i32,
                 *satcom_msg.source() as i32,
             )?;
+
+        let concerned_boat_info = self.boats_registry.get(*satcom_msg.source())?;
+
+        concerned_boat_info.update_voyage_data(
+            Some(concerned_voyage_order.2.name.clone()),
+            Some(concerned_voyage_order.1.eta.month() as u8),
+            Some(concerned_voyage_order.1.eta.day() as u8),
+            Some(concerned_voyage_order.1.eta.hour() as u8),
+            Some(concerned_voyage_order.1.eta.minute() as u8),
+        )?;
+
+        self.boats_registry.update(concerned_boat_info)?;
 
         self.update_associated_order_status_and_respond(
             &satcom_msg,
@@ -434,7 +434,7 @@ impl Fms {
             match satcom_msg.message_type() {
                 SatComMessageType::Acknowledgement => {
                     if db_order_status == VoyageStatus::Unassigned {
-                        self.handle_offer_ack(&satcom_msg, db_order).await?;
+                        self.handle_offer_ack(&satcom_msg).await?;
                     } else if db_order_status == VoyageStatus::RevisionSubmitted && refers_rev_ver {
                         self.handle_rev_req_ack(&satcom_msg).await?;
                     }
@@ -446,7 +446,7 @@ impl Fms {
                         && db_order_ver_nbr == msg_ver
                         && db_order.0.executant.is_none()
                     {
-                        self.handle_initial_rev_acceptation(&satcom_msg).await?;
+                        self.handle_initial_rev_acceptation(&satcom_msg, db_order).await?;
                     }
                 }
                 SatComMessageType::RevisionRefusal => {

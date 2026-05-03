@@ -1,14 +1,30 @@
-import { useState } from "react";
-import type { BoatInfoRegistry } from "~/types";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import type { BoatInfoRegistry, StatisticsResult } from "~/types";
 
 interface MetricsProps {
     boats_info: BoatInfoRegistry;
 }
 
+const fetchStatistics = async (): Promise<StatisticsResult> => {
+    const res = await fetch("http://localhost:8000/get_statistics");
+    return res.json();
+};
+
 export function Metrics({ boats_info }: MetricsProps) {
     const [selectedBoat, setSelectedBoat] = useState(-1);
 
-    const selectedBoatInfo = boats_info.find(([id]) => id == selectedBoat)?.[1];
+    const selectedBoatInfo = useMemo(() => {
+        return boats_info.find(
+            (boatTuple) => boatTuple[1].static_data.mmsi === selectedBoat,
+        )?.[1];
+    }, [boats_info, selectedBoat]);
+
+    const { data, isLoading, error } = useQuery({
+        queryKey: ["statistics"],
+        queryFn: fetchStatistics,
+        refetchInterval: 5000,
+    });
 
     return (
         <div className="metrics-screen">
@@ -170,10 +186,20 @@ export function Metrics({ boats_info }: MetricsProps) {
             <div className="metrics-category statistics-container">
                 <p className="metrics-category-title">Statistiques</p>
                 <ul>
-                    <li>Taille de la flotte : 9</li>
-                    <li>Bateaux en activité : 5</li>
-                    <li>Nombre d'ordres de voyage : 1</li>
-                    <li>Taux de complétion : 0 %</li>
+                    <li>Taille de la flotte : {data?.boats_nbr}</li>
+                    <li>
+                        Bateaux en activité : {data?.active_boats_nbr} /{" "}
+                        {data?.boats_nbr}
+                    </li>
+                    <li>
+                        Bateaux ne répondant pas :{" "}
+                        {data?.unresponding_boats_nbr} / {data?.boats_nbr}
+                    </li>
+                    <li>Nombre d'ordres de voyage : {data?.orders_nbr}</li>
+                    <li>
+                        Ordres non attribués : {data?.free_orders_nbr} /{" "}
+                        {data?.orders_nbr}
+                    </li>
                 </ul>
             </div>
         </div>

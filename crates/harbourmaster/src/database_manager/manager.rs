@@ -306,6 +306,25 @@ impl DatabaseManager {
         }
     }
 
+    pub fn get_orders_count(&mut self) -> DatabaseManagerResult<usize> {
+        let count = VOYAGE_ORDERS::table
+            .count()
+            .get_result::<i64>(&mut self.connection)
+            .map_err(DatabaseManagerError::QueryError)?;
+
+        Ok(count as usize)
+    }
+
+    pub fn get_free_orders_count(&mut self) -> DatabaseManagerResult<usize> {
+        let count = VOYAGE_ORDERS::table
+            .filter(VOYAGE_ORDERS::executant.is_null())
+            .count()
+            .get_result::<i64>(&mut self.connection)
+            .map_err(DatabaseManagerError::QueryError)?;
+
+        Ok(count as usize)
+    }
+
     pub fn has_version(
         &mut self,
         voyage_order_id: i32,

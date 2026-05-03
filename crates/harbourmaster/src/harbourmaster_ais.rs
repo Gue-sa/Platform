@@ -78,7 +78,7 @@ impl HarbourmasterAisRunner {
             && IMPLEMENTED_MSGS.binary_search(msg.message_type()).is_ok()
         {
             if self.state.boats_registry.is_registered(&boat_mmsi) {
-                self.state.boats_registry.update(msg.boat_info())?;
+                self.state.boats_registry.update_from_ais_msg(&msg)?;
             } else {
                 self.state.boats_registry.register(msg.boat_info())?;
             }

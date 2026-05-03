@@ -3,7 +3,7 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::Serialize;
 
-#[derive(Queryable, Selectable, Serialize)]
+#[derive(Queryable, Selectable, Serialize, Debug)]
 #[diesel(table_name = DESTINATIONS)]
 #[diesel(belongs_to(ORDER_VERSIONS))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -22,7 +22,7 @@ pub struct DestinationInsertionModel<'a> {
     pub latitude: &'a i32,
 }
 
-#[derive(Queryable, Selectable, Serialize)]
+#[derive(Queryable, Selectable, Serialize, Debug)]
 #[diesel(table_name = VOYAGE_ORDERS)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct VoyageOrderQueryResult {
@@ -33,7 +33,7 @@ pub struct VoyageOrderQueryResult {
     pub current_version_number: i32,
 }
 
-#[derive(Queryable, Selectable, Serialize)]
+#[derive(Queryable, Selectable, Serialize, Debug)]
 #[diesel(table_name = ORDER_VERSIONS)]
 #[diesel(belongs_to(VOYAGE_ORDERS))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]

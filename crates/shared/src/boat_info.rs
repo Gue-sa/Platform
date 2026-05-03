@@ -1,8 +1,9 @@
 use crate::{
+    ais_message::AisMessage,
     bitpacker::BitPacker,
     common::{
-        errors::{BoatInfoError, BoatInfoResult},
-        types::AisField,
+        errors::{AisMessageError, BoatInfoError, BoatInfoResult},
+        types::{AisField, BoatStatus},
     },
 };
 use getset::{Getters, Setters};
@@ -171,6 +172,13 @@ impl BoatInfo {
             .clone())
     }
 
+    pub fn get_writeable_static_data(&self) -> BoatInfoResult<RwLockWriteGuard<'_, StaticData>> {
+        Ok(self
+            .static_data
+            .write()
+            .map_err(|_| BoatInfoError::StaticDataPoisoned)?)
+    }
+
     pub fn get_voyage_data(&self) -> BoatInfoResult<VoyageData> {
         Ok(self
             .voyage_data
@@ -260,6 +268,62 @@ impl BoatInfo {
         guard.eta_day = eta_day.unwrap_or(0);
         guard.eta_hour = eta_hour.unwrap_or(24);
         guard.eta_minute = eta_min.unwrap_or(60);
+
+        Ok(())
+    }
+
+    pub fn update_from_ais_msg(&mut self, msg: &AisMessage) -> BoatInfoResult<()> {
+        let mut static_data_guard = self.get_writeable_static_data()?;
+        let mut voyage_data_guard = self.get_writeable_voyage_data()?;
+        let mut nav_data_guard = self.get_writeable_navigation_data()?;
+
+        let msg_static_data = msg.boat_info().get_static_data()?;
+        let msg_voyage_data = msg.boat_info().get_voyage_data()?;
+        let msg_nav_data = msg.boat_info().get_navigation_data()?;
+
+        match *msg.message_type() {
+            1 | 2 | 3 => {
+                nav_data_guard.set_navigational_status(*msg_nav_data.navigational_status());
+                nav_data_guard.set_rate_of_turn(*msg_nav_data.rate_of_turn());
+                nav_data_guard.set_speed_over_ground(*msg_nav_data.speed_over_ground());
+                nav_data_guard.set_longitude(*msg_nav_data.longitude());
+                nav_data_guard.set_latitude(*msg_nav_data.latitude());
+                nav_data_guard.set_course_over_ground(*msg_nav_data.course_over_ground());
+                nav_data_guard.set_true_heading(*msg_nav_data.true_heading());
+                nav_data_guard.set_time_stamp(*msg_nav_data.time_stamp());
+                nav_data_guard
+                    .set_special_maneuvre_indicator(*msg_nav_data.special_maneuvre_indicator());
+
+                static_data_guard.set_position_accuracy(*msg_static_data.position_accuracy());
+
+                voyage_data_guard.set_raim_flag(*msg_voyage_data.raim_flag());
+            }
+            5 => {
+                static_data_guard.set_ais_version(*msg_static_data.ais_version());
+                static_data_guard.set_imo_number(*msg_static_data.imo_number());
+                static_data_guard.set_call_sign(msg_static_data.call_sign().clone());
+                static_data_guard.set_name(msg_static_data.name().clone());
+                static_data_guard.set_type_of_ship_and_cargo_type(
+                    *msg_static_data.type_of_ship_and_cargo_type(),
+                );
+                static_data_guard.set_a(*msg_static_data.a());
+                static_data_guard.set_b(*msg_static_data.b());
+                static_data_guard.set_c(*msg_static_data.c());
+                static_data_guard.set_d(*msg_static_data.d());
+                static_data_guard.set_type_of_epf_device(*msg_static_data.type_of_epf_device());
+
+                voyage_data_guard.set_eta_minute(*msg_voyage_data.eta_minute());
+                voyage_data_guard.set_eta_hour(*msg_voyage_data.eta_hour());
+                voyage_data_guard.set_eta_day(*msg_voyage_data.eta_day());
+                voyage_data_guard.set_eta_month(*msg_voyage_data.eta_month());
+                voyage_data_guard.set_maximum_present_static_draught(
+                    *msg_voyage_data.maximum_present_static_draught(),
+                );
+                voyage_data_guard.set_destination(msg_voyage_data.destination().clone());
+                voyage_data_guard.set_dte(*msg_voyage_data.dte());
+            }
+            _ => {}
+        }
 
         Ok(())
     }

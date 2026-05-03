@@ -23,9 +23,9 @@ pub struct HarbourmasterWebUi {
 
 impl HarbourmasterWebUi {
     pub async fn new() -> Self {
-        let app: Router = Router::new().fallback(get(HarbourmasterWebUi::serve_ui));
-        let addr: SocketAddr = SocketAddr::from(([0, 0, 0, 0], 3000));
-        let listener: TcpListener = TcpListener::bind(addr).await.unwrap();
+        let app = Router::new().fallback(get(HarbourmasterWebUi::serve_ui));
+        let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+        let listener = TcpListener::bind(addr).await.unwrap();
 
         Self {
             build: FrontendBuild,
@@ -36,7 +36,7 @@ impl HarbourmasterWebUi {
     }
 
     async fn serve_ui(uri: Uri) -> impl IntoResponse {
-        let mut path: String = uri.path().trim_start_matches('/').to_string();
+        let mut path = uri.path().trim_start_matches('/').to_string();
 
         if path.is_empty() {
             path = "index.html".to_string();

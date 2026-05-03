@@ -1,6 +1,6 @@
 use colored::Colorize;
 use opencv::{
-    core::{self, Moments, Point_, Scalar, Vector},
+    core::{self, AlgorithmHint::ALGO_HINT_DEFAULT, Scalar, Vector},
     imgproc::{
         CHAIN_APPROX_SIMPLE, COLOR_BGR2HSV, FONT_HERSHEY_SIMPLEX, LINE_8, MORPH_CLOSE, MORPH_RECT,
         RETR_EXTERNAL, approx_poly_dp, arc_length, bounding_rect, contour_area, cvt_color,
@@ -75,14 +75,14 @@ impl HarbourmasterGps {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement du satellite GPS...".yellow()));
 
-        let mut cam: VideoCapture = VideoCapture::new(
-            Config::load().unwrap().gps_cam_idx().unwrap() as i32,
+        let mut cam = VideoCapture::new(
+            Config::load().unwrap().gps_cam_idx().unwrap().into(),
             CAP_V4L2,
         )
         .unwrap();
 
-        let fourcc: i32 = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
-        cam.set(CAP_PROP_FOURCC, fourcc as f64).unwrap();
+        let fourcc = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
+        cam.set(CAP_PROP_FOURCC, fourcc.into()).unwrap();
 
         cam.set(CAP_PROP_FRAME_WIDTH, 1920.).unwrap();
         cam.set(CAP_PROP_FRAME_HEIGHT, 1080.).unwrap();
@@ -92,15 +92,15 @@ impl HarbourmasterGps {
         //cam.set(videoio::CAP_PROP_AUTO_EXPOSURE, 1.);
         //cam.set(CAP_PROP_EXPOSURE, -3.).unwrap();
 
-        let mut frame: Mat = Mat::default();
-        let mut flipped_frame: Mat = Mat::default();
-        let mut processed_mask: Mat = Mat::default();
-        let mut hsv: Mat = Mat::default();
+        let mut frame = Mat::default();
+        let mut flipped_frame = Mat::default();
+        let mut processed_mask = Mat::default();
+        let mut hsv = Mat::default();
 
-        let mut mask1: Mat = Mat::default();
-        let mut mask2: Mat = Mat::default();
+        let mut mask1 = Mat::default();
+        let mut mask2 = Mat::default();
 
-        let mut mask: Mat = Mat::default();
+        let mut mask = Mat::default();
 
         let mut contours: core::Vector<core::Vector<core::Point_<i32>>> =
             core::Vector::<core::Vector<core::Point>>::new();
@@ -109,7 +109,7 @@ impl HarbourmasterGps {
             get_structuring_element(MORPH_RECT, core::Size::new(5, 5), core::Point::new(-1, -1))
                 .unwrap();
 
-        let mut approx: Vector<Point_<i32>> = Vector::<core::Point>::new();
+        let mut approx = Vector::<core::Point>::new();
 
         loop {
             cam.read(&mut frame).unwrap();
@@ -119,23 +119,21 @@ impl HarbourmasterGps {
 
             core::flip(&frame, &mut flipped_frame, 1).unwrap();
 
-            #[cfg(feature = "arch-based")]
+            #[cfg(any(
+                feature = "arch-based",
+                feature = "rasp-based",
+                not(any(
+                    feature = "arch-based",
+                    feature = "rasp-based",
+                    feature = "debian-based"
+                ))
+            ))]
             cvt_color(
                 &flipped_frame,
                 &mut hsv,
                 COLOR_BGR2HSV,
                 0,
-                core::AlgorithmHint::ALGO_HINT_DEFAULT,
-            )
-            .unwrap();
-
-            #[cfg(feature = "rasp-based")]
-            cvt_color(
-                &flipped_frame,
-                &mut hsv,
-                COLOR_BGR2HSV,
-                0,
-                core::AlgorithmHint::ALGO_HINT_DEFAULT,
+                ALGO_HINT_DEFAULT,
             )
             .unwrap();
 
@@ -186,9 +184,9 @@ impl HarbourmasterGps {
             .unwrap();
 
             for contour in contours.iter() {
-                let area: f64 = contour_area(&contour, false).unwrap();
+                let area = contour_area(&contour, false).unwrap();
                 if area > 800.0 {
-                    let perimeter: f64 = arc_length(&contour, true).unwrap();
+                    let perimeter = arc_length(&contour, true).unwrap();
 
                     approx_poly_dp(&contour, &mut approx, 0.02 * perimeter, true).unwrap();
 
@@ -196,9 +194,9 @@ impl HarbourmasterGps {
                     if approx.len() == 4 && is_contour_convex(&approx).unwrap() {
                         let rect: core::Rect_<i32> = bounding_rect(&approx).unwrap();
 
-                        let moments: Moments = moments(&contour, false).unwrap();
-                        let mut center_x: u32 = 0;
-                        let mut center_y: u32 = 0;
+                        let moments = moments(&contour, false).unwrap();
+                        let mut center_x = 0;
+                        let mut center_y = 0;
 
                         if moments.m00 != 0.0 {
                             // Calcul du centre de masse (barycentre)
@@ -262,7 +260,7 @@ impl HarbourmasterGps {
                 Some(msg) = rx.recv() => {
                     self.logs_cli_tx().send(LogEvent::Gps(format!("Demande de positionnement GPS reçue : {:?}", msg.bits()).green()));
 
-                    let res: BitPacker = BitPacker::from_int(self.latitude.load(Ordering::Relaxed), Some(32)) + BitPacker::from_int(self.longitude.load(Ordering::Relaxed), Some(32)) + msg;
+                    let res = BitPacker::from_int(self.latitude.load(Ordering::Relaxed), Some(32)) + BitPacker::from_int(self.longitude.load(Ordering::Relaxed), Some(32)) + msg;
 
                     self.antenna_tx.send(res.clone()).await;
 
@@ -276,8 +274,8 @@ impl HarbourmasterGps {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement du GPS...".yellow()));
 
-        let listener_arc: Arc<HarbourmasterGps> = Arc::new(self);
-        let detect_and_send_arc: Arc<HarbourmasterGps> = listener_arc.clone();
+        let listener_arc = Arc::new(self);
+        let detect_and_send_arc = listener_arc.clone();
 
         (
             tokio::spawn(async move {

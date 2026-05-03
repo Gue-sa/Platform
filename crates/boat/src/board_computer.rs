@@ -108,7 +108,7 @@ impl BoardComputer {
             ),
         ));
 
-        let order_body: VoyageOrderBody = order.body();
+        let order_body = order.body();
 
         self.boat_info.update_voyage_data(
             Some(order_body.destination().to_string()),
@@ -183,7 +183,7 @@ impl BoardComputer {
         ));
 
         if !self.has_voyage() {
-            let voyage_order: &VoyageOrder = &satcom_msg
+            let voyage_order = &satcom_msg
                 .order()
                 .ok_or(BoardComputerError::NoVoyageOrder)?;
 
@@ -355,19 +355,19 @@ impl BoardComputer {
             "Lancement de l'ordinateur de bord...".yellow(),
         ));
 
-        let self_mmsi: u32 = *self.boat_info.get_static_data()?.mmsi();
+        let self_mmsi = *self.boat_info.get_static_data()?.mmsi();
 
         while let Some(satcom_msg) = self.rx.recv().await {
             if *satcom_msg.target() != self_mmsi || *satcom_msg.source() != HARBOURMASTER_MMSI {
                 continue;
             }
 
-            let concerns_current_voyage: bool = self
+            let concerns_current_voyage = self
                 .voyage
                 .as_ref()
                 .map_or(false, |v| v.order().header() == satcom_msg.order_header());
 
-            let concerns_current_rev: bool = self
+            let concerns_current_rev = self
                 .voyage_order_revision
                 .as_ref()
                 .map_or(false, |rev| rev.header() == satcom_msg.order_header());

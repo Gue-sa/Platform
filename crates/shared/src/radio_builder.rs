@@ -49,7 +49,7 @@ pub async fn build_radio(
     let (c_gps_tx, c_gps_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
     let (c_satcom_tx, c_satcom_rx) = channel::<BitPacker>(Semaphore::MAX_PERMITS);
 
-    let ant1: Antenna = Antenna::init(
+    let ant1 = Antenna::init(
         Some(ais_tx.clone()),
         None,
         None,
@@ -59,7 +59,7 @@ pub async fn build_radio(
         Channel::C87B,
     )
     .await?;
-    let ant2: Antenna = Antenna::init(
+    let ant2 = Antenna::init(
         Some(ais_tx),
         None,
         None,
@@ -69,7 +69,7 @@ pub async fn build_radio(
         Channel::C88B,
     )
     .await?;
-    let ant3: Antenna = Antenna::init(
+    let ant3 = Antenna::init(
         None,
         Some(gps_tx),
         None,
@@ -79,7 +79,7 @@ pub async fn build_radio(
         Channel::GPS,
     )
     .await?;
-    let ant4: Antenna = Antenna::init(
+    let ant4 = Antenna::init(
         None,
         None,
         Some(reader_satcom_tx),
@@ -90,7 +90,7 @@ pub async fn build_radio(
     )
     .await?;
 
-    let satcom: SatCom = SatCom::init(
+    let satcom = SatCom::init(
         reader_satcom_rx,
         sender_satcom_rx,
         c_satcom_tx,
@@ -99,7 +99,7 @@ pub async fn build_radio(
         mmsi,
     );
 
-    let boats_reg: Arc<BoatsInfoRegistry> = Arc::new(BoatsInfoRegistry::new());
+    let boats_reg = Arc::new(BoatsInfoRegistry::new());
 
     Ok((
         ais_rx,

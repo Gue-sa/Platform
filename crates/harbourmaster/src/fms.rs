@@ -2,7 +2,6 @@ use crate::database_manager::manager::DatabaseManager;
 use chrono::{Datelike, Timelike};
 use colored::Colorize;
 use shared::{
-    boat_info::BoatInfo,
     boats_registry::BoatsInfoRegistry,
     common::{
         constants::{FMS_UPDATE_SECS_INTERVAL, HARBOURMASTER_MMSI},
@@ -64,7 +63,7 @@ impl Fms {
         satcom_msg: &SatComMessage,
         msg_type: SatComMessageType,
     ) -> FmsResult<()> {
-        let msg: SatComMessage = SatComMessage::new(
+        let msg = SatComMessage::new(
             HARBOURMASTER_MMSI,
             *satcom_msg.source(),
             satcom_msg.order_header(),
@@ -103,12 +102,14 @@ impl Fms {
     }
 
     async fn run_order_dispatcher(&self) -> FmsResult<()> {
-        self.logs_cli_tx().send(LogEvent::System("Lancement du distributeur d'ordres...".yellow()));
+        self.logs_cli_tx().send(LogEvent::System(
+            "Lancement du distributeur d'ordres...".yellow(),
+        ));
 
         loop {
             self.clock_pulse.notified().await;
 
-            let unassigned_orders: Box<[VoyageOrder]> = self
+            let unassigned_orders = self
                 .database_manager
                 .lock()
                 .map_err(|_| FmsError::DatabaseManagerPoisoned)?
@@ -133,9 +134,9 @@ impl Fms {
 
                     VoyageOrder::from_components(order_header, order_body)
                 })
-                .collect();
+                .collect::<Box<[VoyageOrder]>>();
 
-            let free_boats_mmsis: Box<[u32]> = self
+            let free_boats_mmsis = self
                 .boats_registry
                 .export()
                 .iter()
@@ -151,7 +152,7 @@ impl Fms {
                 .into_boxed_slice();
 
             for i in 0..unassigned_orders.len().min(free_boats_mmsis.len()) {
-                let req: SatComMessage = SatComMessage::new(
+                let req = SatComMessage::new(
                     HARBOURMASTER_MMSI,
                     free_boats_mmsis[i],
                     unassigned_orders[i].header(),
@@ -161,11 +162,14 @@ impl Fms {
 
                 self.satcom_tx.send(req).await?;
 
-                self.logs_cli_tx.send(LogEvent::Computer(format!(
-                    "Offre pour l'ordre de voyage {} envoyée au bateau {}.",
-                    unassigned_orders[i].header().id(),
-                    free_boats_mmsis[i]
-                ).green()));
+                self.logs_cli_tx.send(LogEvent::Computer(
+                    format!(
+                        "Offre pour l'ordre de voyage {} envoyée au bateau {}.",
+                        unassigned_orders[i].header().id(),
+                        free_boats_mmsis[i]
+                    )
+                    .green(),
+                ));
             }
         }
     }
@@ -181,7 +185,7 @@ impl Fms {
     ) -> FmsResult<()> {
         self.update_associated_order_status(&satcom_msg, VoyageStatus::UnderRevision)?;
 
-        let concerned_boat_info: BoatInfo = self.boats_registry.get(*satcom_msg.source())?;
+        let concerned_boat_info = self.boats_registry.get(*satcom_msg.source())?;
 
         concerned_boat_info.update_voyage_data(
             Some(concerned_voyage_order.2.name.clone()),
@@ -281,11 +285,14 @@ impl Fms {
         )
         .await?;
 
-        self.logs_cli_tx.send(LogEvent::Computer(format!(
-            "Révision de l'ordre {} refusée par le bateau {}. Accusé de réception envoyé.",
-            *satcom_message.order_header().id(),
-            *satcom_message.source()
-        ).red()));
+        self.logs_cli_tx.send(LogEvent::Computer(
+            format!(
+                "Révision de l'ordre {} refusée par le bateau {}. Accusé de réception envoyé.",
+                *satcom_message.order_header().id(),
+                *satcom_message.source()
+            )
+            .red(),
+        ));
 
         Ok(())
     }
@@ -319,11 +326,14 @@ impl Fms {
         )
         .await?;
 
-        self.logs_cli_tx.send(LogEvent::Computer(format!(
-            "Ordre {} en cours d'exécution par le bateau {}. Accusé de réception envoyé.",
-            *satcom_msg.order_header().id(),
-            *satcom_msg.source()
-        ).green()));
+        self.logs_cli_tx.send(LogEvent::Computer(
+            format!(
+                "Ordre {} en cours d'exécution par le bateau {}. Accusé de réception envoyé.",
+                *satcom_msg.order_header().id(),
+                *satcom_msg.source()
+            )
+            .green(),
+        ));
 
         Ok(())
     }
@@ -336,11 +346,14 @@ impl Fms {
         )
         .await?;
 
-        self.logs_cli_tx.send(LogEvent::Computer(format!(
-            "Ordre {} achevé par le bateau {}. Notification de fin de voyage envoyée.",
-            *satcom_msg.order_header().id(),
-            *satcom_msg.source()
-        ).green()));
+        self.logs_cli_tx.send(LogEvent::Computer(
+            format!(
+                "Ordre {} achevé par le bateau {}. Notification de fin de voyage envoyée.",
+                *satcom_msg.order_header().id(),
+                *satcom_msg.source()
+            )
+            .green(),
+        ));
 
         Ok(())
     }
@@ -363,7 +376,8 @@ impl Fms {
     }
 
     async fn run_message_listener(&self) -> FmsResult<()> {
-        self.logs_cli_tx().send(LogEvent::System("Lancement de l'écoute FMS...".yellow()));
+        self.logs_cli_tx()
+            .send(LogEvent::System("Lancement de l'écoute FMS...".yellow()));
 
         while let Some(satcom_msg) = self.rx.lock().await.recv().await {
             if *satcom_msg.target() != HARBOURMASTER_MMSI {
@@ -393,8 +407,8 @@ impl Fms {
                 crate::database_manager::models::DestinationQueryResult,
             ) = &db_order_query_result[0];
 
-            let db_order_status: VoyageStatus = (db_order.0.status as u8).into();
-            let db_order_ver_nbr: u8 = db_order.0.current_version_number as u8;
+            let db_order_status = (db_order.0.status as u8).into();
+            let db_order_ver_nbr = db_order.0.current_version_number as u8;
 
             let db_order_rev: Option<
                 crate::database_manager::models::VoyageOrderVersionQueryResult,
@@ -404,17 +418,17 @@ impl Fms {
                 .map_err(|_| FmsError::DatabaseManagerPoisoned)?
                 .get_voyage_order_rev_ver(*satcom_msg.order_header().id() as i32)?;
 
-            let mut db_order_rev_ver_nbr: u8 = db_order_ver_nbr + 1;
+            let mut db_order_rev_ver_nbr = db_order_ver_nbr + 1;
 
             if let Some(v) = db_order_rev {
                 db_order_rev_ver_nbr = v.version_number as u8;
             }
 
-            let msg_ver: u8 = *satcom_msg.order_header().version();
+            let msg_ver = *satcom_msg.order_header().version();
 
-            let refers_current_ver: bool = msg_ver == db_order_ver_nbr
+            let refers_current_ver = msg_ver == db_order_ver_nbr
                 && Some(*satcom_msg.source() as i32) == db_order.0.executant;
-            let refers_rev_ver: bool = msg_ver == db_order_rev_ver_nbr
+            let refers_rev_ver = msg_ver == db_order_rev_ver_nbr
                 && Some(*satcom_msg.source() as i32) == db_order.0.executant;
 
             match satcom_msg.message_type() {
@@ -483,11 +497,12 @@ impl Fms {
     }
 
     pub fn start(self) -> (JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) {
-        self.logs_cli_tx().send(LogEvent::System("Lancement du FMS...".yellow()));
+        self.logs_cli_tx()
+            .send(LogEvent::System("Lancement du FMS...".yellow()));
 
-        let runner_arc: Arc<Self> = Arc::new(self);
-        let order_dispatcher_runer_arc: Arc<Self> = runner_arc.clone();
-        let clock_runner_arc: Arc<Self> = runner_arc.clone();
+        let runner_arc = Arc::new(self);
+        let order_dispatcher_runer_arc = runner_arc.clone();
+        let clock_runner_arc = runner_arc.clone();
 
         (
             tokio::spawn(async move {

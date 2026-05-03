@@ -52,12 +52,12 @@ impl SlotsMap {
                 }
             }
 
-            let ns_since_epoch: u128 = SystemTime::now()
+            let ns_since_epoch = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
 
-            let ns_until_next_min: u128 = 60_000_000_000 - (ns_since_epoch % 60_000_000_000);
+            let ns_until_next_min = 60_000_000_000 - (ns_since_epoch % 60_000_000_000);
 
             let start_instant: Instant =
                 Instant::now() + Duration::from_nanos(ns_until_next_min as u64);
@@ -172,19 +172,19 @@ impl SlotsMap {
     }
 
     pub fn si_offset(s0: Option<u16>, s1: u16) -> u16 {
-        let s0: u16 = s0.unwrap_or(SlotsMap::current_si(Channel::C87B));
+        let s0 = s0.unwrap_or(SlotsMap::current_si(Channel::C87B));
 
         (s1 % SLOTS_PER_MINUTE + SLOTS_PER_MINUTE - s0 % SLOTS_PER_MINUTE) % SLOTS_PER_MINUTE
     }
 
     pub fn absolute_si_distance(s0: Option<u16>, s1: u16) -> u16 {
-        let s0: u16 = s0.unwrap_or(SlotsMap::current_si(Channel::C87B));
+        let s0 = s0.unwrap_or(SlotsMap::current_si(Channel::C87B));
 
         (s0 % SLOTS_PER_MINUTE).abs_diff(s1 % SLOTS_PER_MINUTE)
     }
 
     pub fn offseted_si(si: u16, offset: u16) -> u16 {
-        let offseted_si: u16 = (si + offset) % SLOTS_PER_MINUTE;
+        let offseted_si = (si + offset) % SLOTS_PER_MINUTE;
 
         if si < SLOTS_PER_MINUTE {
             offseted_si
@@ -267,24 +267,24 @@ impl SlotsMap {
         slots_count: Option<u8>,
         chn: Channel,
     ) -> SlotsMapResult<Box<[u16]>> {
-        let len: u16 = len.unwrap_or(1);
-        let ref_si: u16 = ref_si.unwrap_or(SlotsMap::current_si(chn.clone()));
-        let end_si: u16 = SlotsMap::offseted_si(ref_si, len);
-        let ssi_count: u8 = slots_count.unwrap_or(1);
+        let len = len.unwrap_or(1);
+        let ref_si = ref_si.unwrap_or(SlotsMap::current_si(chn.clone()));
+        let end_si = SlotsMap::offseted_si(ref_si, len);
+        let ssi_count = slots_count.unwrap_or(1);
 
         match chn {
             Channel::C87B | Channel::C88B => {
-                let ssi_range: Box<[u16]> = self.ssi_range(ref_si, end_si, chn);
-                let available_ssi: Box<[u16]> = self.filter_available_ssi(&ssi_range)?;
+                let ssi_range = self.ssi_range(ref_si, end_si, chn);
+                let available_ssi = self.filter_available_ssi(&ssi_range)?;
 
                 Ok(available_ssi)
             }
             Channel::Any => {
-                let c87b_ssi_range: Box<[u16]> = self.ssi_range(ref_si, end_si, Channel::C87B);
-                let c88b_ssi_range: Box<[u16]> = self.ssi_range(ref_si, end_si, Channel::C88B);
+                let c87b_ssi_range = self.ssi_range(ref_si, end_si, Channel::C87B);
+                let c88b_ssi_range = self.ssi_range(ref_si, end_si, Channel::C88B);
 
-                let available_c87b_ssi: Box<[u16]> = self.filter_available_ssi(&c87b_ssi_range)?;
-                let available_c88b_ssi: Box<[u16]> = self.filter_available_ssi(&c88b_ssi_range)?;
+                let available_c87b_ssi = self.filter_available_ssi(&c87b_ssi_range)?;
+                let available_c88b_ssi = self.filter_available_ssi(&c88b_ssi_range)?;
 
                 let is_c87b_ssi_range_valid: bool =
                     available_c87b_ssi.len() >= 4.max(ssi_count as usize);
@@ -292,7 +292,7 @@ impl SlotsMap {
                     available_c88b_ssi.len() >= 4.max(ssi_count as usize);
 
                 if is_c87b_ssi_range_valid && is_c88b_ssi_range_valid {
-                    let chosen_chn: &Channel = [Channel::C87B, Channel::C88B]
+                    let chosen_chn = [Channel::C87B, Channel::C88B]
                         .choose(&mut rand::rng())
                         .unwrap();
 

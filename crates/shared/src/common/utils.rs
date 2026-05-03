@@ -82,19 +82,19 @@ pub fn get_current_dt() -> DateTime<Local> {
 }
 
 pub fn get_timestamp(datetime: Option<DateTime<Local>>) -> i64 {
-    let datetime: DateTime<Local> = datetime.unwrap_or(Local::now());
+    let datetime = datetime.unwrap_or(Local::now());
     datetime.timestamp()
 }
 
 #[inline]
 pub fn dt_to_slots_idx(datetime: Option<DateTime<Local>>) -> [u16; 2] {
-    let dt: DateTime<Local> = datetime.unwrap_or(Local::now());
+    let dt = datetime.unwrap_or(Local::now());
 
-    let ns_since_min_start: u64 = (dt.second() as u64 * 1_000_000_000) + dt.nanosecond() as u64;
+    let ns_since_min_start = (dt.second() as u64 * 1_000_000_000) + dt.nanosecond() as u64;
 
-    let si: u16 = ((ns_since_min_start * 3) / 80_000_000) as u16;
+    let si = ((ns_since_min_start * 3) / 80_000_000) as u16;
 
-    let si: u16 = si.min(SLOTS_PER_MINUTE - 1);
+    let si = si.min(SLOTS_PER_MINUTE - 1);
 
     [si, si + SLOTS_PER_MINUTE]
 }

@@ -11,7 +11,7 @@ mod harbourmaster_web_ui;
 #[tokio::main]
 async fn main() -> () {
     if Config::load().is_some() {
-        let harbourmaster: Harbourmaster = Harbourmaster::init()
+        let harbourmaster = Harbourmaster::init()
             .await
             .expect("L'initialisation de la capitainerie a échoué");
 

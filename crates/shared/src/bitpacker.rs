@@ -17,8 +17,8 @@ impl Index<usize> for BitPacker {
     type Output = u8;
 
     fn index(&self, idx: usize) -> &Self::Output {
-        let byte_idx: usize = self.bits.len() - 1 - (idx >> 3);
-        let bit_idx: usize = idx & 7;
+        let byte_idx = self.bits.len() - 1 - (idx >> 3);
+        let bit_idx = idx & 7;
 
         if (self.bits[byte_idx] >> bit_idx) & 1 == 1 {
             &1
@@ -32,9 +32,9 @@ impl Add for BitPacker {
     type Output = BitPacker;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let bits_len: usize = self.bits_len + rhs.bits_len;
-        let bytes_len: usize = bits_len.div_ceil(8);
-        let mut bits: Vec<u8> = vec![0u8; bytes_len];
+        let bits_len = self.bits_len + rhs.bits_len;
+        let bytes_len = bits_len.div_ceil(8);
+        let mut bits = vec![0u8; bytes_len];
 
         let mut write = |idx: usize, bit: u8| {
             if bit == 1 {
@@ -58,7 +58,7 @@ impl Add for BitPacker {
 impl BitPacker {
     #[inline]
     fn get_bit_unchecked(&self, idx: usize) -> u8 {
-        let byte_idx: usize = self.bits.len() - 1 - (idx >> 3);
+        let byte_idx = self.bits.len() - 1 - (idx >> 3);
         (self.bits[byte_idx] >> (idx & 7)) & 1
     }
 
@@ -67,8 +67,8 @@ impl BitPacker {
             return Err(BitPackerError::IndexOutOfBounds);
         }
 
-        let byte_idx: usize = self.bits.len() - 1 - (idx >> 3);
-        let bit_idx: usize = idx & 7;
+        let byte_idx = self.bits.len() - 1 - (idx >> 3);
+        let bit_idx = idx & 7;
 
         if val == 1 {
             self.bits[byte_idx] |= 1 << bit_idx;
@@ -88,8 +88,8 @@ impl BitPacker {
             return Ok(());
         }
 
-        let start: usize = start_idx.unwrap_or(0);
-        let bits_to_write: usize = std::mem::size_of::<T2>() * 8 - val.leading_zeros() as usize;
+        let start = start_idx.unwrap_or(0);
+        let bits_to_write = std::mem::size_of::<T2>() * 8 - val.leading_zeros() as usize;
 
         for i in 0..bits_to_write {
             if ((val >> i) & T2::one()) == T2::one() {
@@ -111,14 +111,14 @@ impl BitPacker {
     }
 
     pub fn from_str(val: &str, bits_len: Option<usize>) -> Self {
-        let bits_len: usize = bits_len.unwrap_or(6 * val.len());
+        let bits_len = bits_len.unwrap_or(6 * val.len());
         let mut bitpacker = Self {
             bits: vec![0u8; bits_len.div_ceil(8)],
             bits_len,
         };
 
         for (i, c) in val.chars().enumerate() {
-            let ord: u8 = ord6(c.to_ascii_uppercase());
+            let ord = ord6(c.to_ascii_uppercase());
             let _ = bitpacker.write_bits(ord, Some(i * 6));
         }
         bitpacker
@@ -132,16 +132,16 @@ impl BitPacker {
     }
 
     pub fn slice(&self, start_idx: Option<usize>, end_idx: Option<usize>) -> BitPackerResult<Self> {
-        let start: usize = start_idx.unwrap_or(0);
-        let end: usize = end_idx.unwrap_or(self.bits_len.saturating_sub(1));
+        let start = start_idx.unwrap_or(0);
+        let end = end_idx.unwrap_or(self.bits_len.saturating_sub(1));
 
         if start >= self.bits_len || end >= self.bits_len {
             return Err(BitPackerError::IndexOutOfBounds);
         }
 
-        let slice_len: usize = end - start + 1;
-        let bytes_len: usize = slice_len.div_ceil(8);
-        let mut bits: Vec<u8> = vec![0u8; bytes_len];
+        let slice_len = end - start + 1;
+        let bytes_len = slice_len.div_ceil(8);
+        let mut bits = vec![0u8; bytes_len];
 
         for i in 0..slice_len {
             if self.get_bit_unchecked(start + i) == 1 {
@@ -157,8 +157,8 @@ impl BitPacker {
         start_idx: Option<usize>,
         end_idx: Option<usize>,
     ) -> BitPackerResult<T> {
-        let start: usize = start_idx.unwrap_or(0);
-        let end: usize = end_idx.unwrap_or(self.bits_len.saturating_sub(1));
+        let start = start_idx.unwrap_or(0);
+        let end = end_idx.unwrap_or(self.bits_len.saturating_sub(1));
 
         if start >= self.bits_len || end >= self.bits_len {
             return Err(BitPackerError::IndexOutOfBounds);
@@ -178,20 +178,20 @@ impl BitPacker {
         start_idx: Option<usize>,
         end_idx: Option<usize>,
     ) -> BitPackerResult<String> {
-        let start: usize = start_idx.unwrap_or(0);
-        let end: usize = end_idx.unwrap_or(self.bits_len.saturating_sub(1));
+        let start = start_idx.unwrap_or(0);
+        let end = end_idx.unwrap_or(self.bits_len.saturating_sub(1));
 
         if start >= self.bits_len || end >= self.bits_len {
             return Err(BitPackerError::IndexOutOfBounds);
         }
 
-        let len: usize = end - start + 1;
-        let num_chars: usize = len / 6;
+        let len = end - start + 1;
+        let num_chars = len / 6;
 
-        let mut extracted_str: String = String::with_capacity(num_chars);
+        let mut extracted_str = String::with_capacity(num_chars);
 
         for char_idx in 0..num_chars {
-            let mut chr_ord: u8 = 0;
+            let mut chr_ord = 0;
             let char_start = start + char_idx * 6;
 
             for bit_idx in 0..6 {

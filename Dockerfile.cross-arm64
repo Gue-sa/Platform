@@ -3,23 +3,24 @@ FROM ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main
 ENV PKG_CONFIG_ALLOW_CROSS=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN dpkg --add-architecture arm64 && \
+# 1. Ajout du dépôt "testing" (Trixie) pour accéder à OpenCV 4.10
+RUN echo "deb http://deb.debian.org/debian testing main" >> /etc/apt/sources.list && \
+    dpkg --add-architecture arm64 && \
     apt-get update && \
-    apt-get install -y --no-install-recommends \
+    # On force l'installation depuis 'testing' pour avoir la 4.10
+    apt-get install -y -t testing --no-install-recommends \
         pkg-config \
         clang \
         libclang-dev \
         libfontconfig1-dev:arm64 \
         libsqlite3-dev:arm64 \
-        libudev-dev:arm64
-
-RUN apt-get install -y --no-install-recommends \
+        libudev-dev:arm64 \
+        # Bibliothèques OpenCV 4.10
         libopencv-core-dev:arm64 \
         libopencv-imgproc-dev:arm64 \
         libopencv-videoio-dev:arm64 \
-        libopencv-highgui-dev:arm64
+        libopencv-highgui-dev:arm64 \
+        libopencv-dev:arm64
 
-RUN apt-get download libopencv-dev:arm64 && \
-    dpkg --force-all -i libopencv-dev_*.deb && \
-    rm libopencv-dev_*.deb && \
-    sed -i 's/^Libs:.*/Libs: -L${libdir} -lopencv_highgui -lopencv_videoio -lopencv_imgproc -lopencv_core/' /usr/lib/aarch64-linux-gnu/pkgconfig/opencv4.pc
+# 2. Configuration du chemin pour pkg-config (spécifique à l'architecture cible)
+ENV PKG_CONFIG_PATH_aarch64_unknown_linux_gnu=/usr/lib/aarch64-linux-gnu/pkgconfig

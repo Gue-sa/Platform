@@ -14,7 +14,7 @@ impl SerialDriver {
         }
     }
 
-    pub async fn start(self) -> () {
+    pub async fn start(self) {
         let ports: Vec<serialport::SerialPortInfo> = available_ports().unwrap();
 
         let port_name = ports

@@ -39,11 +39,11 @@ impl Slot {
         }
     }
 
-    pub fn flag_as_used(&mut self) -> () {
+    pub fn flag_as_used(&mut self) {
         self.frames_since_last_use = -1;
     }
 
-    pub fn book(&mut self, mmsi: u32, timeout: Option<u8>, is_assigned: bool) -> () {
+    pub fn book(&mut self, mmsi: u32, timeout: Option<u8>, is_assigned: bool) {
         if self.owner.is_none() {
             self.owner = Some(mmsi);
             self.timeout = timeout;
@@ -52,14 +52,14 @@ impl Slot {
         }
     }
 
-    pub fn release(&mut self) -> () {
+    pub fn release(&mut self) {
         self.owner = None;
         self.timeout = None;
         self.is_assigned = false;
         self.frames_since_last_use = -2;
     }
 
-    pub fn tick(&mut self) -> () {
+    pub fn tick(&mut self) {
         self.flag_as_used();
 
         if self.timeout.unwrap() == 0 {

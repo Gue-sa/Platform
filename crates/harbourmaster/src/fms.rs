@@ -51,7 +51,7 @@ impl Fms {
         self.logs_cli_tx.clone()
     }
 
-    async fn run_fms_master_clock(&self) -> () {
+    async fn run_fms_master_clock(&self) {
         loop {
             tokio::time::sleep(Duration::from_secs(FMS_UPDATE_SECS_INTERVAL)).await;
             self.clock_pulse.notify_waiters();

@@ -42,7 +42,7 @@ impl SystemState {
         *self.can_navigate.read().unwrap()
     }
 
-    pub fn stop_ais_emission(&self) -> () {
+    pub fn stop_ais_emission(&self) {
         let mut guard: RwLockWriteGuard<'_, bool> = self.ais_emission_on.write().unwrap();
         if *guard {
             *guard = false;
@@ -51,7 +51,7 @@ impl SystemState {
             .send(LogEvent::System("Emission AIS en cours.".yellow()));
     }
 
-    pub fn start_ais_emission(&self) -> () {
+    pub fn start_ais_emission(&self) {
         let mut guard: RwLockWriteGuard<'_, bool> = self.ais_emission_on.write().unwrap();
         if !*guard {
             *guard = true;
@@ -60,7 +60,7 @@ impl SystemState {
             .send(LogEvent::System("Emission AIS interrompue.".yellow()));
     }
 
-    pub fn stop_gps(&self) -> () {
+    pub fn stop_gps(&self) {
         let mut guard: RwLockWriteGuard<'_, bool> = self.gps_on.write().unwrap();
         if *guard {
             *guard = false;
@@ -68,7 +68,7 @@ impl SystemState {
         self.logs_cli_tx().send(LogEvent::System("GPS démarré.".yellow()));
     }
 
-    pub fn start_gps(&self) -> () {
+    pub fn start_gps(&self) {
         let mut guard: RwLockWriteGuard<'_, bool> = self.ais_emission_on.write().unwrap();
         if !*guard {
             *guard = true;
@@ -76,7 +76,7 @@ impl SystemState {
         self.logs_cli_tx().send(LogEvent::System("GPS éteint.".yellow()));
     }
 
-    pub fn start_navigation(&self) -> () {
+    pub fn start_navigation(&self) {
         let mut guard: RwLockWriteGuard<'_, bool> = self.can_navigate.write().unwrap();
         if *guard {
             *guard = false;
@@ -84,7 +84,7 @@ impl SystemState {
         self.logs_cli_tx().send(LogEvent::System("Navigation en cours.".yellow()));
     }
 
-    pub fn stop_navigation(&self) -> () {
+    pub fn stop_navigation(&self) {
         let mut guard: RwLockWriteGuard<'_, bool> = self.can_navigate.write().unwrap();
         if !*guard {
             *guard = true;

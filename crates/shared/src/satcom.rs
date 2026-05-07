@@ -37,7 +37,7 @@ impl SatCom {
         self.logs_cli_tx.clone()
     }
 
-    async fn satcom_runner(&mut self) -> () {
+    async fn satcom_runner(&mut self) {
         loop {
             tokio::select! {
                 Some(msg) = self.reader_rx.recv() => {

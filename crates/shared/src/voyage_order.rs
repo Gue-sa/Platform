@@ -134,7 +134,7 @@ impl VoyageOrder {
         self.header.id == order2.header.id && self.header.version > order2.header.version
     }
 
-    pub fn set_ver(&mut self, ver: u8) -> () {
+    pub fn set_ver(&mut self, ver: u8) {
         self.header.set_version(ver);
     }
 }

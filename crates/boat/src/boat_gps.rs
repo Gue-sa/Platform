@@ -37,7 +37,7 @@ impl BoatGps {
         self.logs_cli_tx.clone()
     }
 
-    async fn run_gps(&mut self) -> () {
+    async fn run_gps(&mut self) {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement du GPS...".yellow()));
 

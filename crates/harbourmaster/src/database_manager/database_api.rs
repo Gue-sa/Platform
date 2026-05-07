@@ -179,7 +179,7 @@ impl DatabaseApi {
     async fn create_voyage_order(
         State(shared_state): State<Arc<DatabaseApiSharedState>>,
         Json(payload): Json<CreateVoyageOrderPayload>,
-    ) -> () {
+    ) {
         let mut db_manager: std::sync::MutexGuard<'_, DatabaseManager> =
             shared_state.database_manager.lock().unwrap();
 

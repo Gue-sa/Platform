@@ -94,7 +94,7 @@ impl Config {
         }
     }
 
-    pub fn write(&self) -> () {
+    pub fn write(&self) {
         let content = toml::to_string_pretty(self).expect("Erreur de sérialisation");
         fs::write("config.toml", content).expect("Impossible de sauvegarder la configuration");
     }

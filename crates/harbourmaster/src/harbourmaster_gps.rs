@@ -74,7 +74,7 @@ impl HarbourmasterGps {
         self.longitude.store(lon, Ordering::Relaxed);
     }
 
-    async fn run_detect_and_send(&self) -> () {
+    async fn run_detect_and_send(&self) {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement du satellite GPS...".yellow()));
 
@@ -241,7 +241,7 @@ impl HarbourmasterGps {
         }
     }
 
-    async fn run_listener(&self) -> () {
+    async fn run_listener(&self) {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement de l'écoute GPS...".yellow()));
 

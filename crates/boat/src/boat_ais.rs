@@ -105,11 +105,11 @@ impl BoatAisState {
         &self.slots_map
     }
 
-    fn increase_t_counter(&self) -> () {
+    fn increase_t_counter(&self) {
         self.sotdma_t_counter.fetch_add(1, Relaxed);
     }
 
-    fn decrease_t_counter(&self) -> () {
+    fn decrease_t_counter(&self) {
         self.sotdma_t_counter.fetch_sub(1, Relaxed);
     }
 
@@ -623,7 +623,7 @@ impl BoatAisRunner {
         Ok(())
     }
 
-    fn sotdma_change_rr(&self) -> () {
+    fn sotdma_change_rr(&self) {
         todo!()
     }
 
@@ -678,7 +678,7 @@ impl BoatAisRunner {
         }
     }
 
-    async fn run_listeners(&self) -> () {
+    async fn run_listeners(&self) {
         self.logs_cli_tx().send(LogEvent::System(
             "Lancement de l'écoute de l'AIS...".yellow(),
         ));

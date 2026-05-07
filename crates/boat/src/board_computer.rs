@@ -77,7 +77,7 @@ impl BoardComputer {
         self.voyage.is_some()
     }
 
-    fn update_voyage(&mut self, new_voyage: Voyage) -> () {
+    fn update_voyage(&mut self, new_voyage: Voyage) {
         self.voyage = Some(new_voyage);
     }
 

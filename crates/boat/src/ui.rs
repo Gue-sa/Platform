@@ -50,7 +50,7 @@ impl Ui {
         }
     }
 
-    pub fn start(&self) -> () {
+    pub fn start(&self) {
         let ui_handle_clone = self.ui_handle.clone();
         let boat_info_arc = self.boat_info.clone();
 

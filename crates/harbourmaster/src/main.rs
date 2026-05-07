@@ -9,7 +9,7 @@ mod harbourmaster_gps;
 mod harbourmaster_web_ui;
 
 #[tokio::main]
-async fn main() -> () {
+async fn main() {
     if Config::load().is_some() {
         let harbourmaster = Harbourmaster::init()
             .await

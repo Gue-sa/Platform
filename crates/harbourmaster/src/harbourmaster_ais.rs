@@ -140,7 +140,7 @@ impl HarbourmasterAisRunner {
         Ok(msg)
     }
 
-    async fn run_listeners(&self) -> () {
+    async fn run_listeners(&self) {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement de l'écoute AIS...".yellow()));
 

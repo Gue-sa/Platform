@@ -77,13 +77,13 @@ fn find_term_config() -> Option<(&'static str, &'static [&'static str])> {
     None
 }
 
-fn clear_terminal() -> () {
+fn clear_terminal() {
     Command::new("clear")
         .status()
         .expect("\nImpossible de clear le terminal.\n");
 }
 
-fn display_banner() -> () {
+fn display_banner() {
     let has_server = matches!(fs::exists("server"), Ok(true));
     let has_harbourmaster = matches!(fs::exists("harbourmaster"), Ok(true));
     let has_boat = matches!(fs::exists("boat"), Ok(true));
@@ -109,7 +109,7 @@ fn display_banner() -> () {
     println!("{banner_msg}");
 }
 
-fn setup_vhosts() -> () {
+fn setup_vhosts() {
     let mut child = Command::new("bash")
         .arg("-s")
         .stdin(Stdio::piped())
@@ -137,7 +137,7 @@ fn are_logfiles_setup() -> bool {
     true
 }
 
-fn setup_logfiles() -> () {
+fn setup_logfiles() {
     let config = Config::default();
 
     let _ = config.log_files_names().iter().for_each(|logs_filename| {
@@ -224,7 +224,7 @@ fn bool_input(prompt: &str, pos: Option<&str>, neg: Option<&str>) -> bool {
         == 0
 }
 
-fn build_config() -> () {
+fn build_config() {
     let mut config = Config::default();
 
     let is_sim = bool_input(
@@ -342,7 +342,7 @@ fn probe_cam_idx() -> Option<u8> {
     }
 }
 
-fn change_settings() -> () {
+fn change_settings() {
     let config = Config::load().unwrap();
 
     let settings: [&str; 13] = [

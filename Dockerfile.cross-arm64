@@ -1,26 +1,58 @@
 FROM ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main
 
+# Configuration de l'environnement
 ENV PKG_CONFIG_ALLOW_CROSS=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Ajout du dépôt "testing" (Trixie) pour accéder à OpenCV 4.10
-RUN echo "deb http://deb.debian.org/debian testing main" >> /etc/apt/sources.list && \
-    dpkg --add-architecture arm64 && \
+RUN dpkg --add-architecture arm64 && \
     apt-get update && \
-    # On force l'installation depuis 'testing' pour avoir la 4.10
-    apt-get install -y -t testing --no-install-recommends \
+    apt-get install -y --no-install-recommends \
         pkg-config \
+        cmake \
+        git \
+        make \
         clang \
+        llvm \
         libclang-dev \
+        libjpeg-dev:arm64 \
+        libpng-dev:arm64 \
+        libtiff-dev:arm64 \
         libfontconfig1-dev:arm64 \
         libsqlite3-dev:arm64 \
         libudev-dev:arm64 \
-        # Bibliothèques OpenCV 4.10
-        libopencv-core-dev:arm64 \
-        libopencv-imgproc-dev:arm64 \
-        libopencv-videoio-dev:arm64 \
-        libopencv-highgui-dev:arm64 \
-        libopencv-dev:arm64
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Configuration du chemin pour pkg-config (spécifique à l'architecture cible)
-ENV PKG_CONFIG_PATH_aarch64_unknown_linux_gnu=/usr/lib/aarch64-linux-gnu/pkgconfig
+RUN git clone --depth 1 --branch 4.10.0 https://github.com/opencv/opencv.git /tmp/opencv && \
+    mkdir -p /tmp/opencv/build && cd /tmp/opencv/build && \
+    cmake \
+        -D CMAKE_BUILD_TYPE=RELEASE \
+        -D CMAKE_INSTALL_PREFIX=/usr/aarch64-linux-gnu \
+        -D CMAKE_TOOLCHAIN_FILE=/tmp/opencv/platforms/linux/aarch64-gnu.toolchain.cmake \
+        -D BUILD_EXAMPLES=OFF \
+        -D BUILD_TESTS=OFF \
+        -D BUILD_PERF_TESTS=OFF \
+        -D WITH_GTK=OFF \
+        -D WITH_QT=OFF \
+        -D BUILD_opencv_python3=OFF \
+        -D BUILD_opencv_java=OFF \
+        -D BUILD_opencv_highgui=ON \
+        -D BUILD_opencv_videoio=ON \
+        -D BUILD_opencv_imgproc=ON \
+        -D BUILD_opencv_core=ON \
+        .. && \
+    make -j$(nproc) && \
+    make install && \
+    rm -rf /tmp/opencv
+
+ENV LIBCLANG_PATH=/usr/lib/x86_64-linux-gnu
+ENV LLVM_CONFIG_PATH=/usr/bin/llvm-config
+
+ENV PKG_CONFIG_PATH_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig
+ENV PKG_CONFIG_LIBDIR_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig
+
+ENV OpenCV_DIR=/usr/aarch64-linux-gnu/lib/cmake/opencv4
+ENV OPENCV_HEADER_DIR=/usr/aarch64-linux-gnu/include/opencv4
+ENV OPENCV_LINK_PATHS=/usr/aarch64-linux-gnu/lib
+ENV OPENCV_LINK_LIBS=opencv_highgui,opencv_videoio,opencv_imgproc,opencv_core
+
+ENV LD_LIBRARY_PATH_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu/lib

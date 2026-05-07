@@ -1,8 +1,7 @@
 use colored::Colorize;
 use opencv::{
     core::{
-        AlgorithmHint::ALGO_HINT_DEFAULT, BORDER_CONSTANT, Point, Point_, Rect_, Scalar, Size,
-        Vector, add, flip, in_range, no_array,
+        BORDER_CONSTANT, Point, Point_, Rect_, Scalar, Size, Vector, add, flip, in_range, no_array,
     },
     imgproc::{
         CHAIN_APPROX_SIMPLE, COLOR_BGR2HSV, FONT_HERSHEY_SIMPLEX, LINE_8, MORPH_CLOSE, MORPH_RECT,
@@ -122,7 +121,6 @@ impl HarbourmasterGps {
 
             #[cfg(any(
                 feature = "arch-based",
-                feature = "rasp-based",
                 not(any(
                     feature = "arch-based",
                     feature = "rasp-based",
@@ -134,11 +132,11 @@ impl HarbourmasterGps {
                 &mut hsv,
                 COLOR_BGR2HSV,
                 0,
-                ALGO_HINT_DEFAULT,
+                opencv::core::AlgorithmHint::ALGO_HINT_DEFAULT,
             )
             .unwrap();
 
-            #[cfg(feature = "debian-based")]
+            #[cfg(any(feature = "debian-based", feature = "rasp-based"))]
             cvt_color(&flipped_frame, &mut hsv, COLOR_BGR2HSV, 0).unwrap();
 
             in_range(

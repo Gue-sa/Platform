@@ -428,7 +428,7 @@ impl BoardComputer {
         tokio::spawn(async move {
             let _ = self.run_board_computer().await;
 
-            self.logs_cli_tx().send(LogEvent::System("L'ordinateur de bord s'est arrêté de façon innatendue. Veuillez le relancer manuellement.".red()));
+            self.logs_cli_tx().send(LogEvent::System("L'ordinateur de bord s'est arrêté de façon inattendue. Veuillez le relancer manuellement.".red()));
         })
     }
 }

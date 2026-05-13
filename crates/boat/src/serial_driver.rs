@@ -28,7 +28,7 @@ impl SerialDriver {
             })
             .unwrap();
 
-        let mut port = serialport::new(port_name, 115200)
+        let mut port = serialport::new(port_name, 115_200)
             .timeout(Duration::from_millis(100))
             .open()
             .unwrap();

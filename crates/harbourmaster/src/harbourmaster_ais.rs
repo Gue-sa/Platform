@@ -222,13 +222,13 @@ impl HarbourmasterAisRunner {
 
                 slots_map_cleanup_runner_arc
                     .logs_cli_tx()
-                    .send(LogEvent::System("Le daemon de nettoyage de la table des slots s'est arrêté de façon innatendue. Veuillez redémarrer l'AIS manuellement.".yellow()));
+                    .send(LogEvent::System("Le daemon de nettoyage de la table des slots s'est arrêté de façon inattendue. Veuillez redémarrer l'AIS manuellement.".yellow()));
             }),
             tokio::spawn(async move {
                 listeners_runner_arc.run_listeners().await;
 
                 listeners_runner_arc.logs_cli_tx()
-                    .send(LogEvent::System("L'écoute AIS s'est arrêtée de façon innatendue. Veuillez redémarrer l'AIS manuellement.".yellow()));
+                    .send(LogEvent::System("L'écoute AIS s'est arrêtée de façon inattendue. Veuillez redémarrer l'AIS manuellement.".yellow()));
             }),
         )
     }

@@ -372,14 +372,14 @@ impl AisMessage {
             message_type: message_type,
             boat_info: boat_info,
 
-            ramp_up_bits: BitPacker::from_int::<u8>(255, Some(8)),
-            sync_sequence: BitPacker::from_int::<u32>(5592405, Some(24)),
-            start_flag: BitPacker::from_int::<u8>(126, Some(8)),
+            ramp_up_bits: BitPacker::from_int::<u8>(0b11111111, Some(8)),
+            sync_sequence: BitPacker::from_int::<u32>(0b10101010101010101010101, Some(24)),
+            start_flag: BitPacker::from_int::<u8>(0b01111110, Some(8)),
             data: data,
             communication_state: communication_state,
             crc: BitPacker::from_int(crc, Some(16)),
-            end_flag: BitPacker::from_int::<u8>(126, Some(8)),
-            buffer: BitPacker::from_int::<u32>(8388607, Some(23)),
+            end_flag: BitPacker::from_int::<u8>(0b01111110, Some(8)),
+            buffer: BitPacker::from_int::<u32>(0b11111111111111111111111, Some(23)),
         })
     }
 
@@ -398,14 +398,14 @@ impl AisMessage {
             message_type: message_type,
             boat_info: boat_info.clone(),
 
-            ramp_up_bits: BitPacker::from_int::<u8>(255, Some(8)),
-            sync_sequence: BitPacker::from_int::<u32>(5592405, Some(24)),
-            start_flag: BitPacker::from_int::<u8>(126, Some(8)),
+            ramp_up_bits: BitPacker::from_int::<u8>(0b11111111, Some(8)),
+            sync_sequence: BitPacker::from_int::<u32>(0b10101010101010101010101, Some(24)),
+            start_flag: BitPacker::from_int::<u8>(0b01111110, Some(8)),
             data: data,
             communication_state: communication_state,
             crc: BitPacker::from_int(crc, Some(16)),
-            end_flag: BitPacker::from_int::<u8>(126, Some(8)),
-            buffer: BitPacker::from_int::<u32>(8388607, Some(23)),
+            end_flag: BitPacker::from_int::<u8>(0b01111110, Some(8)),
+            buffer: BitPacker::from_int::<u32>(0b11111111111111111111111, Some(23)),
         })
     }
 

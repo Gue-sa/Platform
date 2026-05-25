@@ -1,4 +1,4 @@
-use crate::voyage::Voyage;
+use crate::{navigator::Navigator, voyage::Voyage};
 use colored::*;
 use shared::{
     boat_info::BoatInfo,
@@ -24,6 +24,7 @@ pub struct BoardComputer {
     rx: Receiver<SatComMessage>,
     satcom_tx: Sender<SatComMessage>,
     voyage_order_revision: Option<VoyageOrder>,
+    navigator: Navigator,
     logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
 }
 
@@ -34,6 +35,7 @@ impl BoardComputer {
         voyage: Option<&Voyage>,
         rx: Receiver<SatComMessage>,
         satcom_tx: Sender<SatComMessage>,
+        navigator: Navigator,
         logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
     ) -> Self {
         Self {
@@ -43,6 +45,7 @@ impl BoardComputer {
             rx: rx,
             satcom_tx: satcom_tx,
             voyage_order_revision: None,
+            navigator: navigator,
             logs_cli_tx: logs_cli_tx,
         }
     }
@@ -249,6 +252,8 @@ impl BoardComputer {
         )
         .await?;
 
+        self.navigator.set_voyage(self.voyage.clone().unwrap());
+
         Ok(())
     }
 
@@ -347,6 +352,8 @@ impl BoardComputer {
         )
         .await?;
 
+        self.navigator.end_voyage();
+
         Ok(())
     }
 
@@ -424,6 +431,8 @@ impl BoardComputer {
     }
 
     pub fn start(mut self) -> JoinHandle<()> {
+        self.navigator.start();
+
         // ATTENTION : tout ce qui touche à la révision d'ordres de voyage en cours de route est très hasardeux, pour ne pas dire 0% fonctionnel.
         tokio::spawn(async move {
             let _ = self.run_board_computer().await;

@@ -1,7 +1,4 @@
-use std::{
-    net::{IpAddr, Ipv4Addr},
-    time::Duration,
-};
+use std::net::{IpAddr, Ipv4Addr};
 
 use crate::common::types::{AisField, AisMessageType};
 

@@ -403,7 +403,7 @@ fn change_settings() {
             }
         ),
         &format!(
-            "Modifier le délai entre les requêtes GPS bateau (valeur actuelle = {}s, défaut = 5s)",
+            "Modifier le délai entre les requêtes GPS bateau (valeur actuelle = {}s, défaut = 3s)",
             *config.gps_refresh_delay()
         ),
         &format!(

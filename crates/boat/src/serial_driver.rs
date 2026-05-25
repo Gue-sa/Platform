@@ -1,20 +1,67 @@
+use colored::Colorize;
+use getset::{Getters, Setters};
 use serialport::{SerialPortType, available_ports};
-use std::{thread, time::Duration};
+use shared::common::types::LogEvent;
+use slint::format;
+use std::{
+    sync::{Arc, RwLock},
+    thread::sleep,
+    time::Duration,
+};
+use tokio::task::JoinHandle;
+
+#[derive(Getters, Setters)]
+#[getset(get = "pub", set = "pub")]
+struct MotorsConfig {
+    left_motor_power_percentage: i8,
+    right_motor_percentage: i8,
+}
 
 pub struct SerialDriver {
-    //rx: Receiver<&str>,
-    //tx: Sender<&str>,
+    logs_cli_tx: std::sync::mpsc::Sender<LogEvent>,
+    motors_config: Arc<RwLock<MotorsConfig>>,
 }
 
 impl SerialDriver {
-    pub fn init(/*rx: Receiver<&str>, tx: Sender<&str>*/) -> Self {
-        SerialDriver {
-            //rx: rx,
-            //tx: tx,
+    pub fn init(logs_cli_tx: std::sync::mpsc::Sender<LogEvent>) -> Self {
+        Self {
+            motors_config: Arc::new(RwLock::new(MotorsConfig {
+                left_motor_power_percentage: 0,
+                right_motor_percentage: 0,
+            })),
+            logs_cli_tx: logs_cli_tx,
         }
     }
 
-    pub async fn start(self) {
+    pub fn change_motors_config(&mut self, left: Option<i8>, right: Option<i8>) {
+        if let Some(l) = left {
+            self.motors_config
+                .write()
+                .unwrap()
+                .set_left_motor_power_percentage(l);
+        }
+
+        if let Some(r) = right {
+            self.motors_config
+                .write()
+                .unwrap()
+                .set_right_motor_percentage(r);
+        }
+
+        self.logs_cli_tx.send(LogEvent::System(
+            format!(
+                "Nouvelle configuration moteurs: droit: {}%, gauche: {}%",
+                self.motors_config.read().unwrap().right_motor_percentage,
+                self.motors_config
+                    .read()
+                    .unwrap()
+                    .left_motor_power_percentage
+            )
+            .green(),
+        ));
+    }
+
+    pub fn start(&self) -> JoinHandle<()> {
         let ports: Vec<serialport::SerialPortInfo> = available_ports().unwrap();
 
         let port_name = ports
@@ -33,31 +80,25 @@ impl SerialDriver {
             .open()
             .unwrap();
 
+        let motors_config_clone = self.motors_config.clone();
+
         tokio::spawn(async move {
             loop {
-                port.write_all(b"1\n").unwrap();
-                println!("Avancer.");
+                let order = format!(
+                    "left-right {} {}",
+                    motors_config_clone
+                        .read()
+                        .unwrap()
+                        .left_motor_power_percentage(),
+                    motors_config_clone.read().unwrap().right_motor_percentage()
+                )
+                .to_string();
 
-                thread::sleep(Duration::from_secs(5));
+                port.write_all(order.as_bytes());
 
-                port.write_all(b"-1\n").unwrap();
-                println!("Reculer.");
-
-                thread::sleep(Duration::from_secs(5));
-
-                /*
-                port.write_all(b"01\n").unwrap();
-                println!("Droite.");
-
-                thread::sleep(Duration::from_secs(1));
-
-                port.write_all(b"00\n").unwrap();
-                println!("Gauche.");
-
-                thread::sleep(Duration::from_secs(1));
-                */
+                sleep(Duration::from_millis(100));
             }
-        });
+        })
 
         /*
         let mut buffer = vec![0; 32];
@@ -65,17 +106,5 @@ impl SerialDriver {
             println!("Reçu : {:?}", &buffer[..bytes_read]);
         }
         */
-    }
-
-    pub async fn set_speed(&mut self, speed: u16) {
-        //self.tx.send(format!("SPEED:{}", speed)).await.unwrap();
-    }
-
-    pub async fn set_heading(&mut self, heading: u16) {
-        //self.tx.send(format!("HEADING:{}", heading)).await.unwrap();
-    }
-
-    pub async fn cross_distance(&mut self, distance: u16) {
-        //self.tx.send(format!("CROSS_DISTANCE:{}", distance)).await.unwrap();
     }
 }

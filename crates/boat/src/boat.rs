@@ -1,6 +1,6 @@
 use crate::{
     board_computer::BoardComputer, boat_ais::BoatAisRunner, boat_gps::BoatGps,
-    systemstate::SystemState, ui::Ui,
+    navigator::Navigator, serial_driver::SerialDriver, systemstate::SystemState, ui::Ui,
 };
 use shared::{
     antenna::Antenna,
@@ -11,7 +11,7 @@ use shared::{
     radio_builder::build_radio,
     satcom::SatCom,
 };
-use std::sync::{Arc, mpsc::channel};
+use std::sync::{Arc, Mutex, mpsc::channel};
 use tokio::task::JoinHandle;
 
 pub struct Boat {
@@ -35,6 +35,7 @@ impl Boat {
         let boat_info_arc = Arc::new(BoatInfo::new(None, None, None));
 
         let (cli_tx, cli_rx) = channel::<LogEvent>();
+
         let cli = LogsCli::new(
             cli_rx,
             config.boat_sys_logs_filename(),
@@ -83,12 +84,23 @@ impl Boat {
             system_state_arc.clone(),
             cli_tx.clone(),
         );
+
+        let serial_driver = SerialDriver::init(cli_tx.clone());
+        let serial_driver_arc = Arc::new(Mutex::new(serial_driver));
+
+        let navigator = Navigator::init(
+            Arc::new(Mutex::new(None)),
+            serial_driver_arc.clone(),
+            boat_info_arc.clone(),
+        );
+
         let board_computer = BoardComputer::init(
             boat_info_arc.clone(),
             boats_reg_arc,
             voyage,
             board_computer_rx,
             sender_satcom_tx,
+            navigator,
             cli_tx.clone(),
         );
 
@@ -110,10 +122,10 @@ impl Boat {
     pub async fn start(self) -> BoatResult<()> {
         let config = Config::load().unwrap();
 
-        let _c87b_antenna_handle: JoinHandle<()> = self.c87b_antenna.start().await?;
-        let _c88b_antenna_handle: JoinHandle<()> = self.c88b_antenna.start().await?;
-        let _gps_antenna_handle: JoinHandle<()> = self.gps_antenna.start().await?;
-        let _satcom_antenna_handle: JoinHandle<()> = self.satcom_antenna.start().await?;
+        let _c87b_antenna_handle = self.c87b_antenna.start().await?;
+        let _c88b_antenna_handle = self.c88b_antenna.start().await?;
+        let _gps_antenna_handle = self.gps_antenna.start().await?;
+        let _satcom_antenna_handle = self.satcom_antenna.start().await?;
 
         let _gps_handle: Option<JoinHandle<()>> = if *config.gps_detection() {
             Some(self.gps.start())
@@ -121,16 +133,11 @@ impl Boat {
             None
         };
 
-        let _satcom_handle: JoinHandle<()> = self.satcom.start();
-        let _board_computer_handle: JoinHandle<()> = self.board_computer.start();
-        let _ais_handle: (
-            JoinHandle<()>,
-            JoinHandle<()>,
-            JoinHandle<()>,
-            JoinHandle<()>,
-        ) = self.ais.start();
+        let _satcom_handle = self.satcom.start();
+        let _board_computer_handle = self.board_computer.start();
+        let _ais_handle = self.ais.start();
 
-        let _logs_cli_handle: Option<JoinHandle<()>> = if *config.cli() {
+        let _logs_cli_handle = if *config.cli() {
             Some(self.logs_cli.run().unwrap())
         } else {
             None

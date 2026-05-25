@@ -5,6 +5,7 @@
 /crates/shared/target
 
 logs.log
+*.log
 todo
 */.env
 harbourmaster_database.db

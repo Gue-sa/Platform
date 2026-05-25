@@ -30,10 +30,7 @@ use std::{
     sync::mpsc::Receiver,
     time::Duration,
 };
-use tokio::{
-    task::JoinHandle,
-    time::{Interval, interval},
-};
+use tokio::{task::JoinHandle, time::interval};
 
 #[cfg(unix)]
 fn force_wake_launcher() {

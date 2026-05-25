@@ -55,7 +55,7 @@ impl Default for Config {
             api: true,
 
             gps_detection: true,
-            gps_refresh_delay: 5,
+            gps_refresh_delay: 3,
             gps_cam_idx: None,
 
             max_cli_logs_history_length: 1000,

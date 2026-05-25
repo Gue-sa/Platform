@@ -2,8 +2,8 @@ use crate::{
     ais_message::AisMessage,
     bitpacker::BitPacker,
     common::{
-        errors::{AisMessageError, BoatInfoError, BoatInfoResult},
-        types::{AisField, AisMessageType, BoatStatus},
+        errors::{BoatInfoError, BoatInfoResult},
+        types::{AisField, AisMessageType},
     },
 };
 use getset::{Getters, Setters};

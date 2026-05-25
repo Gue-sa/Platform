@@ -2,7 +2,7 @@ use crate::database_manager::manager::DatabaseManager;
 use chrono::{Datelike, Timelike};
 use colored::Colorize;
 use shared::{
-    boats_registry::{self, BoatsInfoRegistry},
+    boats_registry::BoatsInfoRegistry,
     common::{
         constants::{FMS_UPDATE_SECS_INTERVAL, HARBOURMASTER_MMSI},
         errors::{FmsError, FmsResult},

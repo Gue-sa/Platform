@@ -1,6 +1,6 @@
 use shared::config::Config;
 
-use crate::{boat::Boat, serial_driver::SerialDriver};
+use crate::boat::Boat;
 use std::thread;
 
 mod board_computer;
@@ -8,6 +8,7 @@ mod boat;
 mod boat_ais;
 mod boat_gps;
 mod common;
+mod navigator;
 mod serial_driver;
 mod systemstate;
 mod ui;

@@ -2,6 +2,7 @@ use getset::{CloneGetters, Getters, Setters};
 use shared::{common::types::VoyageStatus, voyage_order::VoyageOrder};
 
 #[derive(Debug, Clone, Getters)]
+#[getset(get = "pub")]
 pub struct VoyageSegment {
     navigational_status: u8,
     start_point: (u16, u16),
@@ -49,6 +50,51 @@ impl VoyageSegment {
             //minutes_duration: minutes_duration
         }
     }
+
+    pub fn distance_from_end(&self, p: (u16, u16)) -> u16 {
+        (((self.end_point.0 as i32 - p.0 as i32) ^ 2 + (self.end_point.1 as i32 - p.1 as i32) ^ 2)
+            as f64)
+            .sqrt() as u16
+    }
+
+    pub fn expected_lat(&self, lon: u16) -> u16 {
+        ((self.end_point.1 as f64 - self.start_point.1 as f64)
+            / (self.end_point.0 as f64 - self.start_point.0 as f64)
+            * (lon as f64))
+            .round() as u16
+            + self.start_point.0
+    }
+
+    pub fn expected_lon(&self, lat: u16) -> u16 {
+        ((self.end_point.0 as f64 - self.start_point.0 as f64)
+            / (self.end_point.1 as f64 - self.start_point.1 as f64)
+            * (lat as f64))
+            .round() as u16
+            + self.start_point.1
+    }
+
+    pub fn orthogonal_projection(&self, p: (u16, u16)) -> (u16, u16) {
+        let a = self.end_point.1 as f64 - self.start_point.1 as f64;
+        let b = self.start_point.0 as f64 - self.end_point.0 as f64;
+        let c = self.end_point.0 as f64 * self.start_point.1 as f64
+            - self.end_point.1 as f64 * self.start_point.0 as f64;
+
+        let x =
+            ((b * b * p.0 as f64 - a * b * p.1 as f64 - a * c) / (a * a + b * b)).round() as u16;
+        let y =
+            ((a * a * p.1 as f64 - a * b * p.0 as f64 - b * c) / (a * a + b * b)).round() as u16;
+
+        (x, y)
+    }
+
+    pub fn distance_from_route(&self, p: (u16, u16)) -> f64 {
+        let orth_proj = self.orthogonal_projection(p);
+        let dist = ((orth_proj.0 as i32 - p.0 as i32).pow(2) as f64
+            + (orth_proj.1 as i32 - p.1 as i32).pow(2) as f64)
+            .sqrt();
+
+        dist
+    }
 }
 
 impl Voyage {
@@ -68,8 +114,16 @@ impl Voyage {
         }
     }
 
-    pub fn next_segment(&mut self) -> &VoyageSegment {
-        self.current_segment += 1;
-        &self.segments[self.current_segment]
+    pub fn next_segment(&mut self) -> Option<&VoyageSegment> {
+        if self.segments.len() - 1 > self.current_segment {
+            self.current_segment += 1;
+            Some(&self.segments[self.current_segment])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_current_segment(&mut self) -> &VoyageSegment {
+        &mut self.segments[self.current_segment]
     }
 }

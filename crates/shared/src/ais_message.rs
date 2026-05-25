@@ -67,7 +67,7 @@ impl CommunicationState {
         nbr_of_slots: Option<u8>,
         keep_flag: Option<bool>,
     ) -> Self {
-        CommunicationState {
+        Self {
             communication_state_type: if SOTDMA_CS_MSGS.binary_search(&msg_type).is_ok() {
                 CSType::SOTDMA
             } else {

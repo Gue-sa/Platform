@@ -226,11 +226,12 @@ impl BoatInfo {
         Ok(())
     }
 
-    pub fn update_positon(&self, lat: Option<u32>, lon: Option<u32>) -> BoatInfoResult<()> {
+    pub fn update_positon(&self, lat: Option<u32>, lon: Option<u32>, heading: Option<u16>) -> BoatInfoResult<()> {
         let mut guard: RwLockWriteGuard<'_, NavigationData> =
             self.get_writeable_navigation_data()?;
         guard.latitude = lat.unwrap_or(0);
         guard.longitude = lon.unwrap_or(0);
+        guard.true_heading = heading.unwrap_or(0);
 
         Ok(())
     }

@@ -5,19 +5,49 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         pkg-config \
+        cmake \
+        git \
+        make \
         clang \
+        llvm \
         libclang-dev \
+        libjpeg-dev \
+        libpng-dev \
+        libtiff-dev \
         libfontconfig1-dev \
         libsqlite3-dev \
-        libudev-dev
+        libudev-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get install -y --no-install-recommends \
-        libopencv-core-dev \
-        libopencv-imgproc-dev \
-        libopencv-videoio-dev \
-        libopencv-highgui-dev
+RUN git clone --depth 1 --branch 4.10.0 https://github.com/opencv/opencv.git /tmp/opencv && \
+    mkdir -p /tmp/opencv/build && cd /tmp/opencv/build && \
+    cmake \
+        -D CMAKE_BUILD_TYPE=RELEASE \
+        -D CMAKE_INSTALL_PREFIX=/usr/local \
+        -D BUILD_EXAMPLES=OFF \
+        -D BUILD_TESTS=OFF \
+        -D BUILD_PERF_TESTS=OFF \
+        -D WITH_GTK=OFF \
+        -D WITH_QT=OFF \
+        -D BUILD_opencv_python3=OFF \
+        -D BUILD_opencv_java=OFF \
+        -D BUILD_opencv_highgui=ON \
+        -D BUILD_opencv_videoio=ON \
+        -D BUILD_opencv_imgproc=ON \
+        -D BUILD_opencv_core=ON \
+        -D BUILD_opencv_objdetect=ON \
+        .. && \
+    make -j$(nproc) && \
+    make install && \
+    rm -rf /tmp/opencv
 
-RUN apt-get download libopencv-dev && \
-    dpkg --force-all -i libopencv-dev_*.deb && \
-    rm libopencv-dev_*.deb && \
-    sed -i 's/^Libs:.*/Libs: -L${libdir} -lopencv_highgui -lopencv_videoio -lopencv_imgproc -lopencv_core/' /usr/lib/x86_64-linux-gnu/pkgconfig/opencv4.pc
+ENV LIBCLANG_PATH=/usr/lib/x86_64-linux-gnu
+ENV LLVM_CONFIG_PATH=/usr/bin/llvm-config
+
+ENV OpenCV_DIR=/usr/local/lib/cmake/opencv4
+ENV OPENCV_HEADER_DIR=/usr/local/include/opencv4
+ENV OPENCV_LINK_PATHS=/usr/local/lib
+ENV OPENCV_LINK_LIBS=opencv_highgui,opencv_videoio,opencv_imgproc,opencv_core,opencv_objdetect
+
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH

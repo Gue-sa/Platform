@@ -39,6 +39,7 @@ RUN git clone --depth 1 --branch 4.10.0 https://github.com/opencv/opencv.git /tm
         -D BUILD_opencv_videoio=ON \
         -D BUILD_opencv_imgproc=ON \
         -D BUILD_opencv_core=ON \
+        -D BUILD_opencv_objdetect=ON \
         .. && \
     make -j$(nproc) && \
     make install && \
@@ -53,6 +54,6 @@ ENV PKG_CONFIG_LIBDIR_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu/lib/pkgco
 ENV OpenCV_DIR=/usr/aarch64-linux-gnu/lib/cmake/opencv4
 ENV OPENCV_HEADER_DIR=/usr/aarch64-linux-gnu/include/opencv4
 ENV OPENCV_LINK_PATHS=/usr/aarch64-linux-gnu/lib
-ENV OPENCV_LINK_LIBS=opencv_highgui,opencv_videoio,opencv_imgproc,opencv_core
+ENV OPENCV_LINK_LIBS=opencv_highgui,opencv_videoio,opencv_imgproc,opencv_core,opencv_objdetect
 
 ENV LD_LIBRARY_PATH_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu/lib

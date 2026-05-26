@@ -12,6 +12,7 @@ opencv = { version = "0.98.2", default-features = false, features = [
         "videoio",
         "imgproc",
         "highgui",
+        "objdetect"
 ] }
 rand = "0.10.1"
 tokio = { version = "1.51.0", features = ["full"] }

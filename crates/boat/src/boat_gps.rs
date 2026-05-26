@@ -48,10 +48,12 @@ impl BoatGps {
         loop {
             tokio::select! {
                 Some(msg) = self.rx.recv() => {
-                    if let Ok(latitude) = msg.extract_int::<u32>(None, Some(31)) && let Ok(longitude) = msg.extract_int::<u32>(Some(32), None) {
-                        let _ = self.boat_info.update_positon(Some(latitude), Some(longitude));
+                    if let Ok(heading) = msg.extract_int::<u32>(None, Some(31)) && let Ok(latitude) = msg.extract_int::<u32>(Some(32), Some(63)) && let Ok(longitude) = msg.extract_int::<u32>(Some(64), Some(95)) {
+                        let _ = self.boat_info.update_positon(Some(latitude), Some(longitude), Some(heading as u16));
 
-                        self.logs_cli_tx().send(LogEvent::Gps(format!("Position mise à jour depuis le GPS : ({latitude}, {longitude})").green()));
+                        self.logs_cli_tx().send(LogEvent::Gps(format!("Position mise à jour depuis le GPS : ({latitude}, {longitude}, {heading})°").green()));
+                    } else {
+                        self.logs_cli_tx().send(LogEvent::Gps(format!("Positionnement GPS malformé reçu : {}", msg.to_bin_str()).red()));
                     }
                 },
                 _ = interval.tick() => {

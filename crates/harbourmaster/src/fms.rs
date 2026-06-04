@@ -504,8 +504,9 @@ impl Fms {
         let runner_arc = Arc::new(self);
         let order_dispatcher_runer_arc = runner_arc.clone();
         let clock_runner_arc = runner_arc.clone();
+        let notification_arc = runner_arc.clone();
 
-        (
+        let handles = (
             tokio::spawn(async move {
                 clock_runner_arc.run_fms_master_clock().await;
             }),
@@ -525,6 +526,12 @@ impl Fms {
                         .red(),
                 ));
             }),
-        )
+        );
+
+        notification_arc.logs_cli_tx().send(LogEvent::System(
+            "FMS lancé.".yellow(),
+        ));
+
+        handles
     }
 }

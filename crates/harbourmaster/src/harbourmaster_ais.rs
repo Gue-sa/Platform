@@ -141,9 +141,6 @@ impl HarbourmasterAisRunner {
     }
 
     async fn run_listeners(&self) {
-        self.logs_cli_tx()
-            .send(LogEvent::System("Lancement de l'écoute AIS...".yellow()));
-
         loop {
             let pck_opt = {
                 let mut rx = self.ais_rx.lock().await;
@@ -205,15 +202,16 @@ impl HarbourmasterAisRunner {
         let listeners_runner_arc = Arc::new(self);
         let slots_map_cleanup_runner_arc: Arc<HarbourmasterAisRunner> =
             listeners_runner_arc.clone();
+        let notification_arc = listeners_runner_arc.clone();
 
-        slots_map_cleanup_runner_arc
-            .logs_cli_tx()
-            .send(LogEvent::System(
-                "Lancement du nettoyage automatique de la table des slots AIS...".yellow(),
-            ));
-
-        (
+        let handles = (
             tokio::spawn(async move {
+                slots_map_cleanup_runner_arc
+                    .logs_cli_tx()
+                    .send(LogEvent::System(
+                        "Lancement du nettoyage automatique de la table des slots AIS...".yellow(),
+                    ));
+
                 slots_map_cleanup_runner_arc
                     .state
                     .slots_map()
@@ -223,6 +221,12 @@ impl HarbourmasterAisRunner {
                 slots_map_cleanup_runner_arc
                     .logs_cli_tx()
                     .send(LogEvent::System("Le daemon de nettoyage de la table des slots s'est arrêté de façon inattendue. Veuillez redémarrer l'AIS manuellement.".yellow()));
+
+                slots_map_cleanup_runner_arc
+                    .logs_cli_tx()
+                    .send(LogEvent::System(
+                        "Nettoyage automatique de la table des slots AIS lancé.".yellow(),
+                    ));
             }),
             tokio::spawn(async move {
                 listeners_runner_arc.run_listeners().await;
@@ -230,6 +234,12 @@ impl HarbourmasterAisRunner {
                 listeners_runner_arc.logs_cli_tx()
                     .send(LogEvent::System("L'écoute AIS s'est arrêtée de façon inattendue. Veuillez redémarrer l'AIS manuellement.".yellow()));
             }),
-        )
+        );
+
+        notification_arc
+            .logs_cli_tx()
+            .send(LogEvent::System("AIS lancé.".yellow()));
+
+        handles
     }
 }

@@ -62,6 +62,12 @@ impl SerialDriver {
     }
 
     pub fn start(&self) -> JoinHandle<()> {
+        self.logs_cli_tx.send(LogEvent::System(
+            "Lancement de la communication série...".yellow(),
+        ));
+
+        let logs_cli_clone = self.logs_cli_tx.clone();
+
         let ports: Vec<serialport::SerialPortInfo> = available_ports().unwrap();
 
         let port_name = ports
@@ -82,9 +88,13 @@ impl SerialDriver {
 
         let motors_config_clone = self.motors_config.clone();
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
+            let mut order = String::new();
+
+            let mut prec_order = String::new();
+
             loop {
-                let order = format!(
+                order = format!(
                     "left-right {} {}",
                     motors_config_clone
                         .read()
@@ -94,11 +104,27 @@ impl SerialDriver {
                 )
                 .to_string();
 
-                port.write_all(order.as_bytes());
+                if order != prec_order {
+                    port.write_all(order.as_bytes());
 
-                sleep(Duration::from_millis(100));
+                    logs_cli_clone.send(LogEvent::System(
+                        format!(
+                            "Ordre lancé : left-right {} {}",
+                            motors_config_clone
+                                .read()
+                                .unwrap()
+                                .left_motor_power_percentage(),
+                            motors_config_clone.read().unwrap().right_motor_percentage()
+                        )
+                        .green(),
+                    ));
+
+                    prec_order = order;
+                }
+
+                sleep(Duration::from_millis(250));
             }
-        })
+        });
 
         /*
         let mut buffer = vec![0; 32];
@@ -106,5 +132,10 @@ impl SerialDriver {
             println!("Reçu : {:?}", &buffer[..bytes_read]);
         }
         */
+
+        self.logs_cli_tx
+            .send(LogEvent::System("Communication série lancée.".yellow()));
+
+        handle
     }
 }

@@ -38,6 +38,10 @@ impl SatCom {
     }
 
     async fn satcom_runner(&mut self) {
+        self.logs_cli_tx().send(LogEvent::System(
+            "Communications satellite lancées.".yellow(),
+        ));
+
         loop {
             tokio::select! {
                 Some(msg) = self.reader_rx.recv() => {
@@ -71,8 +75,10 @@ impl SatCom {
             "Démarrage des communications satellite (SatCom)...".yellow(),
         ));
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             self.satcom_runner().await;
-        })
+        });
+
+        handle
     }
 }

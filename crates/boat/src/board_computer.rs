@@ -364,6 +364,10 @@ impl BoardComputer {
 
         let self_mmsi = *self.boat_info.get_static_data()?.mmsi();
 
+        self.logs_cli_tx().send(LogEvent::System(
+            "Ordinateur de bord lancé.".yellow(),
+        ));
+
         while let Some(satcom_msg) = self.rx.recv().await {
             if *satcom_msg.target() != self_mmsi || *satcom_msg.source() != HARBOURMASTER_MMSI {
                 continue;

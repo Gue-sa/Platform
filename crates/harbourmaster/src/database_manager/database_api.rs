@@ -68,11 +68,13 @@ impl DatabaseApi {
     }
 
     pub async fn start(self) -> JoinHandle<()> {
-        self.state_arc
+        let notification_arc = self.state_arc.clone();
+
+        notification_arc
             .logs_cli_tx()
             .send(LogEvent::System("Lancement de l'API armateur...".yellow()));
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let api = Router::new()
                 .route("/", get(Self::welcome))
                 .route("/get_voyage_orders", get(Self::get_voyage_orders))
@@ -90,7 +92,13 @@ impl DatabaseApi {
             let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
 
             axum::serve(listener, api).await.unwrap();
-        })
+        });
+
+        notification_arc
+            .logs_cli_tx()
+            .send(LogEvent::System("API armateur lancée.".yellow()));
+
+        handle
     }
 
     async fn welcome() -> String {

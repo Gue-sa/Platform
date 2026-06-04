@@ -45,6 +45,9 @@ impl BoatGps {
             *Config::load().unwrap().gps_refresh_delay(),
         ));
 
+        self.logs_cli_tx()
+            .send(LogEvent::System("GPS lancé.".yellow()));
+
         loop {
             tokio::select! {
                 Some(msg) = self.rx.recv() => {

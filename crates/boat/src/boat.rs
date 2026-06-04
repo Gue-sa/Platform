@@ -92,6 +92,7 @@ impl Boat {
             Arc::new(Mutex::new(None)),
             serial_driver_arc.clone(),
             boat_info_arc.clone(),
+            cli_tx.clone(),
         );
 
         let board_computer = BoardComputer::init(

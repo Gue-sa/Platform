@@ -755,7 +755,7 @@ impl BoatAisRunner {
             "Lancement du nettoyage automatique de la table des slots AIS...".yellow(),
         ));
 
-        (
+        let handles = (
             tokio::spawn(async move {
                 let _ = slots_map_cleanup_runner_arc
                     .state
@@ -780,6 +780,12 @@ impl BoatAisRunner {
                 sotdma_runner_arc.logs_cli_tx().send(LogEvent::System("Le SOTDMA s'est arrêté de façon inattendue. Veuillez redémarrer l'AIS manuellement.".red()));
                 panic!();
             }),
-        )
+        );
+
+        runner_arc.logs_cli_tx().send(LogEvent::System(
+            "Nettoyage automatique de la table des slots AIS lancé.".yellow(),
+        ));
+
+        handles
     }
 }

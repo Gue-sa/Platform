@@ -1,9 +1,10 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc::Sender},
     time::Duration,
 };
 
-use shared::boat_info::BoatInfo;
+use colored::Colorize;
+use shared::{boat_info::BoatInfo, common::types::LogEvent};
 use tokio::{sync::Notify, time::sleep};
 
 use crate::{
@@ -27,6 +28,7 @@ pub struct Navigator {
     voyage: Arc<Mutex<Option<Voyage>>>,
     serial_driver: Arc<Mutex<SerialDriver>>,
     boat_info: Arc<BoatInfo>,
+    logs_cli: Sender<LogEvent>,
     state: NavigatorState,
 }
 
@@ -105,12 +107,14 @@ impl Navigator {
         voyage_opt: Arc<Mutex<Option<Voyage>>>,
         serial_driver: Arc<Mutex<SerialDriver>>,
         boat_info: Arc<BoatInfo>,
+        logs_cli: Sender<LogEvent>,
     ) -> Self {
         Self {
             voyage: voyage_opt,
             serial_driver: serial_driver,
             boat_info: boat_info,
             state: NavigatorState::new(),
+            logs_cli: logs_cli,
         }
     }
 
@@ -313,6 +317,9 @@ impl Navigator {
     }
 
     async fn run_voyage(&mut self) {
+        self.logs_cli
+            .send(LogEvent::System("Exécution du voyage...".yellow()));
+
         loop {
             if let Some(seg) = self.current_segment_info() {
                 self.turn_to_heading(*seg.heading()).await;
@@ -356,13 +363,23 @@ impl Navigator {
                         */
                     }
                 }
+
+                self.logs_cli
+                    .send(LogEvent::System("Exécution du voyage terminée.".yellow()));
             } else {
+                self.logs_cli.send(LogEvent::System(
+                    "Exécution du voyage terminée : aucun ordre de voyage en mémoire.".red(),
+                ));
+
                 return;
             }
         }
     }
 
     pub fn start(&self) {
+        self.logs_cli
+            .send(LogEvent::System("Lancement du navigateur...".yellow()));
+
         let mut self_clone = self.clone();
         let driver = self.serial_driver.clone();
 
@@ -379,5 +396,8 @@ impl Navigator {
                 }
             }
         });
+
+        self.logs_cli
+            .send(LogEvent::System("Navigateur lancé.".yellow()));
     }
 }

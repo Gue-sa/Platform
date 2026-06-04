@@ -17,7 +17,7 @@ use opencv::{
     },
     prelude::*,
     videoio::{
-        CAP_PROP_BUFFERSIZE, CAP_PROP_FOURCC, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH,
+        self, CAP_PROP_BUFFERSIZE, CAP_PROP_FOURCC, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH,
         CAP_V4L2, VideoCapture, VideoWriter,
     },
 };
@@ -81,7 +81,7 @@ impl HarbourmasterGps {
         self.longitude.store(lon, Ordering::Relaxed);
         self.heading.store(heading, Ordering::Relaxed);
     }
-    
+
     async fn run_detect_and_send(&self) {
         self.logs_cli_tx().send(LogEvent::System(
             "Lancement du satellite GPS (ArUco)...".yellow(),
@@ -92,6 +92,8 @@ impl HarbourmasterGps {
             CAP_V4L2,
         )
         .unwrap();
+
+        cam.set(videoio::CAP_PROP_AUTO_EXPOSURE, 1.0);
 
         let fourcc = VideoWriter::fourcc('M', 'J', 'P', 'G').unwrap();
         cam.set(CAP_PROP_FOURCC, fourcc.into()).unwrap();
@@ -123,7 +125,6 @@ impl HarbourmasterGps {
                 .detect_markers(&frame, &mut corners, &mut ids, &mut rejected)
                 .unwrap();
 
-            /*
             if !ids.is_empty() {
                 draw_detected_markers(
                     &mut frame,
@@ -133,7 +134,6 @@ impl HarbourmasterGps {
                 )
                 .unwrap();
             }
-            */
 
             opencv::core::flip(&frame, &mut flipped_frame, 1).unwrap();
 
@@ -175,7 +175,6 @@ impl HarbourmasterGps {
                         ])
                         .await;
 
-                    /*
                     put_text(
                         &mut flipped_frame,
                         &format!("ID: {} | Cap: {} deg", id, heading.round()),
@@ -188,15 +187,13 @@ impl HarbourmasterGps {
                         false,
                     )
                     .unwrap();
-                    */
                 }
             }
-            /*
+
             highgui::imshow("Tracking ArUco", &flipped_frame).unwrap();
             if highgui::wait_key(1).unwrap() == 'q' as i32 {
                 break;
             }
-            */
         }
     }
 
@@ -231,14 +228,21 @@ impl HarbourmasterGps {
 
         let listener_arc = Arc::new(self);
         let detect_and_send_arc = listener_arc.clone();
+        let notification_arc = listener_arc.clone();
 
-        (
+        let handles = (
             tokio::spawn(async move {
                 detect_and_send_arc.run_detect_and_send().await;
             }),
             tokio::spawn(async move {
                 listener_arc.run_listener().await;
             }),
-        )
+        );
+
+        notification_arc
+            .logs_cli_tx()
+            .send(LogEvent::System("GPS lancé.".yellow()));
+
+        handles
     }
 }

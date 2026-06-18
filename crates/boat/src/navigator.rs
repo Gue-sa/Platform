@@ -8,9 +8,20 @@ use shared::{boat_info::BoatInfo, common::types::LogEvent};
 use tokio::{sync::Notify, time::sleep};
 
 use crate::{
+    common::constants::{
+        ANGLE_UNCERTAINTY_RADIUS_MEDIUM, NAV_PARAMS_CHECK_DELAY,
+        POSITION_UNCERTAINTY_RADIUS_MEDIUM, ROUTE_CHECK_DELAY,
+    },
     serial_driver::SerialDriver,
     voyage::{Voyage, VoyageSegment},
 };
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
+enum RotationDirection {
+    Clockwise,
+    Anticlockwise,
+    Undefined,
+}
 
 #[derive(Clone)]
 struct NavigatorState {
@@ -50,20 +61,21 @@ impl NavigatorState {
             return self.heading_estimate;
         }
 
-        let mut estimated_heading = 0;
+        let mut estimated_heading = 0.0;
 
         for window in self.positions_history.windows(2) {
-            let (lat1, lon1) = window[0];
-            let (lat2, lon2) = window[1];
+            let (lon1, lat1) = window[0];
+            let (lon2, lat2) = window[1];
 
-            let window_heading = (lon2 as f64 - lon1 as f64)
-                .atan2(lat2 as f64 - lat1 as f64)
-                .to_degrees()
-                .round() as u16;
-            estimated_heading = (window_heading + estimated_heading) / 2;
+            let dx = lon2 as f64 - lon1 as f64;
+            let dy = lat2 as f64 - lat1 as f64;
+            let window_heading = dx.atan2(-dy).to_degrees();
+
+            let normalized = (window_heading + 360.0) % 360.0;
+            estimated_heading = (normalized + estimated_heading) / 2.0;
         }
 
-        estimated_heading
+        estimated_heading.round() as u16
     }
 
     fn calculate_speed_estimate(&self) -> u8 {
@@ -71,20 +83,20 @@ impl NavigatorState {
             return self.speed_estimate;
         }
 
-        let mut estimated_speed = 0;
+        let mut estimated_speed = 0.0;
 
         for window in self.positions_history.windows(2) {
-            let (lat1, lon1) = window[0];
-            let (lat2, lon2) = window[1];
+            let (lon1, lat1) = window[0]; // Correction (lon, lat)
+            let (lon2, lat2) = window[1];
 
-            let distance = (((lon2 as u16 - lon1 as u16) as f64).powf(2.)
-                + ((lat2 as u16 - lat1 as u16) as f64).powf(2.))
-            .sqrt();
+            let distance = (((lon2 as f64 - lon1 as f64).powf(2.)
+                + ((lat2 as f64 - lat1 as f64).powf(2.)))
+            .sqrt());
 
-            estimated_speed = ((distance as f64 / 0.001).round() as u8 + estimated_speed) / 2;
+            estimated_speed = (distance / 0.001 + estimated_speed) / 2.0;
         }
 
-        estimated_speed as u8
+        estimated_speed.round() as u8
     }
 
     pub fn update(&mut self, new_pos: (u16, u16)) {
@@ -94,11 +106,8 @@ impl NavigatorState {
             self.positions_history.remove(0);
         }
 
-        let new_heading_estimate = self.calculate_heading_estimate();
-        let new_speed_estimate = self.calculate_speed_estimate();
-
-        self.heading_estimate = new_heading_estimate;
-        self.speed_estimate = new_speed_estimate;
+        self.heading_estimate = self.calculate_heading_estimate();
+        self.speed_estimate = self.calculate_speed_estimate();
     }
 }
 
@@ -126,14 +135,14 @@ impl Navigator {
         tokio::spawn(async move {
             loop {
                 nav_params_check_pulse_clone.notify_waiters();
-                sleep(Duration::from_secs(3)).await;
+                sleep(Duration::from_millis(NAV_PARAMS_CHECK_DELAY)).await;
             }
         });
 
         tokio::spawn(async move {
             loop {
                 route_check_pulse_clone.notify_waiters();
-                sleep(Duration::from_millis(200)).await;
+                sleep(Duration::from_millis(ROUTE_CHECK_DELAY)).await;
             }
         });
 
@@ -169,33 +178,49 @@ impl Navigator {
     }
 
     async fn turn(&self, angle: i16) {
-        let target_heading =
-            (self.boat_info.get_navigation_data().unwrap().true_heading() + angle as u16) % 360;
+        let current = *self.boat_info.get_navigation_data().unwrap().true_heading() as i32;
+        let target_heading = (current + angle as i32).rem_euclid(360) as u16;
         self.turn_to_heading(target_heading).await;
     }
 
     async fn turn_to_heading(&self, heading: u16) {
-        let current_heading = *self.boat_info.get_navigation_data().unwrap().true_heading();
+        self.logs_cli.send(LogEvent::System(
+            format!("Rotation vers le cap {}°...", heading).yellow(),
+        ));
 
-        let diff = current_heading.abs_diff(heading);
+        let mut prec_factor = 0;
+        let mut factor = 0;
 
-        if diff < 5 {
-            return;
-        }
+        loop {
+            if self.is_on_heading(heading) {
+                self.stop();
+                self.logs_cli.send(LogEvent::System(
+                    format!("Cap {}° atteint.", heading).green(),
+                ));
+                return;
+            }
 
-        if (current_heading + 360 - heading) % 360 < 180 {
-            self.serial_driver
-                .lock()
-                .unwrap()
-                .change_motors_config(Some(-100), Some(100));
-        } else {
-            self.serial_driver
-                .lock()
-                .unwrap()
-                .change_motors_config(Some(100), Some(-100));
-        }
+            let current_heading = match self.boat_info.get_navigation_data() {
+                Ok(data) => *data.true_heading(),
+                Err(_) => {
+                    sleep(Duration::from_millis(NAV_PARAMS_CHECK_DELAY)).await;
+                    continue;
+                }
+            };
 
-        while !self.is_on_heading(heading) {
+            factor = (heading as i32 - current_heading as i32 + 540).rem_euclid(360) - 180;
+
+            let (left_speed, right_speed) = if factor > 0 { (-100, 100) } else { (100, -100) };
+
+            if prec_factor == 0 || prec_factor < 0 && factor > 0 || prec_factor > 0 && factor < 0 {
+                self.serial_driver
+                    .lock()
+                    .unwrap()
+                    .change_motors_config(Some(left_speed), Some(right_speed));
+
+                prec_factor = factor;
+            }
+
             sleep(Duration::from_millis(100)).await;
         }
     }
@@ -209,10 +234,12 @@ impl Navigator {
 
     fn is_on_course(&self) -> bool {
         let nav_data = self.boat_info.get_navigation_data().unwrap();
-        let (lat, lon) = (*nav_data.latitude() as u16, *nav_data.longitude() as u16);
+        let (lon, lat) = (*nav_data.longitude() as u16, *nav_data.latitude() as u16);
 
         if let Some(seg) = self.current_segment_info() {
-            return seg.distance_from_route((lat, lon)) < 50.;
+            return seg.distance_from_route((lon, lat))
+                <= POSITION_UNCERTAINTY_RADIUS_MEDIUM as f64
+                && self.is_on_heading(*seg.heading());
         }
 
         true
@@ -220,30 +247,40 @@ impl Navigator {
 
     fn los_guidance(&self) -> ((u16, u16), u16) {
         let nav_data = self.boat_info.get_navigation_data().unwrap();
-        let (current_lat, current_lon) =
-            (*nav_data.latitude() as u16, *nav_data.longitude() as u16);
+        let (current_lon, current_lat) =
+            (*nav_data.longitude() as u16, *nav_data.latitude() as u16);
 
         if let Some(seg) = self.current_segment_info() {
-            let (proj_lat, proj_lon) = seg.orthogonal_projection((current_lat, current_lon));
+            let (proj_lon, proj_lat) = seg.orthogonal_projection((current_lon, current_lat));
 
             let seg_heading_rad = (*seg.heading() as f64).to_radians();
             let lookahead_distance = 100.0;
 
             let trgt_lon = proj_lon as f64 + (lookahead_distance * seg_heading_rad.sin());
-            let trgt_lat = proj_lat as f64 + (lookahead_distance * seg_heading_rad.cos());
+            let trgt_lat = proj_lat as f64 - (lookahead_distance * seg_heading_rad.cos());
 
-            let trgt_heading = (trgt_lon - current_lon as f64)
-                .atan2(trgt_lat - current_lat as f64)
-                .to_degrees()
-                .round() as u16;
+            let dx = trgt_lon - current_lon as f64;
+            let dy = trgt_lat - current_lat as f64;
+            let trgt_heading_raw = dx.atan2(-dy).to_degrees();
+
+            let trgt_heading = ((trgt_heading_raw + 360.0) % 360.0).round() as u16;
 
             return (
-                (trgt_lat.round() as u16, trgt_lon.round() as u16),
+                (trgt_lon.round() as u16, trgt_lat.round() as u16),
                 trgt_heading,
             );
         }
 
-        ((current_lat, current_lon), 0)
+        ((current_lon, current_lat), 0)
+    }
+
+    fn has_reached_point(&self, p: (u16, u16)) -> bool {
+        let nav_data = self.boat_info.get_navigation_data().unwrap();
+        let (lon, lat) = (*nav_data.longitude() as i32, *nav_data.latitude() as i32);
+
+        let distance = (((lon - p.0 as i32).pow(2) + (lat - p.1 as i32).pow(2)) as f64).sqrt();
+
+        distance <= POSITION_UNCERTAINTY_RADIUS_MEDIUM as f64
     }
 
     async fn correct_course(&mut self) {
@@ -255,39 +292,25 @@ impl Navigator {
         self.go_forward();
 
         while !self.has_reached_point(trgt_pos) {
-            sleep(Duration::from_millis(200)).await;
+            sleep(Duration::from_millis(NAV_PARAMS_CHECK_DELAY)).await; // ATTENTION, C'EST DANGEREUX ! A TERME, IL FAUDRAIT JUSTE UPDATE LE VOYAGE AVEC LA MANOEUVRE DE CORRECTION, ET LAISSE LE NAVIGATEUR S'OCCUPER DE LA MANOEUVRE
         }
 
         self.stop();
 
         if let Some(seg) = self.current_segment_info() {
             self.turn_to_heading(*seg.heading()).await;
-
-            if !(seg.distance_from_end(trgt_pos) < 50) {
-                self.go_forward();
-            }
+            self.go_forward();
         }
 
         self.state.is_correcting_course = false;
     }
 
-    fn has_reached_point(&self, p: (u16, u16)) -> bool {
-        let nav_data = self.boat_info.get_navigation_data().unwrap();
-        let (lat, lon) = (*nav_data.latitude(), *nav_data.longitude());
-
-        let distance = ((((lon as u16 - p.0) as i32).pow(2) + ((lat as u16 - p.1) as i32).pow(2))
-            as f64)
-            .sqrt();
-
-        distance < 50.0
-    }
-
     fn is_on_heading(&self, heading: u16) -> bool {
         let current_heading = *self.boat_info.get_navigation_data().unwrap().true_heading();
-
         let diff = current_heading.abs_diff(heading);
+        let shortest_diff = if diff > 180 { 360 - diff } else { diff };
 
-        diff < 5
+        shortest_diff <= ANGLE_UNCERTAINTY_RADIUS_MEDIUM
     }
 
     fn current_segment_info(&self) -> Option<VoyageSegment> {
@@ -329,43 +352,42 @@ impl Navigator {
                     tokio::select! {
                         _ = self.state.nav_params_check_pulse.notified() => {
                             let nav_data = self.boat_info.get_navigation_data().unwrap();
-                            let (lat, lon) = (*nav_data.latitude() as u16, *nav_data.longitude() as u16);
-                            self.state.update((lat, lon));
+                            let (lon, lat) = (*nav_data.longitude() as u16, *nav_data.latitude() as u16);
+                            self.state.update((lon, lat));
                         },
                         _ = self.state.route_check_pulse.notified() => {
                             if !self.state.is_correcting_course {
                                 let dist_to_seg_end = self.distance_from_current_segment_end();
 
                                 match dist_to_seg_end {
-                                    Some(d) if d < 50 => {
+                                    Some(d) if d <= POSITION_UNCERTAINTY_RADIUS_MEDIUM => {
+                                        self.stop();
+
                                         let mut guard = self.voyage.lock().unwrap();
+
                                         if let Some(voyage) = guard.as_mut() {
                                             if voyage.next_segment().is_none() {
                                                 *guard = None;
-                                                return;
+
+                                                self.logs_cli
+                                                    .send(LogEvent::System("Exécution du voyage terminée.".yellow()));
                                             }
                                         }
                                         break;
                                     }
-                                    Some(_) => {}
-                                    None => return
-                                }
-
-                                if !self.is_on_course() {
-                                    self.correct_course().await;
+                                    Some(d) if d > POSITION_UNCERTAINTY_RADIUS_MEDIUM => {
+                                        if !self.is_on_course() {
+                                            self.correct_course().await;
+                                        }
+                                    }
+                                    Some(_) | None => {
+                                        self.stop();
+                                    }
                                 }
                             }
                         }
-                        /*,
-                        _ = self.state.obstacles_check_pulse.notified() => {
-                            todo!()
-                        }
-                        */
                     }
                 }
-
-                self.logs_cli
-                    .send(LogEvent::System("Exécution du voyage terminée.".yellow()));
             } else {
                 self.logs_cli.send(LogEvent::System(
                     "Exécution du voyage terminée : aucun ordre de voyage en mémoire.".red(),

@@ -34,27 +34,26 @@ impl VoyageSegment {
         .sqrt()
         .round() as u16;
 
-        let heading = (end_p.0 as f64 - start_p.0 as f64)
-            .atan2(end_p.1 as f64 - start_p.1 as f64)
-            .to_degrees()
-            .round() as u16;
-        //let minutes_duration = distance / target_speed;
+        let dx = end_p.0 as f64 - start_p.0 as f64;
+        let dy = end_p.1 as f64 - start_p.1 as f64;
+        let heading_raw = dx.atan2(-dy).to_degrees();
+
+        let heading = ((heading_raw + 360.0) % 360.0).round() as u16;
 
         Self {
             navigational_status: nav_status,
             start_point: start_p,
             end_point: end_p,
             distance: dist,
-            //target_speed: target_speed,
             heading: heading,
-            //minutes_duration: minutes_duration
         }
     }
 
     pub fn distance_from_end(&self, p: (u16, u16)) -> u16 {
-        (((self.end_point.0 as i32 - p.0 as i32) ^ 2 + (self.end_point.1 as i32 - p.1 as i32) ^ 2)
-            as f64)
-            .sqrt() as u16
+        ((((self.end_point.0 as i32 - p.0 as i32).pow(2)
+            + (self.end_point.1 as i32 - p.1 as i32).pow(2)) as f64)
+            .sqrt())
+        .round() as u16
     }
 
     pub fn expected_lat(&self, lon: u16) -> u16 {
@@ -88,12 +87,27 @@ impl VoyageSegment {
     }
 
     pub fn distance_from_route(&self, p: (u16, u16)) -> f64 {
-        let orth_proj = self.orthogonal_projection(p);
-        let dist = ((orth_proj.0 as i32 - p.0 as i32).pow(2) as f64
-            + (orth_proj.1 as i32 - p.1 as i32).pow(2) as f64)
-            .sqrt();
+        let px = p.0 as f64;
+        let py = p.1 as f64;
+        let x1 = self.start_point.0 as f64;
+        let y1 = self.start_point.1 as f64;
+        let x2 = self.end_point.0 as f64;
+        let y2 = self.end_point.1 as f64;
 
-        dist
+        let dx = x2 - x1;
+        let dy = y2 - y1;
+        let length_squared = dx * dx + dy * dy;
+
+        if length_squared == 0.0 {
+            return ((px - x1).powi(2) + (py - y1).powi(2)).sqrt();
+        }
+
+        let t = (((px - x1) * dx + (py - y1) * dy) / length_squared).clamp(0.0, 1.0);
+
+        let proj_x = x1 + t * dx;
+        let proj_y = y1 + t * dy;
+
+        ((px - proj_x).powi(2) + (py - proj_y).powi(2)).sqrt()
     }
 }
 

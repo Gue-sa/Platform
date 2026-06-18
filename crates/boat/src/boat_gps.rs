@@ -41,8 +41,9 @@ impl BoatGps {
         self.logs_cli_tx()
             .send(LogEvent::System("Lancement du GPS...".yellow()));
 
-        let mut interval = interval(Duration::from_secs(
-            *Config::load().unwrap().gps_refresh_delay(),
+        let mut interval = interval(Duration::from_millis(
+            //*Config::load().unwrap().gps_refresh_delay(),
+            100,
         ));
 
         self.logs_cli_tx()
@@ -60,7 +61,7 @@ impl BoatGps {
                     }
                 },
                 _ = interval.tick() => {
-                    let _ = self.antenna_tx.send(BitPacker::from_int(Ipv4Addr::to_bits(BOAT_IPV4), Some(32))).await;
+                    let _ = self.antenna_tx.send(BitPacker::from_int(u32::from_be_bytes(BOAT_IPV4.octets()), Some(32))).await;
 
                     self.logs_cli_tx().send(LogEvent::Gps("Demande de positionnement envoyée à la capitainerie.".green()));
                 }

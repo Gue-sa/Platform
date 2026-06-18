@@ -23,7 +23,7 @@ pub struct Boat {
     c88b_antenna: Antenna,
     gps_antenna: Antenna,
     satcom_antenna: Antenna,
-    ui: Ui,
+    ui: Option<Ui>,
     logs_cli: LogsCli,
     system_state: Arc<SystemState>,
 }
@@ -65,8 +65,12 @@ impl Boat {
         let system_state_arc = Arc::new(SystemState::new(cli_tx.clone()));
         let voyage = None;
 
-        let ui = Ui::init(boat_info_arc.clone());
+        let mut ui = None;
 
+        if *config.gui() {
+            ui = Some(Ui::init(boat_info_arc.clone()));
+        }
+        
         let ais = BoatAisRunner::init(
             ais_rx,
             c87b_tx,
@@ -145,7 +149,7 @@ impl Boat {
         };
 
         if *config.gui() {
-            self.ui.start();
+            self.ui.unwrap().start();
         };
 
         Ok(())

@@ -1,16 +1,8 @@
 use colored::Colorize;
 use opencv::{
-    core::{
-        BORDER_CONSTANT, Point, Point_, Point2f, Rect_, Scalar, Size, Vector, add, flip, in_range,
-        no_array,
-    },
+    core::{Point, Point2f, Scalar, Vector},
     highgui,
-    imgproc::{
-        CHAIN_APPROX_SIMPLE, COLOR_BGR2HSV, FONT_HERSHEY_SIMPLEX, LINE_8, MORPH_CLOSE, MORPH_RECT,
-        RETR_EXTERNAL, approx_poly_dp, arc_length, bounding_rect, contour_area, cvt_color,
-        find_contours, get_structuring_element, is_contour_convex, moments, morphology_ex,
-        put_text, rectangle,
-    },
+    imgproc::{FONT_HERSHEY_SIMPLEX, LINE_8, put_text},
     objdetect::{
         self, ArucoDetector, DetectorParameters, PredefinedDictionaryType, RefineParameters,
         draw_detected_markers, get_predefined_dictionary,

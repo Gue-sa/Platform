@@ -1,4 +1,18 @@
 use std::net::{IpAddr, Ipv4Addr};
 
-pub const BOAT_IPV4: Ipv4Addr = Ipv4Addr::new(10, 0, 0, 3);
+pub const BOAT_IPV4: Ipv4Addr = Ipv4Addr::new(10, 161, 91, 150);
 pub const BOAT_IPADDR: IpAddr = IpAddr::V4(BOAT_IPV4);
+
+pub const POSITION_UNCERTAINTY_RADIUS_BIG: u16 = 100;
+pub const POSITION_UNCERTAINTY_RADIUS_MEDIUM: u16 = 75;
+pub const POSITION_UNCERTAINTY_RADIUS_SMALL: u16 = 50;
+
+pub const ANGLE_UNCERTAINTY_RADIUS_BIG: u16 = 5;
+pub const ANGLE_UNCERTAINTY_RADIUS_MEDIUM: u16 = 3;
+pub const ANGLE_UNCERTAINTY_RADIUS_SMALL: u16 = 1;
+
+pub const ROUTE_CHECK_DELAY: u64 = 100;
+pub const NAV_PARAMS_CHECK_DELAY: u64 = 100;
+pub const HEADING_CORRECTION_CHECK_DELAY: u64 = 100;
+
+pub const GPS_REFRESH_DELAY: u64 = 100;

@@ -645,7 +645,7 @@ impl BoatAisRunner {
             self.logs_cli_tx()
                 .send(LogEvent::System("Entrée sur le réseau terminée.".yellow()));
             self.logs_cli_tx().send(LogEvent::System(
-                "Début de la première frame SOTMA...".yellow(),
+                "Début de la première frame SOTDMA...".yellow(),
             ));
 
             match self.sotdma_first_frame().await {

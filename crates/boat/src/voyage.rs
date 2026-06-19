@@ -36,7 +36,7 @@ impl VoyageSegment {
 
         let dx = end_p.0 as f64 - start_p.0 as f64;
         let dy = end_p.1 as f64 - start_p.1 as f64;
-        let heading_raw = dx.atan2(-dy).to_degrees();
+        let heading_raw = dx.atan2(dy).to_degrees();
 
         let heading = ((heading_raw + 360.0) % 360.0).round() as u16;
 
@@ -115,7 +115,7 @@ impl Voyage {
     pub fn from(voyage_order: VoyageOrder, current_pos: (u16, u16)) -> Self {
         let segment = VoyageSegment::new(
             0,
-            current_pos,
+            (current_pos.1, current_pos.0), //current_pos
             *voyage_order.body().destination_position(),
             0,
         );

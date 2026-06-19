@@ -9,19 +9,12 @@ use tokio::{sync::Notify, time::sleep};
 
 use crate::{
     common::constants::{
-        ANGLE_UNCERTAINTY_RADIUS_MEDIUM, NAV_PARAMS_CHECK_DELAY,
+        ANGLE_UNCERTAINTY_RADIUS_MEDIUM, HEADING_CORRECTION_CHECK_DELAY, NAV_PARAMS_CHECK_DELAY,
         POSITION_UNCERTAINTY_RADIUS_MEDIUM, ROUTE_CHECK_DELAY,
     },
     serial_driver::SerialDriver,
     voyage::{Voyage, VoyageSegment},
 };
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Hash)]
-enum RotationDirection {
-    Clockwise,
-    Anticlockwise,
-    Undefined,
-}
 
 #[derive(Clone)]
 struct NavigatorState {
@@ -40,7 +33,7 @@ pub struct Navigator {
     serial_driver: Arc<Mutex<SerialDriver>>,
     boat_info: Arc<BoatInfo>,
     logs_cli: Sender<LogEvent>,
-    state: NavigatorState,
+    state: Arc<Mutex<NavigatorState>>,
 }
 
 impl NavigatorState {
@@ -69,7 +62,7 @@ impl NavigatorState {
 
             let dx = lon2 as f64 - lon1 as f64;
             let dy = lat2 as f64 - lat1 as f64;
-            let window_heading = dx.atan2(-dy).to_degrees();
+            let window_heading = dx.atan2(dy).to_degrees();
 
             let normalized = (window_heading + 360.0) % 360.0;
             estimated_heading = (normalized + estimated_heading) / 2.0;
@@ -122,15 +115,17 @@ impl Navigator {
             voyage: voyage_opt,
             serial_driver: serial_driver,
             boat_info: boat_info,
-            state: NavigatorState::new(),
+            state: Arc::new(Mutex::new(NavigatorState::new())),
             logs_cli: logs_cli,
         }
     }
 
     fn run_navigator_master_clock(&self) {
-        let nav_params_check_pulse_clone = self.state.nav_params_check_pulse.clone();
-        let route_check_pulse_clone = self.state.route_check_pulse.clone();
-        let obstacles_check_pulse_clone = self.state.obstacles_check_pulse.clone();
+        let state = self.state.lock().unwrap();
+
+        let nav_params_check_pulse_clone = state.nav_params_check_pulse.clone();
+        let route_check_pulse_clone = state.route_check_pulse.clone();
+        let obstacles_check_pulse_clone = state.obstacles_check_pulse.clone();
 
         tokio::spawn(async move {
             loop {
@@ -221,7 +216,7 @@ impl Navigator {
                 prec_factor = factor;
             }
 
-            sleep(Duration::from_millis(100)).await;
+            sleep(Duration::from_millis(HEADING_CORRECTION_CHECK_DELAY)).await;
         }
     }
 
@@ -234,7 +229,7 @@ impl Navigator {
 
     fn is_on_course(&self) -> bool {
         let nav_data = self.boat_info.get_navigation_data().unwrap();
-        let (lon, lat) = (*nav_data.longitude() as u16, *nav_data.latitude() as u16);
+        let (lat, lon) = (*nav_data.longitude() as u16, *nav_data.latitude() as u16);
 
         if let Some(seg) = self.current_segment_info() {
             return seg.distance_from_route((lon, lat))
@@ -247,23 +242,47 @@ impl Navigator {
 
     fn los_guidance(&self) -> ((u16, u16), u16) {
         let nav_data = self.boat_info.get_navigation_data().unwrap();
-        let (current_lon, current_lat) =
+        let (current_lat, current_lon) =
             (*nav_data.longitude() as u16, *nav_data.latitude() as u16);
 
         if let Some(seg) = self.current_segment_info() {
-            let (proj_lon, proj_lat) = seg.orthogonal_projection((current_lon, current_lat));
+            let px = current_lon as f64;
+            let py = current_lat as f64;
 
-            let seg_heading_rad = (*seg.heading() as f64).to_radians();
-            let lookahead_distance = 100.0;
+            let x1 = seg.start_point().0 as f64;
+            let y1 = seg.start_point().1 as f64;
+            let x2 = seg.end_point().0 as f64;
+            let y2 = seg.end_point().1 as f64;
 
-            let trgt_lon = proj_lon as f64 + (lookahead_distance * seg_heading_rad.sin());
-            let trgt_lat = proj_lat as f64 - (lookahead_distance * seg_heading_rad.cos());
+            let dx = x2 - x1;
+            let dy = y2 - y1;
+            let length_squared = dx * dx + dy * dy;
 
-            let dx = trgt_lon - current_lon as f64;
-            let dy = trgt_lat - current_lat as f64;
-            let trgt_heading_raw = dx.atan2(-dy).to_degrees();
+            if length_squared == 0.0 {
+                return ((x2.round() as u16, y2.round() as u16), *seg.heading());
+            }
 
-            let trgt_heading = ((trgt_heading_raw + 360.0) % 360.0).round() as u16;
+            let t_proj = ((px - x1) * dx + (py - y1) * dy) / length_squared;
+
+            let t_lookahead = 100.0 / length_squared.sqrt();
+
+            let mut t_target = t_proj + t_lookahead;
+            if t_target > 1.0 {
+                t_target = 1.0;
+            }
+
+            let trgt_lon = x1 + t_target * dx;
+            let trgt_lat = y1 + t_target * dy;
+
+            let trgt_dx = trgt_lon - px;
+            let trgt_dy = trgt_lat - py;
+
+            let trgt_heading = if trgt_dx.abs() < 1.0 && trgt_dy.abs() < 1.0 {
+                *seg.heading()
+            } else {
+                let trgt_heading_raw = trgt_dx.atan2(trgt_dy).to_degrees();
+                ((trgt_heading_raw + 360.0) % 360.0).round() as u16
+            };
 
             return (
                 (trgt_lon.round() as u16, trgt_lat.round() as u16),
@@ -276,7 +295,7 @@ impl Navigator {
 
     fn has_reached_point(&self, p: (u16, u16)) -> bool {
         let nav_data = self.boat_info.get_navigation_data().unwrap();
-        let (lon, lat) = (*nav_data.longitude() as i32, *nav_data.latitude() as i32);
+        let (lat, lon) = (*nav_data.longitude() as i32, *nav_data.latitude() as i32);
 
         let distance = (((lon - p.0 as i32).pow(2) + (lat - p.1 as i32).pow(2)) as f64).sqrt();
 
@@ -284,7 +303,7 @@ impl Navigator {
     }
 
     async fn correct_course(&mut self) {
-        self.state.is_correcting_course = true;
+        self.state.lock().unwrap().is_correcting_course = true;
 
         let (trgt_pos, trgt_heading) = self.los_guidance();
 
@@ -302,7 +321,7 @@ impl Navigator {
             self.go_forward();
         }
 
-        self.state.is_correcting_course = false;
+        self.state.lock().unwrap().is_correcting_course = false;
     }
 
     fn is_on_heading(&self, heading: u16) -> bool {
@@ -329,7 +348,7 @@ impl Navigator {
                 Some(
                     voyage
                         .get_current_segment()
-                        .distance_from_end((*nav.longitude() as u16, *nav.latitude() as u16)),
+                        .distance_from_end((*nav.latitude() as u16, *nav.longitude() as u16)),
                 )
             } else {
                 None
@@ -348,15 +367,23 @@ impl Navigator {
                 self.turn_to_heading(*seg.heading()).await;
                 self.go_forward();
 
+                let (nav_pulse, route_pulse) = {
+                    let state = self.state.lock().unwrap();
+                    (
+                        state.nav_params_check_pulse.clone(),
+                        state.route_check_pulse.clone(),
+                    )
+                };
+
                 loop {
                     tokio::select! {
-                        _ = self.state.nav_params_check_pulse.notified() => {
+                        _ = nav_pulse.notified() => {
                             let nav_data = self.boat_info.get_navigation_data().unwrap();
                             let (lon, lat) = (*nav_data.longitude() as u16, *nav_data.latitude() as u16);
-                            self.state.update((lon, lat));
+                            self.state.lock().unwrap().update((lat, lon));
                         },
-                        _ = self.state.route_check_pulse.notified() => {
-                            if !self.state.is_correcting_course {
+                        _ = route_pulse.notified() => {
+                            if !self.state.lock().unwrap().is_correcting_course {
                                 let dist_to_seg_end = self.distance_from_current_segment_end();
 
                                 match dist_to_seg_end {
@@ -377,7 +404,11 @@ impl Navigator {
                                     }
                                     Some(d) if d > POSITION_UNCERTAINTY_RADIUS_MEDIUM => {
                                         if !self.is_on_course() {
-                                            self.correct_course().await;
+                                            let mut self_clone = self.clone();
+                                            
+                                            tokio::spawn(async move {
+                                                self_clone.correct_course().await;
+                                            });
                                         }
                                     }
                                     Some(_) | None => {
